@@ -165,6 +165,14 @@ function AFrameScene({
   const steelRidgeY = Math.max(steelBaseY + 0.5, geometry.ridgeHeight - steelInset);
   const leftSteelBaseX = -geometry.baseWidth / 2 + steelInset;
   const rightSteelBaseX = geometry.baseWidth / 2 - steelInset;
+  const frontHouseZ = -geometry.effectiveHouseDepth / 2;
+  const rearHouseZ = geometry.effectiveHouseDepth / 2;
+  const frontTerrainZ = -scenario.terrain.depth / 2;
+  const frontHouseDimensionZ = frontHouseZ - 0.55;
+  const frontUsefulDimensionZ = frontHouseZ - 1.05;
+  const frontUpperFloorDimensionZ = frontHouseZ - 1.45;
+  const frontHeightDimensionZ = frontHouseZ - 0.75;
+  const frontTerrainDimensionZ = frontTerrainZ - 0.55;
 
   return (
     <>
@@ -296,30 +304,34 @@ function AFrameScene({
 
       {toggles.dimensions ? (
         <group>
-          <Text position={[0, 0.25, geometry.effectiveHouseDepth / 2 + 0.65]} fontSize={0.35} color="#111827">
-            {`Casa ${geometry.baseWidth} m x ${geometry.effectiveHouseDepth} m`}
-          </Text>
-          <Text position={[0, geometry.ridgeHeight + 0.45, 0]} fontSize={0.35} color="#111827">
-            {`Cumeeira ${geometry.ridgeHeight} m`}
-          </Text>
-          <Text position={[0, 0.25, -scenario.terrain.depth / 2 - 0.6]} fontSize={0.32} color="#0f766e">
-            {`Lote ${scenario.terrain.width} m x ${scenario.terrain.depth} m`}
-          </Text>
+          {dimensionMode === "basic" ? (
+            <>
+              <Text position={[0, 0.25, frontHouseDimensionZ]} fontSize={0.35} color="#111827">
+                {`Casa ${geometry.baseWidth} m x ${geometry.effectiveHouseDepth} m`}
+              </Text>
+              <Text position={[0, geometry.ridgeHeight + 0.45, frontHeightDimensionZ]} fontSize={0.35} color="#111827">
+                {`Cumeeira ${geometry.ridgeHeight} m`}
+              </Text>
+              <Text position={[0, 0.25, frontTerrainDimensionZ]} fontSize={0.32} color="#0f766e">
+                {`Lote ${scenario.terrain.width} m x ${scenario.terrain.depth} m`}
+              </Text>
+            </>
+          ) : null}
           {dimensionMode === "detailed" ? (
             <>
               <DimensionLine
                 points={[
-                  [-geometry.baseWidth / 2, 0.16, geometry.effectiveHouseDepth / 2 + 0.4],
-                  [geometry.baseWidth / 2, 0.16, geometry.effectiveHouseDepth / 2 + 0.4],
+                  [-geometry.baseWidth / 2, 0.16, frontHouseDimensionZ],
+                  [geometry.baseWidth / 2, 0.16, frontHouseDimensionZ],
                 ]}
                 label={`Largura casa ${geometry.baseWidth} m`}
-                labelPosition={[0, 0.42, geometry.effectiveHouseDepth / 2 + 0.4]}
+                labelPosition={[0, 0.42, frontHouseDimensionZ]}
                 color="#111827"
               />
               <DimensionLine
                 points={[
-                  [geometry.baseWidth / 2 + 0.55, 0.16, -geometry.effectiveHouseDepth / 2],
-                  [geometry.baseWidth / 2 + 0.55, 0.16, geometry.effectiveHouseDepth / 2],
+                  [geometry.baseWidth / 2 + 0.55, 0.16, frontHouseZ],
+                  [geometry.baseWidth / 2 + 0.55, 0.16, rearHouseZ],
                 ]}
                 label={`Prof. ${geometry.effectiveHouseDepth} m`}
                 labelPosition={[geometry.baseWidth / 2 + 0.9, 0.45, 0]}
@@ -327,51 +339,51 @@ function AFrameScene({
               />
               <DimensionLine
                 points={[
-                  [-geometry.baseWidth / 2 - 0.55, 0.16, 0],
-                  [-geometry.baseWidth / 2 - 0.55, geometry.ridgeHeight, 0],
+                  [-geometry.baseWidth / 2 - 0.75, 0.16, frontHeightDimensionZ],
+                  [-geometry.baseWidth / 2 - 0.75, geometry.ridgeHeight, frontHeightDimensionZ],
                 ]}
                 label={`Altura ${geometry.ridgeHeight} m`}
-                labelPosition={[-geometry.baseWidth / 2 - 0.9, geometry.ridgeHeight / 2, 0]}
+                labelPosition={[-geometry.baseWidth / 2 - 1.15, geometry.ridgeHeight / 2, frontHeightDimensionZ]}
                 color="#7c2d12"
               />
               <DimensionLine
                 points={[
-                  [-geometry.groundUsefulWidth / 2, 0.18, -geometry.effectiveHouseDepth / 2 - 0.35],
-                  [geometry.groundUsefulWidth / 2, 0.18, -geometry.effectiveHouseDepth / 2 - 0.35],
+                  [-geometry.groundUsefulWidth / 2, 0.18, frontUsefulDimensionZ],
+                  [geometry.groundUsefulWidth / 2, 0.18, frontUsefulDimensionZ],
                 ]}
                 label={`Largura util terreo ${geometry.groundUsefulWidth} m`}
-                labelPosition={[0, 0.45, -geometry.effectiveHouseDepth / 2 - 0.35]}
+                labelPosition={[0, 0.45, frontUsefulDimensionZ]}
                 color="#15803d"
               />
               {geometry.upperFloorTotalArea > 0 ? (
                 <>
                   <DimensionLine
                     points={[
-                      [-geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, -geometry.effectiveHouseDepth / 2 + geometry.upperFloorDepth + 0.25],
-                      [geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, -geometry.effectiveHouseDepth / 2 + geometry.upperFloorDepth + 0.25],
+                      [-geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, frontUpperFloorDimensionZ],
+                      [geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, frontUpperFloorDimensionZ],
                     ]}
                     label={`Largura sup. ${geometry.upperFloorTotalWidth} m`}
-                    labelPosition={[0, scenario.aFrame.upperFloorLevelHeight + 0.5, -geometry.effectiveHouseDepth / 2 + geometry.upperFloorDepth + 0.25]}
+                    labelPosition={[0, scenario.aFrame.upperFloorLevelHeight + 0.5, frontUpperFloorDimensionZ]}
                     color="#92400e"
                   />
                   <DimensionLine
                     points={[
-                      [0, 0.16, -geometry.effectiveHouseDepth / 2 - 0.65],
-                      [0, scenario.aFrame.upperFloorLevelHeight, -geometry.effectiveHouseDepth / 2 - 0.65],
+                      [geometry.baseWidth / 2 + 1.1, 0.16, frontHeightDimensionZ],
+                      [geometry.baseWidth / 2 + 1.1, scenario.aFrame.upperFloorLevelHeight, frontHeightDimensionZ],
                     ]}
                     label={`Piso superior ${scenario.aFrame.upperFloorLevelHeight} m`}
-                    labelPosition={[0.75, scenario.aFrame.upperFloorLevelHeight / 2, -geometry.effectiveHouseDepth / 2 - 0.65]}
+                    labelPosition={[geometry.baseWidth / 2 + 1.75, scenario.aFrame.upperFloorLevelHeight / 2, frontHeightDimensionZ]}
                     color="#92400e"
                   />
                 </>
               ) : null}
               <DimensionLine
                 points={[
-                  [-scenario.terrain.width / 2, 0.08, scenario.terrain.depth / 2 + 0.45],
-                  [scenario.terrain.width / 2, 0.08, scenario.terrain.depth / 2 + 0.45],
+                  [-scenario.terrain.width / 2, 0.08, frontTerrainDimensionZ],
+                  [scenario.terrain.width / 2, 0.08, frontTerrainDimensionZ],
                 ]}
                 label={`Largura lote ${scenario.terrain.width} m`}
-                labelPosition={[0, 0.35, scenario.terrain.depth / 2 + 0.45]}
+                labelPosition={[0, 0.35, frontTerrainDimensionZ]}
                 color="#0f766e"
               />
               <DimensionLine
