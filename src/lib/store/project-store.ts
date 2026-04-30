@@ -5,6 +5,8 @@ import { persist } from "zustand/middleware";
 import { defaultProject } from "@/data/defaultProject";
 import type {
   AFrameInputs,
+  CustomMaterialProduct,
+  FoundationAssumptions,
   LocationData,
   PricingMeta,
   Project,
@@ -63,10 +65,12 @@ function normalizeProject(project: Project): Project {
     accessories: project.accessories?.length ? project.accessories : defaults.accessories,
     steelProfiles: project.steelProfiles?.length ? project.steelProfiles : defaults.steelProfiles,
     steelPriceSources: project.steelPriceSources?.length ? project.steelPriceSources : defaults.steelPriceSources,
+    customMaterials: project.customMaterials?.length ? project.customMaterials : defaults.customMaterials,
     suppliers: project.suppliers?.length ? project.suppliers : defaults.suppliers,
     structuralInputs: { ...defaults.structuralInputs, ...project.structuralInputs },
     materialAssumptions: { ...defaults.materialAssumptions, ...project.materialAssumptions },
     budgetAssumptions: { ...defaults.budgetAssumptions, ...project.budgetAssumptions },
+    foundationAssumptions: { ...defaults.foundationAssumptions, ...project.foundationAssumptions },
   };
 }
 
@@ -85,6 +89,9 @@ interface ProjectStore {
   updateScenarioSteelMode: (scenarioId: string, steelMode: Scenario["steelMode"]) => void;
   updatePanelProduct: (panelProductId: string, updates: Partial<Project["panelProducts"][number]>) => void;
   updateAccessory: (accessoryId: string, updates: Partial<Project["accessories"][number]>) => void;
+  updateCustomMaterial: (materialId: string, updates: Partial<CustomMaterialProduct>) => void;
+  addCustomMaterial: () => void;
+  deleteCustomMaterial: (materialId: string) => void;
   updateSteelProfile: (profileId: string, updates: Partial<SteelProfile>) => void;
   addCustomPanelProduct: () => void;
   deletePanelProduct: (panelProductId: string) => void;
@@ -94,6 +101,7 @@ interface ProjectStore {
   updateStructuralInputs: (updates: Partial<StructuralInputs>) => void;
   updateMaterialAssumptions: (updates: Partial<Project["materialAssumptions"]>) => void;
   updateBudgetAssumptions: (updates: Partial<Project["budgetAssumptions"]>) => void;
+  updateFoundationAssumptions: (updates: Partial<FoundationAssumptions>) => void;
   duplicateSelectedScenario: () => void;
   deleteScenario: (scenarioId: string) => void;
   importProject: (project: Project) => void;
@@ -166,6 +174,45 @@ export const useProjectStore = create<ProjectStore>()(
           project: {
             ...state.project,
             accessories: state.project.accessories.map((item) => (item.id === accessoryId ? { ...item, ...updates } : item)),
+          },
+        })),
+      updateCustomMaterial: (materialId, updates) =>
+        set((state) => ({
+          project: {
+            ...state.project,
+            customMaterials: state.project.customMaterials.map((item) => (item.id === materialId ? { ...item, ...updates } : item)),
+          },
+        })),
+      addCustomMaterial: () =>
+        set((state) => ({
+          project: {
+            ...state.project,
+            customMaterials: [
+              ...state.project.customMaterials,
+              {
+                id: `material-${Date.now()}`,
+                code: "NOVO-MATERIAL",
+                description: "Novo material para orcamento",
+                category: "other",
+                supplier: "A confirmar",
+                unit: "un",
+                quantity: 1,
+                lengthM: 1,
+                widthM: 1,
+                unitPriceBRL: undefined,
+                maxLengthM: undefined,
+                lengthIncrementM: 1,
+                enabled: true,
+                notes: "Ajustar descricao, medida, preco e fornecedor.",
+              },
+            ],
+          },
+        })),
+      deleteCustomMaterial: (materialId) =>
+        set((state) => ({
+          project: {
+            ...state.project,
+            customMaterials: state.project.customMaterials.filter((item) => item.id !== materialId),
           },
         })),
       updateSteelProfile: (profileId, updates) =>
@@ -258,6 +305,10 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           project: { ...state.project, budgetAssumptions: { ...state.project.budgetAssumptions, ...updates } },
         })),
+      updateFoundationAssumptions: (updates) =>
+        set((state) => ({
+          project: { ...state.project, foundationAssumptions: { ...state.project.foundationAssumptions, ...updates } },
+        })),
       duplicateSelectedScenario: () =>
         set((state) => {
           const selected = state.project.scenarios.find((scenario) => scenario.id === state.project.selectedScenarioId);
@@ -288,7 +339,7 @@ export const useProjectStore = create<ProjectStore>()(
     }),
     {
       name: "aframe-project-store",
-      version: 2,
+      version: 3,
       partialize: (state) => ({ project: state.project }),
       merge: (persisted, current) => {
         const persistedProject = (persisted as { project?: Project } | undefined)?.project;

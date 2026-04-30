@@ -2,6 +2,7 @@ import type { BudgetItem, BudgetSummary, MaterialLine, Project, Scenario, Struct
 import { calculateAFrameGeometry } from "./geometry";
 import { calculateMaterialList } from "./materials";
 import { estimateSteelStructure } from "./structure";
+import { estimateRadierFoundation } from "./foundation";
 
 const round = (value: number, decimals = 2) => {
   const factor = 10 ** decimals;
@@ -34,6 +35,7 @@ export function calculateBudget(project: Project, scenario: Scenario): BudgetSum
   const geometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
   const materialLines = calculateMaterialList(project, scenario);
   const structural: StructuralEstimate = estimateSteelStructure(project, scenario);
+  const foundation = estimateRadierFoundation(scenario, project.foundationAssumptions);
   const items: BudgetItem[] = materialLines.map(asBudgetItem);
   const panelPackageCostBRL = round(materialLines.filter((line) => line.category === "panels").reduce((sum, line) => sum + line.netTotalBRL, 0));
   const accessoriesCostBRL = round(
@@ -42,11 +44,8 @@ export function calculateBudget(project: Project, scenario: Scenario): BudgetSum
   const freightBRL = scenario.pricing.freightBRL;
   const steelStructureCostBRL = structural.estimatedCostBRL;
 
-  const civilPlaceholderBRL = round(
-    project.budgetAssumptions.foundationPlaceholderBRL +
-      project.budgetAssumptions.slabPlaceholderBRL +
-      project.budgetAssumptions.drainagePlaceholderBRL
-  );
+  const foundationCostBRL = project.foundationAssumptions.enabled ? foundation.totalBRL : 0;
+  const civilPlaceholderBRL = round(project.budgetAssumptions.foundationPlaceholderBRL + project.budgetAssumptions.slabPlaceholderBRL + project.budgetAssumptions.drainagePlaceholderBRL);
   const facadePlaceholderBRL = round(
     project.budgetAssumptions.frontFacadePlaceholderBRL +
       project.budgetAssumptions.rearClosurePlaceholderBRL +
@@ -68,6 +67,7 @@ export function calculateBudget(project: Project, scenario: Scenario): BudgetSum
       accessoriesCostBRL +
       freightBRL +
       steelStructureCostBRL +
+      foundationCostBRL +
       civilPlaceholderBRL +
       facadePlaceholderBRL +
       laborEquipmentBRL +
@@ -107,10 +107,11 @@ export function calculateBudget(project: Project, scenario: Scenario): BudgetSum
         : "Preco calculado com preco/kg cadastrado nos perfis; confirmar por cotacao formal.",
       requiresConfirmation: true,
     },
+    ...(project.foundationAssumptions.enabled ? foundation.items : []),
     {
       id: "civil-placeholder",
       category: "civil",
-      description: "Fundacao, radier/laje e drenagem - placeholders",
+      description: "Drenagem e complementos civis - placeholders",
       quantity: 1,
       unit: "lot",
       unitPriceBRL: civilPlaceholderBRL,
@@ -118,7 +119,7 @@ export function calculateBudget(project: Project, scenario: Scenario): BudgetSum
       discountBRL: 0,
       netTotalBRL: civilPlaceholderBRL,
       supplier: "A confirmar",
-      notes: "Nao inclui calculo de fundacao nem sondagem.",
+      notes: "Complemento editavel. Fundacao tipo radier com fibra e calculada em itens separados.",
       requiresConfirmation: true,
     },
     {
@@ -179,7 +180,7 @@ export function calculateBudget(project: Project, scenario: Scenario): BudgetSum
     }
   );
 
-  const warnings = [...geometry.warnings, ...structural.warnings];
+  const warnings = [...geometry.warnings, ...structural.warnings, ...foundation.warnings];
   if (isPriceStale(scenario.pricing.quoteDate, scenario.pricing.validDays)) {
     warnings.push({
       id: "price-stale",
@@ -195,6 +196,7 @@ export function calculateBudget(project: Project, scenario: Scenario): BudgetSum
     freightBRL,
     steelStructureCostBRL,
     civilPlaceholderBRL,
+    foundationCostBRL,
     laborEquipmentBRL,
     technicalLegalBRL,
     contingencyBRL,

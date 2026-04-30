@@ -5,7 +5,7 @@ import { formatCurrency } from "@/lib/format";
 
 export function BudgetCategoryChart({ data }: { data: Array<{ name: string; value: number }> }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" minWidth={320} minHeight={260}>
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />

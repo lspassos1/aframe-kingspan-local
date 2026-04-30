@@ -11,6 +11,8 @@ As quantidades sao recalculadas por profundidade, largura util do painel, compri
 
 Os produtos de catalogo usam opcoes finitas de comprimento, espessura e acabamento. O usuario so consegue editar livremente essas medidas no produto `Painel customizado / fornecedor a confirmar`.
 
+Materiais adicionais podem ser cadastrados na pagina `Materiais`. Para telhas/painéis com comprimento maximo definido, quando a medida informada ultrapassa o limite, o app divide a compra preliminar em pecas adicionais usando multiplo configuravel, por padrao 1 m.
+
 Itens sem preco confirmado, como massa vedante e acabamento lateral, aparecem como `confirmar fornecedor`.
 
 Frete e sempre separado.

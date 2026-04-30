@@ -69,19 +69,19 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r bg-sidebar px-4 py-5 lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r bg-sidebar/95 px-4 py-5 shadow-sm lg:block">
         <Link href="/dashboard" className="flex items-center gap-3 px-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
             <Ruler className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold">A-frame MVP</p>
-            <p className="text-xs text-muted-foreground">Pre-projeto local</p>
+            <p className="text-sm font-semibold">A-frame Estudo</p>
+            <p className="text-xs text-muted-foreground">pre-projeto local</p>
           </div>
         </Link>
         <Separator className="my-5" />
         <NavList />
-        <div className="absolute bottom-5 left-4 right-4 rounded-md border bg-background p-3 text-xs text-muted-foreground">
+        <div className="absolute bottom-5 left-4 right-4 rounded-md border bg-card/80 p-3 text-xs text-muted-foreground shadow-sm">
           <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
             <Wrench className="h-3.5 w-3.5" />
             Uso pessoal/local
@@ -92,7 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
           <Link href="/dashboard" className="font-semibold">
-            A-frame MVP
+            A-frame Estudo
           </Link>
           <Sheet>
             <SheetTrigger asChild>

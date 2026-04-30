@@ -16,6 +16,7 @@ import { useProjectStore } from "@/lib/store/project-store";
 import { coerceAFrameToPanel, getPanelExternalOptions, getPanelInternalOptions, getPanelLengthOptions } from "@/lib/panels";
 
 type ViewMode = "iso" | "top" | "front" | "rear" | "side" | "section";
+type DimensionMode = "basic" | "detailed";
 
 interface ToggleState {
   panels: boolean;
@@ -117,18 +118,41 @@ function SlopePlane({
   );
 }
 
+function DimensionLine({
+  points,
+  label,
+  labelPosition,
+  color = "#111827",
+}: {
+  points: Array<[number, number, number]>;
+  label: string;
+  labelPosition: [number, number, number];
+  color?: string;
+}) {
+  return (
+    <group>
+      <Line points={points} color={color} lineWidth={2} />
+      <Text position={labelPosition} fontSize={0.24} color={color} anchorX="center" anchorY="middle">
+        {label}
+      </Text>
+    </group>
+  );
+}
+
 function AFrameScene({
   project,
   scenario,
   toggles,
   view,
   panelOpacity,
+  dimensionMode,
 }: {
   project: Project;
   scenario: Scenario;
   toggles: ToggleState;
   view: ViewMode;
   panelOpacity: number;
+  dimensionMode: DimensionMode;
 }) {
   const geometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
   const panel = project.panelProducts.find((item) => item.id === scenario.panelProductId) ?? project.panelProducts[0];
@@ -280,6 +304,86 @@ function AFrameScene({
           <Text position={[0, 0.25, -scenario.terrain.depth / 2 - 0.6]} fontSize={0.32} color="#0f766e">
             {`Lote ${scenario.terrain.width} m x ${scenario.terrain.depth} m`}
           </Text>
+          {dimensionMode === "detailed" ? (
+            <>
+              <DimensionLine
+                points={[
+                  [-geometry.baseWidth / 2, 0.16, geometry.effectiveHouseDepth / 2 + 0.4],
+                  [geometry.baseWidth / 2, 0.16, geometry.effectiveHouseDepth / 2 + 0.4],
+                ]}
+                label={`Largura casa ${geometry.baseWidth} m`}
+                labelPosition={[0, 0.42, geometry.effectiveHouseDepth / 2 + 0.4]}
+                color="#111827"
+              />
+              <DimensionLine
+                points={[
+                  [geometry.baseWidth / 2 + 0.55, 0.16, -geometry.effectiveHouseDepth / 2],
+                  [geometry.baseWidth / 2 + 0.55, 0.16, geometry.effectiveHouseDepth / 2],
+                ]}
+                label={`Prof. ${geometry.effectiveHouseDepth} m`}
+                labelPosition={[geometry.baseWidth / 2 + 0.9, 0.45, 0]}
+                color="#111827"
+              />
+              <DimensionLine
+                points={[
+                  [-geometry.baseWidth / 2 - 0.55, 0.16, 0],
+                  [-geometry.baseWidth / 2 - 0.55, geometry.ridgeHeight, 0],
+                ]}
+                label={`Altura ${geometry.ridgeHeight} m`}
+                labelPosition={[-geometry.baseWidth / 2 - 0.9, geometry.ridgeHeight / 2, 0]}
+                color="#7c2d12"
+              />
+              <DimensionLine
+                points={[
+                  [-geometry.groundUsefulWidth / 2, 0.18, -geometry.effectiveHouseDepth / 2 - 0.35],
+                  [geometry.groundUsefulWidth / 2, 0.18, -geometry.effectiveHouseDepth / 2 - 0.35],
+                ]}
+                label={`Largura util terreo ${geometry.groundUsefulWidth} m`}
+                labelPosition={[0, 0.45, -geometry.effectiveHouseDepth / 2 - 0.35]}
+                color="#15803d"
+              />
+              {geometry.upperFloorTotalArea > 0 ? (
+                <>
+                  <DimensionLine
+                    points={[
+                      [-geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, -geometry.effectiveHouseDepth / 2 + geometry.upperFloorDepth + 0.25],
+                      [geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, -geometry.effectiveHouseDepth / 2 + geometry.upperFloorDepth + 0.25],
+                    ]}
+                    label={`Largura sup. ${geometry.upperFloorTotalWidth} m`}
+                    labelPosition={[0, scenario.aFrame.upperFloorLevelHeight + 0.5, -geometry.effectiveHouseDepth / 2 + geometry.upperFloorDepth + 0.25]}
+                    color="#92400e"
+                  />
+                  <DimensionLine
+                    points={[
+                      [0, 0.16, -geometry.effectiveHouseDepth / 2 - 0.65],
+                      [0, scenario.aFrame.upperFloorLevelHeight, -geometry.effectiveHouseDepth / 2 - 0.65],
+                    ]}
+                    label={`Piso superior ${scenario.aFrame.upperFloorLevelHeight} m`}
+                    labelPosition={[0.75, scenario.aFrame.upperFloorLevelHeight / 2, -geometry.effectiveHouseDepth / 2 - 0.65]}
+                    color="#92400e"
+                  />
+                </>
+              ) : null}
+              <DimensionLine
+                points={[
+                  [-scenario.terrain.width / 2, 0.08, scenario.terrain.depth / 2 + 0.45],
+                  [scenario.terrain.width / 2, 0.08, scenario.terrain.depth / 2 + 0.45],
+                ]}
+                label={`Largura lote ${scenario.terrain.width} m`}
+                labelPosition={[0, 0.35, scenario.terrain.depth / 2 + 0.45]}
+                color="#0f766e"
+              />
+              <DimensionLine
+                points={[
+                  [-scenario.terrain.width / 2 - 0.45, 0.08, -scenario.terrain.depth / 2],
+                  [-scenario.terrain.width / 2 - 0.45, 0.08, scenario.terrain.depth / 2],
+                ]}
+                label={`Prof. lote ${scenario.terrain.depth} m`}
+                labelPosition={[-scenario.terrain.width / 2 - 0.85, 0.35, 0]}
+                color="#0f766e"
+              />
+            </>
+          ) : null}
         </group>
       ) : null}
 
@@ -306,7 +410,9 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
   const [toggles, setToggles] = useState<ToggleState>(defaultToggles);
   const [view, setView] = useState<ViewMode>("iso");
   const [panelOpacity, setPanelOpacity] = useState(0.46);
+  const [dimensionMode, setDimensionMode] = useState<DimensionMode>("detailed");
   const updateScenarioAFrame = useProjectStore((state) => state.updateScenarioAFrame);
+  const updateScenarioTerrain = useProjectStore((state) => state.updateScenarioTerrain);
   const updateScenarioPanel = useProjectStore((state) => state.updateScenarioPanel);
   const panel = project.panelProducts.find((item) => item.id === scenario.panelProductId) ?? project.panelProducts[0];
   const lengthOptions = getPanelLengthOptions(panel);
@@ -317,6 +423,10 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
 
   const updateAFrame = (updates: Partial<Scenario["aFrame"]>) => {
     updateScenarioAFrame(scenario.id, { ...scenario.aFrame, ...updates });
+  };
+
+  const updateTerrain = (updates: Partial<Scenario["terrain"]>) => {
+    updateScenarioTerrain(scenario.id, { ...scenario.terrain, ...updates });
   };
 
   const selectPanel = (panelProductId: string) => {
@@ -339,10 +449,10 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-      <div className="min-h-[620px] overflow-hidden rounded-md border bg-slate-50">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-h-[680px] overflow-hidden rounded-md border bg-slate-50">
         <Canvas shadows camera={{ position: [18, 12, 18], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
-          <AFrameScene project={project} scenario={scenario} toggles={toggles} view={view} panelOpacity={panelOpacity} />
+          <AFrameScene project={project} scenario={scenario} toggles={toggles} view={view} panelOpacity={panelOpacity} dimensionMode={dimensionMode} />
         </Canvas>
       </div>
       <aside className="space-y-4">
@@ -415,6 +525,29 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
+                <Label>Prof. casa</Label>
+                <Input
+                  type="number"
+                  min={2}
+                  step={0.1}
+                  value={scenario.aFrame.houseDepth}
+                  onChange={(event) => updateAFrame({ houseDepth: Number(event.target.value), automaticDepth: false })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Altura util min.</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={2.3}
+                  step={0.05}
+                  value={scenario.aFrame.minimumUsefulHeight}
+                  onChange={(event) => updateAFrame({ minimumUsefulHeight: Number(event.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
                 <Label>Pav. superior</Label>
                 <Select
                   value={scenario.aFrame.upperFloorMode}
@@ -442,6 +575,62 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
                   onChange={(event) => updateAFrame({ upperFloorAreaPercent: Number(event.target.value) })}
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Altura piso superior</Label>
+                <Input
+                  type="number"
+                  min={1.8}
+                  max={5}
+                  step={0.05}
+                  value={scenario.aFrame.upperFloorLevelHeight}
+                  onChange={(event) => updateAFrame({ upperFloorLevelHeight: Number(event.target.value) })}
+                  className="h-8 w-24"
+                />
+              </div>
+              <Slider
+                min={1.8}
+                max={5}
+                step={0.05}
+                value={[scenario.aFrame.upperFloorLevelHeight]}
+                onValueChange={([value]) => updateAFrame({ upperFloorLevelHeight: value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3">
+              <div className="space-y-2">
+                <Label>Largura lote</Label>
+                <Input type="number" step={0.1} value={scenario.terrain.width} onChange={(event) => updateTerrain({ width: Number(event.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Prof. lote</Label>
+                <Input type="number" step={0.1} value={scenario.terrain.depth} onChange={(event) => updateTerrain({ depth: Number(event.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Recuo frente</Label>
+                <Input type="number" step={0.1} value={scenario.terrain.frontSetback} onChange={(event) => updateTerrain({ frontSetback: Number(event.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Recuo lateral</Label>
+                <Input
+                  type="number"
+                  step={0.1}
+                  value={scenario.terrain.leftSetback}
+                  onChange={(event) => updateTerrain({ leftSetback: Number(event.target.value), rightSetback: Number(event.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Modo de cotas</Label>
+              <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="basic">Basico</SelectItem>
+                  <SelectItem value="detailed">Detalhado</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
