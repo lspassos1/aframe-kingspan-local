@@ -341,6 +341,10 @@ export const useProjectStore = create<ProjectStore>()(
       name: "aframe-project-store",
       version: 3,
       partialize: (state) => ({ project: state.project }),
+      migrate: (persisted) => {
+        const persistedProject = (persisted as { project?: Project } | undefined)?.project;
+        return { project: persistedProject ? normalizeProject(persistedProject) : cloneProject(defaultProject) };
+      },
       merge: (persisted, current) => {
         const persistedProject = (persisted as { project?: Project } | undefined)?.project;
         return { ...current, project: persistedProject ? normalizeProject(persistedProject) : current.project };
