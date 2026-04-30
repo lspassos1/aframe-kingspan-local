@@ -20,6 +20,17 @@ const BudgetCategoryChart = dynamic(
   }
 );
 
+const foundationMaterialIds = new Set([
+  "foundation-concrete",
+  "foundation-fiber",
+  "foundation-subbase",
+  "foundation-vapor-barrier",
+  "foundation-formwork",
+]);
+
+const foundationLaborIds = new Set(["foundation-soil-prep", "foundation-labor"]);
+const foundationEquipmentIds = new Set(["foundation-pump"]);
+
 export default function BudgetPage() {
   const project = useProjectStore((state) => state.project);
   const updateBudgetAssumptions = useProjectStore((state) => state.updateBudgetAssumptions);
@@ -37,6 +48,57 @@ export default function BudgetPage() {
     { name: "Mao obra", value: budget.laborEquipmentBRL },
     { name: "Tecnico", value: budget.technicalLegalBRL },
     { name: "Conting.", value: budget.contingencyBRL },
+  ];
+  const foundationMaterialCostBRL = foundation.items
+    .filter((item) => foundationMaterialIds.has(item.id))
+    .reduce((sum, item) => sum + item.netTotalBRL, 0);
+  const foundationLaborCostBRL = foundation.items
+    .filter((item) => foundationLaborIds.has(item.id))
+    .reduce((sum, item) => sum + item.netTotalBRL, 0);
+  const foundationEquipmentCostBRL = foundation.items
+    .filter((item) => foundationEquipmentIds.has(item.id))
+    .reduce((sum, item) => sum + item.netTotalBRL, 0);
+  const foundationFormulaRows = [
+    {
+      label: "Area orcada",
+      formula: `(${foundation.widthM} m x ${foundation.depthM} m)`,
+      result: `${foundation.areaM2} m2`,
+    },
+    {
+      label: "Concreto da placa",
+      formula: `${foundation.areaM2} m2 x ${project.foundationAssumptions.slabThicknessM} m`,
+      result: `${foundation.slabConcreteM3} m3`,
+    },
+    {
+      label: "Concreto da viga de borda",
+      formula: `${foundation.perimeterM} m x ${project.foundationAssumptions.edgeBeamWidthM} m x ${project.foundationAssumptions.edgeBeamDepthM} m`,
+      result: `${foundation.edgeBeamConcreteM3} m3`,
+    },
+    {
+      label: "Concreto total com perda",
+      formula: `(placa + borda) x ${100 + project.foundationAssumptions.wastePercent}%`,
+      result: `${foundation.concreteM3} m3`,
+    },
+    {
+      label: "Fibra",
+      formula: `${foundation.concreteM3} m3 x ${project.foundationAssumptions.fiberDosageKgM3} kg/m3`,
+      result: `${foundation.fiberKg} kg`,
+    },
+    {
+      label: "Sub-base",
+      formula: `${foundation.areaM2} m2 x ${project.foundationAssumptions.subbaseThicknessM} m`,
+      result: `${foundation.subbaseM3} m3`,
+    },
+    {
+      label: "Lona/barreira",
+      formula: `${foundation.areaM2} m2 x 1,05`,
+      result: `${foundation.vaporBarrierM2} m2`,
+    },
+    {
+      label: "Forma lateral",
+      formula: "perimetro externo do radier",
+      result: `${foundation.formworkM} m`,
+    },
   ];
 
   return (
@@ -99,6 +161,33 @@ export default function BudgetPage() {
                 checked={project.foundationAssumptions.enabled}
                 onCheckedChange={(checked) => updateFoundationAssumptions({ enabled: Boolean(checked) })}
               />
+            </div>
+            <div className="rounded-md border bg-background p-3">
+              <div className="mb-3">
+                <p className="text-sm font-medium">Como este valor foi orcado</p>
+                <p className="text-xs text-muted-foreground">
+                  Area da casa + folga perimetral, concreto da placa, viga de borda, fibra, sub-base, lona, formas,
+                  preparo do solo, mao de obra e bomba/mobilizacao.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-md bg-muted/40 p-3">
+                  <p className="text-xs text-muted-foreground">Materiais</p>
+                  <p className="font-semibold">{formatCurrency(foundationMaterialCostBRL)}</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-3">
+                  <p className="text-xs text-muted-foreground">Mao de obra</p>
+                  <p className="font-semibold">{formatCurrency(foundationLaborCostBRL)}</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-3">
+                  <p className="text-xs text-muted-foreground">Equipamento</p>
+                  <p className="font-semibold">{formatCurrency(foundationEquipmentCostBRL)}</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-3">
+                  <p className="text-xs text-muted-foreground">Total radier</p>
+                  <p className="font-semibold">{formatCurrency(foundation.totalBRL)}</p>
+                </div>
+              </div>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               {[
@@ -183,6 +272,90 @@ export default function BudgetPage() {
                 />
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-md shadow-none xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Composicao do radier</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Detalhamento da fundacao incluida no orcamento: memoria de calculo, materiais, mao de obra e equipamento.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-md border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Total radier</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundation.totalBRL)}</p>
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Materiais</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundationMaterialCostBRL)}</p>
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Mao de obra/servicos</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundationLaborCostBRL)}</p>
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Equipamento</p>
+                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundationEquipmentCostBRL)}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+              <div className="rounded-md border">
+                <div className="border-b bg-muted/30 px-3 py-2 text-sm font-medium">Memoria de calculo</div>
+                <div className="divide-y">
+                  {foundationFormulaRows.map((row) => (
+                    <div className="grid gap-1 px-3 py-2 text-sm" key={row.label}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium">{row.label}</span>
+                        <span className="font-semibold">{row.result}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{row.formula}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-right">Qtd.</TableHead>
+                      <TableHead>Un.</TableHead>
+                      <TableHead className="text-right">Preco unit.</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {foundation.items.map((item) => {
+                      const type = foundationMaterialIds.has(item.id)
+                        ? "Material"
+                        : foundationLaborIds.has(item.id)
+                          ? "Mao de obra"
+                          : "Equipamento";
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>{type}</TableCell>
+                          <TableCell className="min-w-64 font-medium">{item.description}</TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
+                          <TableCell>{item.unit}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.unitPriceBRL ?? 0)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              O calculo usa a pegada da casa com folga perimetral. Nao inclui sondagem, armaduras especificas, drenagem definitiva, aterramento estrutural, impermeabilizacao detalhada ou projeto executivo.
+            </p>
           </CardContent>
         </Card>
 

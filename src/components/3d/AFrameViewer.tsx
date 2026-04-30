@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
@@ -455,12 +456,15 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
           <AFrameScene project={project} scenario={scenario} toggles={toggles} view={view} panelOpacity={panelOpacity} dimensionMode={dimensionMode} />
         </Canvas>
       </div>
-      <aside className="space-y-4">
-        <div className="rounded-md border p-4">
+      <aside className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
+        <div className="rounded-md border bg-card">
           <div className="mb-3 flex items-center gap-2 font-medium">
-            <Settings2 className="h-4 w-4" />
-            Geometria e painel
+            <div className="flex w-full items-center gap-2 px-4 pt-4">
+              <Settings2 className="h-4 w-4" />
+              Geometria e painel
+            </div>
           </div>
+          <ScrollArea className="max-h-[min(620px,calc(100vh-9rem))] px-4 pb-4 pr-5">
           <div className="space-y-3">
             <div className="space-y-2">
               <Label>Produto</Label>
@@ -640,6 +644,7 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
               <Slider min={0.25} max={0.95} step={0.01} value={[panelOpacity]} onValueChange={([value]) => setPanelOpacity(value)} />
             </div>
           </div>
+          </ScrollArea>
         </div>
         <div className="rounded-md border p-4">
           <div className="mb-3 flex items-center gap-2 font-medium">
