@@ -1,0 +1,81 @@
+import type { SteelPriceSource } from "@/types/project";
+
+export const steelPriceSources: SteelPriceSource[] = [
+  {
+    id: "sinapi-ba-43083-2026-03",
+    label: "SINAPI BA 03/2026 - perfil U enrijecido",
+    sourceType: "SINAPI",
+    sourceUrl: "https://orcamentador.com.br/insumos/sinapi/43083",
+    referenceDate: "2026-03-01",
+    region: "Bahia",
+    profileReference: "Perfil U enrijecido dobrado, e=3,75 mm, h=200 mm, l=75 mm, 9,94 kg/m",
+    priceBRLKg: 10.28,
+    reliability: "reference",
+    notes:
+      "Referencia SINAPI para insumo de perfil U enrijecido na Bahia. Usar somente para triagem de viabilidade; substituir por cotacao de fornecedor para os perfis reais do projeto.",
+  },
+  {
+    id: "sinapi-br-43083-2026-03",
+    label: "SINAPI media BR 03/2026 - perfil U enrijecido",
+    sourceType: "SINAPI",
+    sourceUrl: "https://orcamentador.com.br/insumos/sinapi/43083",
+    referenceDate: "2026-03-01",
+    region: "Media nacional",
+    profileReference: "Perfil U enrijecido dobrado, e=3,75 mm, h=200 mm, l=75 mm, 9,94 kg/m",
+    priceBRLKg: 9.29,
+    reliability: "reference",
+    notes: "Referencia nacional SINAPI. Menos adequada que Bahia para Cruz das Almas, mas util para comparacao.",
+  },
+  {
+    id: "caixa-sinapi-official",
+    label: "CAIXA/IBGE SINAPI oficial",
+    sourceType: "SINAPI",
+    sourceUrl: "https://www.caixa.gov.br/poder-publico/modernizacao-gestao/sinapi/Paginas/default.aspx",
+    referenceDate: "2026-03-01",
+    region: "Brasil / estados",
+    profileReference: "Relatorios mensais de insumos e composicoes",
+    reliability: "quote-required",
+    notes:
+      "Fonte oficial para baixar a tabela mensal por estado. O app guarda apenas referencias; o usuario deve confirmar o arquivo vigente e a composicao correta.",
+  },
+  {
+    id: "brasfer-100x50-ch16-2026-04",
+    label: "Brasfer 100x50 chapa 16 - barra 6 m",
+    sourceType: "online-retail",
+    sourceUrl: "https://www.brasferaco.com.br/tubo-de-aco-retangular-100x50-6-metros-preto",
+    referenceDate: "2026-04-26",
+    region: "Varejo online SP",
+    profileReference: "Tubo retangular 100x50, chapa 16, barra 6 m",
+    priceBRLBar: 218.99,
+    barLengthM: 6,
+    reliability: "reference",
+    notes:
+      "Preco de varejo online, sem frete para Bahia e sem equivalencia estrutural garantida. Nao aplicar automaticamente ao projeto estrutural.",
+  },
+  {
+    id: "aco-cearense-100x40-150-2026-04",
+    label: "Aco Cearense 100x40 1,50 mm - barra 6 m",
+    sourceType: "online-retail",
+    sourceUrl: "https://loja.grupoacocearense.com.br/tubos/tubo-retangular",
+    referenceDate: "2026-04-26",
+    region: "Varejo online Nordeste",
+    profileReference: "Tubo retangular 100x40, 1,50 mm, barra 6 m",
+    priceBRLBar: 155.43,
+    barLengthM: 6,
+    reliability: "reference",
+    notes:
+      "Referencia varejo de tubo leve. Pode ajudar a comparar ordem de grandeza, mas nao substitui cotacao de perfil estrutural.",
+  },
+  {
+    id: "sinapi-ba-99854-2026-03",
+    label: "SINAPI BA 03/2026 - guarda-corpo metalico",
+    sourceType: "SINAPI",
+    sourceUrl: "https://sinapi.eng.br/composicao/2026/mar/BA/ISD/99854/",
+    referenceDate: "2026-03-01",
+    region: "Bahia",
+    profileReference: "Composicao com tubos galvanizados, cantoneiras e barras chatas",
+    reliability: "quote-required",
+    notes:
+      "Referencia regional de itens metalicos galvanizados. Nao e perfil RHS de portico A-frame; usar apenas para pesquisa e conferencia.",
+  },
+];
