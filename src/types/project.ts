@@ -184,7 +184,7 @@ export type MaterialCategory =
   | "contingency"
   | "other";
 
-export type MaterialUnit = "un" | "m" | "m2" | "kg" | "package" | "lot";
+export type MaterialUnit = "un" | "m" | "m2" | "m3" | "kg" | "package" | "lot";
 
 export interface MaterialLine {
   id: string;
@@ -201,6 +201,27 @@ export interface MaterialLine {
   wasteIncluded: boolean;
   manualOverride: boolean;
   requiresConfirmation: boolean;
+  notes: string;
+}
+
+export interface CustomMaterialProduct {
+  id: string;
+  code: string;
+  description: string;
+  category: MaterialCategory;
+  supplier: string;
+  unit: MaterialUnit;
+  quantity: number;
+  lengthM?: number;
+  widthM?: number;
+  thicknessMm?: number;
+  unitPriceBRL?: number;
+  maxLengthM?: number;
+  lengthIncrementM?: number;
+  externalFinish?: string;
+  internalFinish?: string;
+  colorHex?: string;
+  enabled: boolean;
   notes: string;
 }
 
@@ -314,6 +335,44 @@ export interface BudgetItem {
   requiresConfirmation: boolean;
 }
 
+export interface FoundationAssumptions {
+  type: "radier-fiber";
+  enabled: boolean;
+  useHouseFootprint: boolean;
+  extraPerimeterM: number;
+  slabThicknessM: number;
+  edgeBeamWidthM: number;
+  edgeBeamDepthM: number;
+  subbaseThicknessM: number;
+  concreteUnitPriceBRLM3: number;
+  fiberDosageKgM3: number;
+  fiberUnitPriceBRLKg: number;
+  subbaseUnitPriceBRLM3: number;
+  vaporBarrierUnitPriceBRLM2: number;
+  formworkUnitPriceBRLM: number;
+  laborUnitPriceBRLM2: number;
+  pumpBRL: number;
+  soilPrepUnitPriceBRLM2: number;
+  wastePercent: number;
+}
+
+export interface FoundationEstimate {
+  areaM2: number;
+  widthM: number;
+  depthM: number;
+  perimeterM: number;
+  slabConcreteM3: number;
+  edgeBeamConcreteM3: number;
+  concreteM3: number;
+  fiberKg: number;
+  subbaseM3: number;
+  vaporBarrierM2: number;
+  formworkM: number;
+  totalBRL: number;
+  items: BudgetItem[];
+  warnings: AppWarning[];
+}
+
 export interface BudgetSummary {
   items: BudgetItem[];
   panelPackageCostBRL: number;
@@ -321,6 +380,7 @@ export interface BudgetSummary {
   freightBRL: number;
   steelStructureCostBRL: number;
   civilPlaceholderBRL: number;
+  foundationCostBRL: number;
   laborEquipmentBRL: number;
   technicalLegalBRL: number;
   contingencyBRL: number;
@@ -381,6 +441,7 @@ export interface Project {
   panelProducts: PanelProduct[];
   panelFinishes: PanelFinish[];
   accessories: AccessoryProduct[];
+  customMaterials: CustomMaterialProduct[];
   steelProfiles: SteelProfile[];
   steelPriceSources: SteelPriceSource[];
   suppliers: Supplier[];
@@ -411,4 +472,5 @@ export interface Project {
     municipalApprovalPlaceholderBRL: number;
     contingencyPercent: number;
   };
+  foundationAssumptions: FoundationAssumptions;
 }

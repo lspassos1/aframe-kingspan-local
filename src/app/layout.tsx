@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A-frame MVP",
+  title: "A-frame Estudo",
   description: "Ferramenta local para estudo preliminar de casa A-frame com paineis sanduiche.",
 };
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import { calculateBudget, isPriceStale } from "@/lib/calculations/budget";
+import { estimateRadierFoundation } from "@/lib/calculations/foundation";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { calculateMaterialList, calculatePanelLayout } from "@/lib/calculations/materials";
 import { compareScenarios } from "@/lib/calculations/scenarios";
@@ -48,6 +49,20 @@ describe("materials and budget", () => {
     expect(layout.totalPanelAreaM2).toBe(270);
   });
 
+  it("splits roof panels when requested length exceeds available maximum", () => {
+    const geometry = calculateAFrameGeometry(scenario.terrain, { ...scenario.aFrame, panelLength: 9 });
+    const layout = calculatePanelLayout(
+      { ...scenario, aFrame: { ...scenario.aFrame, panelLength: 9 } },
+      geometry,
+      { ...panel, maxLengthM: 7.5, lengthStepM: 1 },
+      0
+    );
+
+    expect(layout.panelLengthExceeded).toBe(true);
+    expect(layout.segmentsPerPanel).toBe(2);
+    expect(layout.panelSegmentLengthM).toBe(5);
+  });
+
   it("generates material list with real quotation seed items", () => {
     const lines = calculateMaterialList(defaultProject, scenario);
 
@@ -60,7 +75,16 @@ describe("materials and budget", () => {
 
     expect(budget.panelPackageCostBRL).toBeCloseTo(56699.64, 1);
     expect(budget.freightBRL).toBe(0);
+    expect(budget.foundationCostBRL).toBeGreaterThan(0);
     expect(budget.totalEstimatedCostBRL).toBeGreaterThan(budget.panelPackageCostBRL);
+  });
+
+  it("estimates radier foundation quantities from current footprint", () => {
+    const foundation = estimateRadierFoundation(scenario, defaultProject.foundationAssumptions);
+
+    expect(foundation.areaM2).toBeGreaterThan(150);
+    expect(foundation.concreteM3).toBeGreaterThan(20);
+    expect(foundation.totalBRL).toBeGreaterThan(0);
   });
 
   it("marks stale quotation dates", () => {

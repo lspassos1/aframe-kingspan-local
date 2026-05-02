@@ -1,5 +1,6 @@
 import type { Project, Scenario, StructuralInputs } from "@/types/project";
 import { accessories } from "./accessories";
+import { customMaterials } from "./customMaterials";
 import { panelFinishes, panelProducts } from "./panels";
 import { steelProfiles } from "./steelProfiles";
 import { steelPriceSources } from "./steelPriceSources";
@@ -134,6 +135,7 @@ export const defaultProject: Project = {
   panelProducts,
   panelFinishes,
   accessories,
+  customMaterials,
   steelProfiles,
   steelPriceSources,
   suppliers,
@@ -163,5 +165,25 @@ export const defaultProject: Project = {
     engineerPlaceholderBRL: 0,
     municipalApprovalPlaceholderBRL: 0,
     contingencyPercent: 10,
+  },
+  foundationAssumptions: {
+    type: "radier-fiber",
+    enabled: true,
+    useHouseFootprint: true,
+    extraPerimeterM: 0.4,
+    slabThicknessM: 0.12,
+    edgeBeamWidthM: 0.25,
+    edgeBeamDepthM: 0.3,
+    subbaseThicknessM: 0.1,
+    concreteUnitPriceBRLM3: 777.24,
+    fiberDosageKgM3: 3,
+    fiberUnitPriceBRLKg: 28,
+    subbaseUnitPriceBRLM3: 335.14,
+    vaporBarrierUnitPriceBRLM2: 8,
+    formworkUnitPriceBRLM: 42,
+    laborUnitPriceBRLM2: 95,
+    pumpBRL: 1200,
+    soilPrepUnitPriceBRLM2: 18,
+    wastePercent: 7,
   },
 };

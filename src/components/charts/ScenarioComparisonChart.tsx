@@ -6,7 +6,7 @@ import type { ScenarioComparisonRow } from "@/lib/calculations/scenarios";
 
 export function ScenarioComparisonChart({ data }: { data: ScenarioComparisonRow[] }) {
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" minWidth={320} minHeight={260}>
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-12} height={70} />
