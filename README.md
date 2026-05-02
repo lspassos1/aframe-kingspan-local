@@ -1,4 +1,4 @@
-# A-frame MVP
+# A-frame Kingspan Local
 
 Aplicacao local para estudo preliminar de casa A-frame com paineis sanduiche Kingspan Isoeste / KingRoofing.
 
@@ -10,6 +10,21 @@ npm run dev
 ```
 
 Abra `http://localhost:3000`.
+
+## Autenticacao e feedback
+
+Copie `.env.example` para `.env.local` e configure:
+
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+- `NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/start`
+- `NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=/start`
+- `GITHUB_FEEDBACK_TOKEN`
+- `GITHUB_FEEDBACK_REPO=lspassos1/aframe-kingspan-local`
+
+O app nao armazena senhas, hashes, OAuth tokens ou refresh tokens. Autenticacao e email ficam no Clerk; projetos continuam no LocalStorage do navegador. O token do GitHub deve ter permissao minima para criar issues no repositorio privado.
 
 ## O que o MVP faz
 

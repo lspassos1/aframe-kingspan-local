@@ -59,6 +59,7 @@ function normalizeProject(project: Project): Project {
   return {
     ...defaults,
     ...project,
+    onboardingCompleted: project.onboardingCompleted ?? defaults.onboardingCompleted,
     scenarios: (project.scenarios?.length ? project.scenarios : defaults.scenarios).map(normalizeScenario),
     panelProducts,
     panelFinishes: project.panelFinishes?.length ? project.panelFinishes : defaults.panelFinishes,
@@ -102,6 +103,7 @@ interface ProjectStore {
   updateMaterialAssumptions: (updates: Partial<Project["materialAssumptions"]>) => void;
   updateBudgetAssumptions: (updates: Partial<Project["budgetAssumptions"]>) => void;
   updateFoundationAssumptions: (updates: Partial<FoundationAssumptions>) => void;
+  setOnboardingCompleted: (completed: boolean) => void;
   duplicateSelectedScenario: () => void;
   deleteScenario: (scenarioId: string) => void;
   importProject: (project: Project) => void;
@@ -309,6 +311,10 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           project: { ...state.project, foundationAssumptions: { ...state.project.foundationAssumptions, ...updates } },
         })),
+      setOnboardingCompleted: (completed) =>
+        set((state) => ({
+          project: { ...state.project, onboardingCompleted: completed },
+        })),
       duplicateSelectedScenario: () =>
         set((state) => {
           const selected = state.project.scenarios.find((scenario) => scenario.id === state.project.selectedScenarioId);
@@ -339,7 +345,7 @@ export const useProjectStore = create<ProjectStore>()(
     }),
     {
       name: "aframe-project-store",
-      version: 3,
+      version: 4,
       partialize: (state) => ({ project: state.project }),
       migrate: (persisted) => {
         const persistedProject = (persisted as { project?: Project } | undefined)?.project;
