@@ -435,6 +435,7 @@ export interface ExportReport {
 export interface Project {
   id: string;
   name: string;
+  onboardingCompleted: boolean;
   currency: CurrencyCode;
   selectedScenarioId: string;
   scenarios: Scenario[];
