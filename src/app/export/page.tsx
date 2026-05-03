@@ -88,7 +88,7 @@ export default function ExportPage() {
         <p className="text-sm text-muted-foreground">Exportar</p>
         <h1 className="text-3xl font-semibold tracking-normal">Salvar, carregar e gerar arquivos</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Tudo funciona localmente no navegador. Nao ha nuvem, login ou backend.
+          Os arquivos do projeto ficam no navegador. Login e autenticacao ficam no Clerk; este app nao armazena senhas.
         </p>
       </div>
 

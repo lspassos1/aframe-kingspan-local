@@ -129,6 +129,7 @@ export const defaultScenarios: Scenario[] = [
 export const defaultProject: Project = {
   id: "aframe-local-project",
   name: "Estudo A-frame - Painel Sanduiche",
+  onboardingCompleted: false,
   currency: "BRL",
   selectedScenarioId: "scenario-a",
   scenarios: defaultScenarios,

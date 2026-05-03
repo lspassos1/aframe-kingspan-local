@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
+import { ptBR } from "@clerk/localizations";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppShell } from "@/components/layout/AppShell";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { RootShell } from "@/components/layout/RootShell";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "A-frame Estudo",
-  description: "Ferramenta local para estudo preliminar de casa A-frame com paineis sanduiche.",
+  description: "Pre-projeto A-frame com modelo 3D, materiais, estrutura preliminar e orcamento.",
 };
 
 export default function RootLayout({
@@ -25,14 +27,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    <ClerkProvider
+      localization={ptBR}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInForceRedirectUrl="/start"
+      signUpForceRedirectUrl="/start"
     >
-      <body className="min-h-full flex flex-col">
-        <AppShell>{children}</AppShell>
-        <SpeedInsights />
-      </body>
-    </html>
+      <html
+        lang="pt-BR"
+        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      >
+        <body className="min-h-full flex flex-col">
+          <RootShell>{children}</RootShell>
+          <SpeedInsights />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
