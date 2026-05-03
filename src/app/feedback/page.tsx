@@ -1,5 +1,6 @@
-import { MessageSquare, ShieldCheck } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { FeedbackForm } from "@/components/feedback/FeedbackForm";
+import { FeedbackPrivacyNotice } from "@/components/feedback/FeedbackPrivacyNotice";
 import { MyFeedbackStatusList } from "@/components/feedback/MyFeedbackStatusList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -29,19 +30,7 @@ export default function FeedbackPage() {
       </section>
 
       <aside className="space-y-4">
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5" />
-              Dados minimos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>Email ou WhatsApp sao opcionais e servem apenas para retorno sobre a sugestao.</p>
-            <p>O formulario usa limitacao simples por IP e um campo invisivel anti-spam.</p>
-            <p>Projetos, medidas e orcamentos continuam salvos localmente no navegador.</p>
-          </CardContent>
-        </Card>
+        <FeedbackPrivacyNotice />
       </aside>
     </main>
   );
