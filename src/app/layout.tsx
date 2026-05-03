@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ptBR } from "@clerk/localizations";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RootShell } from "@/components/layout/RootShell";
 import "./globals.css";
 
@@ -39,6 +40,7 @@ export default function RootLayout({
       >
         <body className="min-h-full flex flex-col">
           <RootShell>{children}</RootShell>
+          <SpeedInsights />
         </body>
       </html>
     </ClerkProvider>
