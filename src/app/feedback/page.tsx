@@ -1,5 +1,6 @@
 import { MessageSquare, ShieldCheck } from "lucide-react";
 import { FeedbackForm } from "@/components/feedback/FeedbackForm";
+import { MyFeedbackStatusList } from "@/components/feedback/MyFeedbackStatusList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function FeedbackPage() {
@@ -24,6 +25,7 @@ export default function FeedbackPage() {
             <FeedbackForm />
           </CardContent>
         </Card>
+        <MyFeedbackStatusList />
       </section>
 
       <aside className="space-y-4">

@@ -22,6 +22,7 @@ import {
   Ruler,
   Settings,
   Wrench,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -43,6 +44,7 @@ const navItems = [
   { href: "/scenarios", label: "Cenarios", icon: BarChart3 },
   { href: "/export", label: "Exportar", icon: FileDown },
   { href: "/feedback", label: "Melhorias", icon: MessageSquare },
+  { href: "/admin/feedback", label: "Admin melhorias", icon: ShieldCheck },
   { href: "/settings", label: "Premissas", icon: Settings },
   { href: "/help", label: "Ajuda", icon: HelpCircle },
 ];

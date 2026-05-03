@@ -52,10 +52,10 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               ) : (
                 <>
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/sign-in">Entrar</Link>
+                    <Link href="/">Entrar</Link>
                   </Button>
                   <Button asChild size="sm">
-                    <Link href="/sign-up">Criar conta</Link>
+                    <Link href="/">Criar conta</Link>
                   </Button>
                 </>
               )}
