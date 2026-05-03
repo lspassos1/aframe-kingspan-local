@@ -1,5 +1,6 @@
 import { defaultProject } from "@/data/defaultProject";
-import type { AFrameInputs, Project, Scenario } from "@/types/project";
+import { constructionMethodRegistry, getConstructionMethodDefinition, type ConstructionMethodId } from "@/lib/construction-methods";
+import type { AFrameInputs, Project, Scenario, ScenarioMethodInputs } from "@/types/project";
 
 export const cloneProject = (project: Project): Project => JSON.parse(JSON.stringify(project)) as Project;
 
@@ -14,20 +15,35 @@ function normalizeScenario(scenario: Scenario): Scenario {
   const houseDepth = legacyAFrame.houseDepth ?? defaultScenario.aFrame.houseDepth;
   const legacyMezzaninePercent =
     legacyAFrame.mezzanineDepth && houseDepth > 0 ? Math.min(100, Math.max(0, (legacyAFrame.mezzanineDepth / houseDepth) * 100)) : 100;
+  const normalizedAFrame = {
+    ...defaultScenario.aFrame,
+    ...scenario.aFrame,
+    upperFloorMode: legacyAFrame.upperFloorMode ?? "full-floor",
+    upperFloorLevelHeight: legacyAFrame.upperFloorLevelHeight ?? legacyAFrame.mezzanineFloorHeight ?? defaultScenario.aFrame.upperFloorLevelHeight,
+    upperFloorAreaPercent: legacyAFrame.upperFloorAreaPercent ?? legacyMezzaninePercent,
+  };
+  const candidateMethod = scenario.constructionMethod;
+  const constructionMethod: ConstructionMethodId =
+    candidateMethod && constructionMethodRegistry[candidateMethod] ? candidateMethod : "aframe";
+  const existingMethodInputs = scenario.methodInputs ?? {};
+  const methodInputs: ScenarioMethodInputs = {
+    ...existingMethodInputs,
+    aframe: normalizedAFrame,
+  };
+
+  if (constructionMethod !== "aframe" && !methodInputs[constructionMethod]) {
+    methodInputs[constructionMethod] = getConstructionMethodDefinition(constructionMethod).getDefaultInputs();
+  }
 
   return {
     ...defaultScenario,
     ...scenario,
+    constructionMethod,
+    methodInputs,
     location: { ...defaultScenario.location, ...scenario.location },
     terrain: { ...defaultScenario.terrain, ...scenario.terrain },
     pricing: { ...defaultScenario.pricing, ...scenario.pricing },
-    aFrame: {
-      ...defaultScenario.aFrame,
-      ...scenario.aFrame,
-      upperFloorMode: legacyAFrame.upperFloorMode ?? "full-floor",
-      upperFloorLevelHeight: legacyAFrame.upperFloorLevelHeight ?? legacyAFrame.mezzanineFloorHeight ?? defaultScenario.aFrame.upperFloorLevelHeight,
-      upperFloorAreaPercent: legacyAFrame.upperFloorAreaPercent ?? legacyMezzaninePercent,
-    },
+    aFrame: normalizedAFrame,
   };
 }
 

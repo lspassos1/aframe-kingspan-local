@@ -3,9 +3,12 @@ import {
   constructionMethodDefinitions,
   constructionMethodIds,
   constructionMethodRegistry,
+  getAFrameInputsFromScenario,
   getConstructionMethodDefinition,
+  getScenarioMethodInputs,
   type ConstructionMethodId,
 } from "@/lib/construction-methods";
+import { defaultProject } from "@/data/defaultProject";
 
 const expectedIds: ConstructionMethodId[] = ["aframe", "conventional-masonry", "eco-block", "monolithic-eps"];
 
@@ -59,5 +62,12 @@ describe("construction method registry", () => {
       expect(validation.valid).toBe(false);
       expect(validation.issues[0]?.path).toBe("");
     }
+  });
+
+  it("resolves scenario method inputs while preserving A-frame transition fields", () => {
+    const scenario = defaultProject.scenarios[0];
+
+    expect(getScenarioMethodInputs(scenario)).toMatchObject(scenario.aFrame);
+    expect(getAFrameInputsFromScenario(scenario)).toMatchObject(scenario.aFrame);
   });
 });
