@@ -1,7 +1,6 @@
-import Link from "next/link";
-import { ArrowRight, FileSpreadsheet, LockKeyhole, MessageSquare, Ruler, ShieldCheck } from "lucide-react";
+import { FileSpreadsheet, LockKeyhole, MessageSquare, Ruler, ShieldCheck } from "lucide-react";
 import { HeroMedia } from "@/components/landing/HeroMedia";
-import { Button } from "@/components/ui/button";
+import { LandingAuthActions } from "@/components/landing/LandingAuthActions";
 
 const capabilities = [
   "Modelo 3D parametrico dentro do lote",
@@ -28,17 +27,7 @@ export default function HomePage() {
               em uma ferramenta focada em viabilidade.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button asChild size="lg">
-              <Link href="/sign-up">
-                Criar conta e iniciar
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/sign-in">Entrar</Link>
-            </Button>
-          </div>
+          <LandingAuthActions />
           <div className="grid gap-3 sm:grid-cols-2">
             {capabilities.map((item) => (
               <div key={item} className="flex items-start gap-2 rounded-md border bg-card/70 p-3 text-sm">
