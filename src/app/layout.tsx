@@ -29,8 +29,8 @@ export default function RootLayout({
   return (
     <ClerkProvider
       localization={ptBR}
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
+      signInUrl="/"
+      signUpUrl="/"
       signInForceRedirectUrl="/start"
       signUpForceRedirectUrl="/start"
     >

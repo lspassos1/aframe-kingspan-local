@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createFeedbackIssue } from "@/lib/feedback/github";
 import { feedbackSchema } from "@/lib/validation/feedback";
 
 type RateLimitEntry = {
@@ -75,29 +76,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Revise os campos do formulario." }, { status: 400 });
   }
 
-  const token = process.env.GITHUB_FEEDBACK_TOKEN;
-  const repo = process.env.GITHUB_FEEDBACK_REPO ?? "lspassos1/aframe-kingspan-local";
-  if (!token) {
-    return NextResponse.json({ message: "Feedback ainda nao esta configurado no servidor." }, { status: 503 });
-  }
-
-  const githubResponse = await fetch(`https://api.github.com/repos/${repo}/issues`, {
-    method: "POST",
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-    body: JSON.stringify({
+  try {
+    const issue = await createFeedbackIssue({
       title: buildIssueTitle(parsed.data.category, parsed.data.message),
       body: buildIssueBody(parsed.data),
-    }),
-  });
-
-  if (!githubResponse.ok) {
+    });
+    return NextResponse.json({
+      message: "Mensagem enviada. Obrigado pela sugestao.",
+      issue: { number: issue.number, status: issue.status, name: issue.name, category: issue.category },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "missing-github-token") {
+      return NextResponse.json({ message: "Feedback ainda nao esta configurado no servidor." }, { status: 503 });
+    }
     return NextResponse.json({ message: "Nao foi possivel criar a issue privada agora." }, { status: 502 });
   }
-
-  return NextResponse.json({ message: "Mensagem enviada. Obrigado pela sugestao." });
 }

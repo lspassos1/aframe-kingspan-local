@@ -19,6 +19,15 @@ import { duplicateScenario } from "@/lib/calculations/scenarios";
 
 const cloneProject = (project: Project): Project => JSON.parse(JSON.stringify(project)) as Project;
 
+export type SavedProjectSummary = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  city: string;
+  state: string;
+  scenarioCount: number;
+};
+
 type LegacyAFrameInputs = Partial<AFrameInputs> & {
   mezzanineFloorHeight?: number;
   mezzanineDepth?: number;
@@ -75,10 +84,37 @@ function normalizeProject(project: Project): Project {
   };
 }
 
+function upsertSavedProject(savedProjects: Project[], project: Project) {
+  const normalized = normalizeProject(project);
+  const stamped = { ...normalized, updatedAt: new Date().toISOString() } as Project & { updatedAt: string };
+  const existing = savedProjects.filter((item) => item.id !== stamped.id);
+  return [stamped, ...existing].sort((a, b) => {
+    const aDate = (a as Project & { updatedAt?: string }).updatedAt ?? "";
+    const bDate = (b as Project & { updatedAt?: string }).updatedAt ?? "";
+    return bDate.localeCompare(aDate);
+  });
+}
+
+export function getSavedProjectSummary(project: Project): SavedProjectSummary {
+  const scenario = project.scenarios.find((item) => item.id === project.selectedScenarioId) ?? project.scenarios[0];
+  return {
+    id: project.id,
+    name: project.name,
+    updatedAt: (project as Project & { updatedAt?: string }).updatedAt ?? "",
+    city: scenario?.location.city ?? "",
+    state: scenario?.location.state ?? "",
+    scenarioCount: project.scenarios.length,
+  };
+}
+
 interface ProjectStore {
   project: Project;
+  savedProjects: Project[];
   setProject: (project: Project) => void;
   resetProject: () => void;
+  saveCurrentProject: () => void;
+  openSavedProject: (projectId: string) => void;
+  deleteSavedProject: (projectId: string) => void;
   selectScenario: (scenarioId: string) => void;
   updateProjectName: (name: string) => void;
   updateScenarioName: (scenarioId: string, name: string) => void;
@@ -120,9 +156,35 @@ export const useProjectStore = create<ProjectStore>()(
   persist(
     (set) => ({
       project: cloneProject(defaultProject),
+      savedProjects: [],
       setProject: (project) => set({ project: normalizeProject(project) }),
-      resetProject: () => set({ project: cloneProject(defaultProject) }),
-      importProject: (project) => set({ project: normalizeProject(project) }),
+      resetProject: () => set({ project: { ...cloneProject(defaultProject), id: `project-${Date.now()}` } }),
+      saveCurrentProject: () =>
+        set((state) => ({
+          savedProjects: upsertSavedProject(state.savedProjects, state.project),
+        })),
+      openSavedProject: (projectId) =>
+        set((state) => {
+          const saved = state.savedProjects.find((item) => item.id === projectId);
+          return saved ? { project: normalizeProject(saved) } : state;
+        }),
+      deleteSavedProject: (projectId) =>
+        set((state) => {
+          const savedProjects = state.savedProjects.filter((item) => item.id !== projectId);
+          if (state.project.id !== projectId) return { savedProjects };
+          return {
+            savedProjects,
+            project: savedProjects[0] ? normalizeProject(savedProjects[0]) : { ...cloneProject(defaultProject), id: `project-${Date.now()}` },
+          };
+        }),
+      importProject: (project) =>
+        set((state) => {
+          const normalized = normalizeProject(project);
+          return {
+            project: normalized,
+            savedProjects: upsertSavedProject(state.savedProjects, normalized),
+          };
+        }),
       selectScenario: (scenarioId) =>
         set((state) => ({
           project: { ...state.project, selectedScenarioId: scenarioId },
@@ -312,9 +374,13 @@ export const useProjectStore = create<ProjectStore>()(
           project: { ...state.project, foundationAssumptions: { ...state.project.foundationAssumptions, ...updates } },
         })),
       setOnboardingCompleted: (completed) =>
-        set((state) => ({
-          project: { ...state.project, onboardingCompleted: completed },
-        })),
+        set((state) => {
+          const project = { ...state.project, onboardingCompleted: completed };
+          return {
+            project,
+            savedProjects: completed ? upsertSavedProject(state.savedProjects, project) : state.savedProjects,
+          };
+        }),
       duplicateSelectedScenario: () =>
         set((state) => {
           const selected = state.project.scenarios.find((scenario) => scenario.id === state.project.selectedScenarioId);
@@ -345,15 +411,29 @@ export const useProjectStore = create<ProjectStore>()(
     }),
     {
       name: "aframe-project-store",
-      version: 4,
-      partialize: (state) => ({ project: state.project }),
+      version: 5,
+      partialize: (state) => ({ project: state.project, savedProjects: state.savedProjects }),
       migrate: (persisted) => {
-        const persistedProject = (persisted as { project?: Project } | undefined)?.project;
-        return { project: persistedProject ? normalizeProject(persistedProject) : cloneProject(defaultProject) };
+        const persistedState = persisted as { project?: Project; savedProjects?: Project[] } | undefined;
+        const persistedProject = persistedState?.project;
+        const project = persistedProject ? normalizeProject(persistedProject) : cloneProject(defaultProject);
+        const savedProjects = persistedState?.savedProjects?.length
+          ? persistedState.savedProjects.map(normalizeProject)
+          : project.onboardingCompleted
+            ? upsertSavedProject([], project)
+            : [];
+        return { project, savedProjects };
       },
       merge: (persisted, current) => {
-        const persistedProject = (persisted as { project?: Project } | undefined)?.project;
-        return { ...current, project: persistedProject ? normalizeProject(persistedProject) : current.project };
+        const persistedState = persisted as { project?: Project; savedProjects?: Project[] } | undefined;
+        const persistedProject = persistedState?.project;
+        const project = persistedProject ? normalizeProject(persistedProject) : current.project;
+        const savedProjects = persistedState?.savedProjects?.length
+          ? persistedState.savedProjects.map(normalizeProject)
+          : project.onboardingCompleted
+            ? upsertSavedProject([], project)
+            : current.savedProjects;
+        return { ...current, project, savedProjects };
       },
     }
   )

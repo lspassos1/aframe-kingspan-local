@@ -44,7 +44,10 @@ export function FeedbackForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
     });
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+    const payload = (await response.json().catch(() => null)) as {
+      message?: string;
+      issue?: { number: number; status: "pending" | "approved" | "rejected"; name: string; category: string };
+    } | null;
     if (!response.ok) {
       setStatus("error");
       setServerMessage(payload?.message ?? "Nao foi possivel enviar agora.");
@@ -52,6 +55,11 @@ export function FeedbackForm() {
     }
     setStatus("success");
     setServerMessage(payload?.message ?? "Mensagem enviada.");
+    if (payload?.issue) {
+      const raw = window.localStorage.getItem("aframe-feedback-submissions");
+      const current = raw ? ((JSON.parse(raw) as Array<typeof payload.issue>) ?? []) : [];
+      window.localStorage.setItem("aframe-feedback-submissions", JSON.stringify([payload.issue, ...current].slice(0, 20)));
+    }
     form.reset({ name: "", contact: "", category: "melhoria", message: "", company: "" });
   };
 
