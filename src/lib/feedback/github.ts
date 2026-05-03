@@ -94,7 +94,16 @@ export async function createFeedbackIssue(values: {
   });
 
   if (!response.ok) throw new Error("github-create-failed");
-  return mapFeedbackIssue((await response.json()) as GitHubIssue);
+  const createdIssue = (await response.json()) as GitHubIssue;
+
+  const closeResponse = await fetch(`https://api.github.com/repos/${repo}/issues/${createdIssue.number}`, {
+    method: "PATCH",
+    headers: headers(token),
+    body: JSON.stringify({ state: "closed", state_reason: "not_planned" }),
+  });
+
+  if (!closeResponse.ok) throw new Error("github-close-failed");
+  return mapFeedbackIssue((await closeResponse.json()) as GitHubIssue);
 }
 
 export async function listFeedbackIssues() {
@@ -149,6 +158,16 @@ export async function updateFeedbackStatus(issueNumber: number, status: Exclude<
   const nextLabel = status === "approved" ? APPROVED_LABEL : REJECTED_LABEL;
   const staleLabel = status === "approved" ? REJECTED_LABEL : APPROVED_LABEL;
   await removeLabel(token, repo, issueNumber, staleLabel);
+
+  const updateIssueResponse = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}`, {
+    method: "PATCH",
+    headers: headers(token),
+    body: JSON.stringify({
+      state: status === "approved" ? "open" : "closed",
+      state_reason: status === "approved" ? null : "not_planned",
+    }),
+  });
+  if (!updateIssueResponse.ok) throw new Error("github-state-update-failed");
 
   const labelResponse = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/labels`, {
     method: "POST",
