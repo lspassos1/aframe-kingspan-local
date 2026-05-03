@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, FolderOpen, Home, Package, Ruler, Save, Wallet, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, FolderOpen, Home, Package, PlusCircle, Ruler, Save, Trash2, Wallet, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ export default function DashboardPage() {
   const savedProjects = useProjectStore((state) => state.savedProjects);
   const openSavedProject = useProjectStore((state) => state.openSavedProject);
   const saveCurrentProject = useProjectStore((state) => state.saveCurrentProject);
+  const resetProject = useProjectStore((state) => state.resetProject);
+  const deleteSavedProject = useProjectStore((state) => state.deleteSavedProject);
   const scenario = useSelectedScenario();
   const panel = project.panelProducts.find((item) => item.id === scenario.panelProductId) ?? project.panelProducts[0];
   const geometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
@@ -27,6 +29,19 @@ export default function DashboardPage() {
   const structural = estimateSteelStructure(project, scenario);
   const warnings = budget.warnings.filter((warning) => warning.level !== "info");
   const savedSummaries = savedProjects.map(getSavedProjectSummary);
+  const activeProjectSaved = savedProjects.some((item) => item.id === project.id);
+
+  const addProject = () => {
+    saveCurrentProject();
+    resetProject();
+    setDetailsOpen(true);
+  };
+
+  const deleteProject = (projectId: string, projectName: string) => {
+    if (!window.confirm(`Excluir "${projectName}" dos projetos salvos neste navegador?`)) return;
+    deleteSavedProject(projectId);
+    setDetailsOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -42,6 +57,10 @@ export default function DashboardPage() {
           <Button variant="outline" onClick={saveCurrentProject}>
             <Save className="mr-2 h-4 w-4" />
             Salvar projeto atual
+          </Button>
+          <Button variant="outline" onClick={addProject}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Adicionar projeto
           </Button>
           {detailsOpen ? (
             <Button variant="outline" onClick={() => setDetailsOpen(false)}>
@@ -59,11 +78,11 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <div>
             <h2 className="font-semibold">Projetos salvos</h2>
-            <p className="text-sm text-muted-foreground">Selecione um projeto para abrir os detalhes no dashboard.</p>
+            <p className="text-sm text-muted-foreground">Salve, abra ou exclua projetos mantidos neste navegador.</p>
           </div>
-          {!detailsOpen ? (
-            <Badge variant="outline">{savedSummaries.length} salvo{savedSummaries.length === 1 ? "" : "s"}</Badge>
-          ) : null}
+          <Badge variant={activeProjectSaved ? "default" : "outline"}>
+            {activeProjectSaved ? "Atual salvo" : `${savedSummaries.length} salvo${savedSummaries.length === 1 ? "" : "s"}`}
+          </Badge>
         </div>
         <div className="grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-3">
           {savedSummaries.length === 0 ? (
@@ -72,29 +91,41 @@ export default function DashboardPage() {
             </div>
           ) : (
             savedSummaries.map((item) => (
-              <button
+              <div
                 key={item.id}
-                type="button"
-                onClick={() => {
-                  openSavedProject(item.id);
-                  setDetailsOpen(true);
-                }}
-                className="rounded-md border bg-background p-4 text-left transition-colors hover:bg-muted/60"
+                className="rounded-md border bg-background p-4 transition-colors hover:bg-muted/40"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium">{item.name}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {item.city || "Cidade nao informada"}{item.state ? `, ${item.state}` : ""} · {item.scenarioCount} cenario
                       {item.scenarioCount === 1 ? "" : "s"}
                     </p>
                   </div>
-                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  {item.id === project.id ? <Badge variant="secondary">Aberto</Badge> : null}
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
                   Atualizado {item.updatedAt ? new Date(item.updatedAt).toLocaleString("pt-BR") : "sem data"}
                 </p>
-              </button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      openSavedProject(item.id);
+                      setDetailsOpen(true);
+                    }}
+                  >
+                    <FolderOpen className="mr-2 h-3.5 w-3.5" />
+                    Abrir
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => deleteProject(item.id, item.name)}>
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Excluir
+                  </Button>
+                </div>
+              </div>
             ))
           )}
         </div>
