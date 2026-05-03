@@ -5,9 +5,9 @@ export default function StartPage() {
     <div className="space-y-6">
       <div>
         <p className="text-sm text-muted-foreground">Inicio do projeto</p>
-        <h1 className="text-3xl font-semibold tracking-normal">Configure o minimo para rodar o 3D</h1>
+        <h1 className="text-3xl font-semibold tracking-normal">Escolha o metodo e configure o estudo</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Depois desta etapa voce pode ajustar recuos, pavimento superior, fundacao, estrutura, materiais e precos nas abas internas.
+          A-frame ja abre o 3D completo. Os demais metodos entram como MVP preliminar enquanto os calculos especificos sao adicionados.
         </p>
       </div>
       <StartProjectForm />

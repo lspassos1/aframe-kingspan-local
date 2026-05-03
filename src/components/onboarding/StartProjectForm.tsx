@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type InputHTMLAttributes } from "react";
+import { useEffect, useMemo, type FormEvent, type InputHTMLAttributes } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConstructionMethodSelector } from "@/components/onboarding/ConstructionMethodSelector";
+import { getConstructionMethodDefinition, getScenarioMethodInputs, type ConstructionMethodId } from "@/lib/construction-methods";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { formatCurrency, formatNumber } from "@/lib/format";
@@ -44,6 +46,12 @@ function NumberInput({
   );
 }
 
+type MinimalMethodInputs = {
+  widthM?: number;
+  depthM?: number;
+  floorHeightM?: number;
+};
+
 export function StartProjectForm() {
   const router = useRouter();
   const project = useProjectStore((state) => state.project);
@@ -52,10 +60,15 @@ export function StartProjectForm() {
   const updateScenarioName = useProjectStore((state) => state.updateScenarioName);
   const updateScenarioLocation = useProjectStore((state) => state.updateScenarioLocation);
   const updateScenarioTerrain = useProjectStore((state) => state.updateScenarioTerrain);
+  const updateScenarioConstructionMethod = useProjectStore((state) => state.updateScenarioConstructionMethod);
+  const updateScenarioMethodInputs = useProjectStore((state) => state.updateScenarioMethodInputs);
   const updateScenarioAFrame = useProjectStore((state) => state.updateScenarioAFrame);
   const updateScenarioPanel = useProjectStore((state) => state.updateScenarioPanel);
   const setOnboardingCompleted = useProjectStore((state) => state.setOnboardingCompleted);
   const requiresFreshInput = !project.onboardingCompleted;
+  const selectedMethod = scenario.constructionMethod;
+  const selectedMethodDefinition = getConstructionMethodDefinition(selectedMethod);
+  const selectedMethodInputs = getScenarioMethodInputs<MinimalMethodInputs>(scenario);
 
   const form = useForm<StartProjectFormValues>({
     resolver: zodResolver(startProjectSchema) as Resolver<StartProjectFormValues>,
@@ -141,6 +154,37 @@ export function StartProjectForm() {
     router.push("/model-3d");
   };
 
+  const selectConstructionMethod = (methodId: ConstructionMethodId) => {
+    updateScenarioConstructionMethod(scenario.id, methodId);
+  };
+
+  const applyMethodPlaceholder = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const projectName = String(formData.get("projectName") ?? "").trim() || `${selectedMethodDefinition.name} - estudo`;
+    const city = String(formData.get("city") ?? "").trim();
+    const state = String(formData.get("state") ?? "").trim();
+    const widthM = Number(formData.get("widthM") ?? selectedMethodInputs.widthM ?? 8);
+    const depthM = Number(formData.get("depthM") ?? selectedMethodInputs.depthM ?? 12);
+    const floorHeightM = Number(formData.get("floorHeightM") ?? selectedMethodInputs.floorHeightM ?? 2.8);
+
+    updateProjectName(projectName);
+    updateScenarioName(scenario.id, "Cenario inicial");
+    updateScenarioLocation(scenario.id, {
+      ...scenario.location,
+      city: city || scenario.location.city || "Cidade a definir",
+      state: state || scenario.location.state || "Estado a definir",
+    });
+    updateScenarioMethodInputs(scenario.id, selectedMethod, {
+      ...selectedMethodInputs,
+      widthM,
+      depthM,
+      floorHeightM,
+    });
+    setOnboardingCompleted(true);
+    router.push("/dashboard");
+  };
+
   const useExampleProject = () => {
     const example = defaultProject.scenarios[0];
     const values: StartProjectFormValues = {
@@ -161,6 +205,10 @@ export function StartProjectForm() {
   };
 
   return (
+    <div className="space-y-6">
+      <ConstructionMethodSelector selectedMethod={selectedMethod} onSelect={selectConstructionMethod} />
+
+      {selectedMethod === "aframe" ? (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Card className="rounded-md shadow-none">
         <CardHeader>
@@ -327,6 +375,86 @@ export function StartProjectForm() {
           </CardContent>
         </Card>
       </aside>
+    </div>
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Card className="rounded-md shadow-none">
+            <CardHeader>
+              <CardTitle>{selectedMethodDefinition.name}</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                MVP preliminar para registrar dimensoes iniciais. Quantitativos, orcamento e 3D especificos entram nos proximos PRs.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={applyMethodPlaceholder} className="space-y-6">
+                <section className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="methodProjectName">Nome do projeto</Label>
+                    <Input id="methodProjectName" name="projectName" defaultValue={requiresFreshInput ? "" : project.name} required />
+                  </div>
+                  <NumberInput
+                    id="methodWidthM"
+                    name="widthM"
+                    label="Largura da casa (m)"
+                    min={2}
+                    defaultValue={selectedMethodInputs.widthM ?? 8}
+                    required
+                  />
+                  <NumberInput
+                    id="methodDepthM"
+                    name="depthM"
+                    label="Profundidade da casa (m)"
+                    min={2}
+                    defaultValue={selectedMethodInputs.depthM ?? 12}
+                    required
+                  />
+                  <NumberInput
+                    id="methodFloorHeightM"
+                    name="floorHeightM"
+                    label="Pe-direito (m)"
+                    min={2}
+                    defaultValue={selectedMethodInputs.floorHeightM ?? 2.8}
+                    required
+                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="methodCity">Cidade</Label>
+                    <Input id="methodCity" name="city" defaultValue={requiresFreshInput ? "" : scenario.location.city} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="methodState">Estado</Label>
+                    <Input id="methodState" name="state" defaultValue={requiresFreshInput ? "" : scenario.location.state} required />
+                  </div>
+                </section>
+
+                <div className="flex justify-end border-t pt-5">
+                  <Button type="submit">
+                    Continuar para dashboard
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <aside className="space-y-4">
+            <Card className="rounded-md shadow-none">
+              <CardHeader>
+                <CardTitle>Escopo deste metodo</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>{selectedMethodDefinition.bestFor}</p>
+                <div className="space-y-2">
+                  {selectedMethodDefinition.defaultWarnings.map((warning) => (
+                    <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950" key={warning.id}>
+                      {warning.message}
+                    </p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

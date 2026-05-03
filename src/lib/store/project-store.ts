@@ -16,6 +16,7 @@ import type {
   Terrain,
 } from "@/types/project";
 import { duplicateScenario } from "@/lib/calculations/scenarios";
+import { getConstructionMethodDefinition, type ConstructionMethodId, type ConstructionMethodInputs } from "@/lib/construction-methods";
 import { cloneProject, normalizeProject, upsertSavedProject } from "@/lib/store/project-normalization";
 
 export type SavedProjectSummary = {
@@ -53,6 +54,8 @@ interface ProjectStore {
   updateScenarioName: (scenarioId: string, name: string) => void;
   updateScenarioLocation: (scenarioId: string, location: LocationData) => void;
   updateScenarioTerrain: (scenarioId: string, terrain: Terrain) => void;
+  updateScenarioConstructionMethod: (scenarioId: string, constructionMethod: ConstructionMethodId) => void;
+  updateScenarioMethodInputs: (scenarioId: string, constructionMethod: ConstructionMethodId, inputs: ConstructionMethodInputs) => void;
   updateScenarioAFrame: (scenarioId: string, aFrame: AFrameInputs) => void;
   updateScenarioPanel: (scenarioId: string, panelProductId: string, externalColor: string, internalFinish: string) => void;
   updateScenarioPricing: (scenarioId: string, pricing: PricingMeta) => void;
@@ -137,6 +140,24 @@ export const useProjectStore = create<ProjectStore>()(
       updateScenarioTerrain: (scenarioId, terrain) =>
         set((state) => ({
           project: updateScenario(state.project, scenarioId, (scenario) => ({ ...scenario, terrain })),
+        })),
+      updateScenarioConstructionMethod: (scenarioId, constructionMethod) =>
+        set((state) => ({
+          project: updateScenario(state.project, scenarioId, (scenario) => ({
+            ...scenario,
+            constructionMethod,
+            methodInputs: {
+              ...scenario.methodInputs,
+              [constructionMethod]: scenario.methodInputs[constructionMethod] ?? getConstructionMethodDefinition(constructionMethod).getDefaultInputs(),
+            },
+          })),
+        })),
+      updateScenarioMethodInputs: (scenarioId, constructionMethod, inputs) =>
+        set((state) => ({
+          project: updateScenario(state.project, scenarioId, (scenario) => ({
+            ...scenario,
+            methodInputs: { ...scenario.methodInputs, [constructionMethod]: inputs },
+          })),
         })),
       updateScenarioAFrame: (scenarioId, aFrame) =>
         set((state) => ({
