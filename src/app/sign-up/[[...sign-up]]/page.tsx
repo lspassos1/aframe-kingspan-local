@@ -1,4 +1,5 @@
 import { SignUp } from "@clerk/nextjs";
+import { AppleLoginButton } from "@/components/auth/AppleLoginButton";
 
 export default function SignUpPage() {
   return (
@@ -8,10 +9,11 @@ export default function SignUpPage() {
           <p className="text-sm text-muted-foreground">Criar conta</p>
           <h1 className="text-3xl font-semibold tracking-normal">Comece com o minimo de dados pessoais.</h1>
           <p className="text-sm leading-6 text-muted-foreground">
-            Usamos Clerk para login com Google e email/senha. Apple ficara oculto ate as credenciais Apple Developer serem configuradas.
+            Usamos Clerk para login com Google e email/senha. Apple aparece apenas como opcao visual.
           </p>
         </div>
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <AppleLoginButton />
           <SignUp path="/sign-up" routing="path" signInUrl="/sign-in" forceRedirectUrl="/start" />
         </div>
       </div>

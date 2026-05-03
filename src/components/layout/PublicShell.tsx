@@ -36,7 +36,9 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             </Button>
           </nav>
           <div className="flex items-center gap-2">
-            {isLoaded && isSignedIn ? (
+            {!isLoaded ? (
+              <div className="h-7 w-36" aria-hidden="true" />
+            ) : isSignedIn ? (
               <>
                 <Button asChild size="sm">
                   <Link href="/dashboard">Abrir app</Link>
