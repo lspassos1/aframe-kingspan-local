@@ -30,7 +30,19 @@ const defaultStructuralInputs: StructuralInputs = {
   referenceSteelPriceSourceId: "sinapi-ba-43083-2026-03",
 };
 
-const baseScenario: Scenario = {
+type AFrameScenarioSeed = Omit<Scenario, "constructionMethod" | "methodInputs">;
+
+function createAFrameScenario(scenario: AFrameScenarioSeed): Scenario {
+  return {
+    ...scenario,
+    constructionMethod: "aframe",
+    methodInputs: {
+      aframe: scenario.aFrame,
+    },
+  };
+}
+
+const baseScenario = createAFrameScenario({
   id: "scenario-a",
   name: "Cenario A - 7,5 m, 50 graus",
   location: {
@@ -81,49 +93,49 @@ const baseScenario: Scenario = {
     freightBRL: 0,
     notes: "Frete nao incluso. Atualizar precos por cotacao formal.",
   },
-};
+});
 
 export const defaultScenarios: Scenario[] = [
   baseScenario,
-  {
+  createAFrameScenario({
     ...baseScenario,
     id: "scenario-b",
     name: "Cenario B - 7,5 m, 60 graus, area automatica",
     aFrame: { ...baseScenario.aFrame, baseAngleDeg: 60, automaticDepth: true },
-  },
-  {
+  }),
+  createAFrameScenario({
     ...baseScenario,
     id: "scenario-c",
     name: "Cenario C - painel 7,0 m, 50 graus",
     panelProductId: "isotelha-trapezoidal-pir-aco-aco",
     aFrame: { ...baseScenario.aFrame, panelLength: 7, houseDepth: 17.3 },
-  },
-  {
+  }),
+  createAFrameScenario({
     ...baseScenario,
     id: "scenario-d",
     name: "Cenario D - painel 30 mm",
     panelProductId: "isotelha-30-750",
     aFrame: { ...baseScenario.aFrame, panelThickness: 30 },
-  },
-  {
+  }),
+  createAFrameScenario({
     ...baseScenario,
     id: "scenario-e",
     name: "Cenario E - painel 20 mm",
     panelProductId: "isotelha-20-750",
     aFrame: { ...baseScenario.aFrame, panelThickness: 20 },
-  },
-  {
+  }),
+  createAFrameScenario({
     ...baseScenario,
     id: "scenario-f",
     name: "Cenario F - estrutura otimizada",
     steelMode: "optimized",
-  },
-  {
+  }),
+  createAFrameScenario({
     ...baseScenario,
     id: "scenario-g",
     name: "Cenario G - estrutura conservadora",
     steelMode: "conservative",
-  },
+  }),
 ];
 
 export const defaultProject: Project = {

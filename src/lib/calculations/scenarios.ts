@@ -66,6 +66,10 @@ export function duplicateScenario(source: Scenario): Scenario {
     terrain: { ...source.terrain },
     location: { ...source.location },
     aFrame: { ...source.aFrame },
+    methodInputs: {
+      ...source.methodInputs,
+      aframe: { ...(source.methodInputs.aframe ?? source.aFrame) },
+    },
     pricing: { ...source.pricing },
   };
 }

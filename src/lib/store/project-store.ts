@@ -140,7 +140,11 @@ export const useProjectStore = create<ProjectStore>()(
         })),
       updateScenarioAFrame: (scenarioId, aFrame) =>
         set((state) => ({
-          project: updateScenario(state.project, scenarioId, (scenario) => ({ ...scenario, aFrame })),
+          project: updateScenario(state.project, scenarioId, (scenario) => ({
+            ...scenario,
+            aFrame,
+            methodInputs: { ...scenario.methodInputs, aframe: aFrame },
+          })),
         })),
       updateScenarioPanel: (scenarioId, panelProductId, externalColor, internalFinish) =>
         set((state) => ({
@@ -344,7 +348,7 @@ export const useProjectStore = create<ProjectStore>()(
     }),
     {
       name: "aframe-project-store",
-      version: 5,
+      version: 6,
       partialize: (state) => ({ project: state.project, savedProjects: state.savedProjects }),
       migrate: (persisted) => {
         const persistedState = persisted as { project?: Project; savedProjects?: Project[] } | undefined;

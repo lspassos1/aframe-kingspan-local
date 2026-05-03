@@ -6,7 +6,7 @@ export type ConstructionMethodSpeed = "slow" | "medium" | "fast";
 
 export type ConstructionMethodIndustrializationLevel = "low" | "medium" | "high";
 
-export type ConstructionMethodInputs = Record<string, unknown>;
+export type ConstructionMethodInputs = object;
 
 export interface ConstructionMethodWarning {
   id: string;

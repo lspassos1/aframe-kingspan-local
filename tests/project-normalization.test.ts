@@ -11,6 +11,8 @@ describe("project serialization and normalization", () => {
     expect(parsed.name).toBe(defaultProject.name);
     expect(parsed.selectedScenarioId).toBe(defaultProject.selectedScenarioId);
     expect(parsed.scenarios).toHaveLength(defaultProject.scenarios.length);
+    expect(parsed.scenarios[0].constructionMethod).toBe("aframe");
+    expect(parsed.scenarios[0].methodInputs.aframe).toMatchObject(parsed.scenarios[0].aFrame);
     expect(parsed.panelProducts).toHaveLength(defaultProject.panelProducts.length);
     expect(parsed.materialAssumptions).toMatchObject(defaultProject.materialAssumptions);
     expect(parsed.budgetAssumptions.contingencyPercent).toBe(defaultProject.budgetAssumptions.contingencyPercent);
@@ -43,10 +45,19 @@ describe("project serialization and normalization", () => {
     const normalized = normalizeProject(legacyProject);
     const normalizedScenario = normalized.scenarios[0];
 
+    expect(normalizedScenario.constructionMethod).toBe("aframe");
+    expect(normalizedScenario.methodInputs.aframe).toMatchObject(normalizedScenario.aFrame);
     expect(normalizedScenario.aFrame.upperFloorMode).toBe("full-floor");
     expect(normalizedScenario.aFrame.upperFloorLevelHeight).toBe(2.6);
     expect(normalizedScenario.aFrame.upperFloorAreaPercent).toBe(50);
     expect(normalized.panelProducts).toHaveLength(defaultProject.panelProducts.length);
     expect(normalized.accessories).toHaveLength(defaultProject.accessories.length);
+  });
+
+  it("keeps every default scenario method-aware while preserving legacy aFrame inputs", () => {
+    for (const scenario of defaultProject.scenarios) {
+      expect(scenario.constructionMethod).toBe("aframe");
+      expect(scenario.methodInputs.aframe).toMatchObject(scenario.aFrame);
+    }
   });
 });

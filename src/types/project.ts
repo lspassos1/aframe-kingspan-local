@@ -1,3 +1,5 @@
+import type { ConstructionMethodId, ConstructionMethodInputs } from "@/lib/construction-methods";
+
 export type CurrencyCode = "BRL";
 
 export type WarningLevel = "info" | "warning" | "error";
@@ -56,9 +58,15 @@ export interface PricingMeta {
   notes: string;
 }
 
+export type ScenarioMethodInputs = Partial<Record<ConstructionMethodId, ConstructionMethodInputs>> & {
+  aframe?: AFrameInputs;
+};
+
 export interface Scenario {
   id: string;
   name: string;
+  constructionMethod: ConstructionMethodId;
+  methodInputs: ScenarioMethodInputs;
   terrain: Terrain;
   location: LocationData;
   aFrame: AFrameInputs;
