@@ -16,8 +16,11 @@ describe("A-frame geometry", () => {
 
     expect(geometry.baseWidth).toBeCloseTo(9.64, 1);
     expect(geometry.ridgeHeight).toBeCloseTo(5.75, 1);
+    expect(geometry.apexAngleDeg).toBe(80);
+    expect(geometry.roofInclinedArea).toBeCloseTo(259.5, 1);
     expect(geometry.groundUsefulWidth).toBeCloseTo(7.13, 1);
     expect(geometry.groundUsefulArea).toBeCloseTo(123.25, 1);
+    expect(geometry.combinedUsefulArea).toBeGreaterThan(geometry.groundUsefulArea);
   });
 
   it("supports automatic depth for target useful area", () => {
@@ -46,6 +49,7 @@ describe("materials and budget", () => {
 
     expect(layout.panelsPerSlope).toBe(18);
     expect(layout.totalPanels).toBe(36);
+    expect(layout.coverageDepthM).toBe(18);
     expect(layout.totalPanelAreaM2).toBe(270);
   });
 
@@ -67,6 +71,9 @@ describe("materials and budget", () => {
     const lines = calculateMaterialList(defaultProject, scenario);
 
     expect(lines.some((line) => line.code === "PAR COSTURA PB1/4-14 X 7/8 P1")).toBe(true);
+    expect(lines.find((line) => line.id === "panels")?.quantity).toBe(36);
+    expect(lines.find((line) => line.id === "par-fix")?.quantity).toBe(300);
+    expect(lines.find((line) => line.id === "cumeeira-trap")?.quantity).toBeGreaterThan(0);
     expect(lines.find((line) => line.id === "massa-vedante")?.requiresConfirmation).toBe(true);
   });
 
@@ -76,7 +83,9 @@ describe("materials and budget", () => {
     expect(budget.panelPackageCostBRL).toBeCloseTo(56699.64, 1);
     expect(budget.freightBRL).toBe(0);
     expect(budget.foundationCostBRL).toBeGreaterThan(0);
+    expect(budget.contingencyBRL).toBeGreaterThan(0);
     expect(budget.totalEstimatedCostBRL).toBeGreaterThan(budget.panelPackageCostBRL);
+    expect(budget.warnings.some((warning) => warning.id === "price-stale")).toBe(true);
   });
 
   it("estimates radier foundation quantities from current footprint", () => {
@@ -98,7 +107,9 @@ describe("structure and scenarios", () => {
 
     expect(estimate.frameCount).toBeGreaterThan(2);
     expect(estimate.totalSteelKg).toBeGreaterThan(0);
+    expect(estimate.members.some((member) => member.id === "main-frames" && member.requiresEngineerValidation)).toBe(true);
     expect(estimate.candidates.length).toBeGreaterThanOrEqual(3);
+    expect(estimate.warnings.some((warning) => warning.id === "structural-disclaimer")).toBe(true);
   });
 
   it("compares default scenarios", () => {
