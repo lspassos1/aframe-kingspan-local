@@ -1,5 +1,4 @@
 import { SignIn } from "@clerk/nextjs";
-import { AppleLoginButton } from "@/components/auth/AppleLoginButton";
 
 export default function SignInPage() {
   return (
@@ -12,8 +11,7 @@ export default function SignInPage() {
             A autenticacao e gerenciada pelo Clerk. Este app nao recebe nem armazena sua senha, hashes de senha ou tokens OAuth.
           </p>
         </div>
-        <div className="flex flex-col items-center gap-3">
-          <AppleLoginButton />
+        <div className="flex justify-center">
           <SignIn path="/sign-in" routing="path" signUpUrl="/sign-up" forceRedirectUrl="/start" />
         </div>
       </div>
