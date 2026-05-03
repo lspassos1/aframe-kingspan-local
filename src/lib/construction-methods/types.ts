@@ -1,3 +1,5 @@
+import type { AppWarning, BudgetItem, BudgetSummary, MaterialLine, Project, Scenario } from "@/types/project";
+
 export type ConstructionMethodId = "aframe" | "conventional-masonry" | "eco-block" | "monolithic-eps";
 
 export type ConstructionMethodComplexity = "low" | "medium" | "high";
@@ -24,6 +26,11 @@ export interface ConstructionMethodValidationResult {
   issues: ConstructionMethodValidationIssue[];
 }
 
+export interface ConstructionMethodCalculationContext {
+  project: Project;
+  scenario: Scenario;
+}
+
 export interface ConstructionMethodDefinition<TInputs extends ConstructionMethodInputs = ConstructionMethodInputs> {
   id: ConstructionMethodId;
   name: string;
@@ -37,6 +44,11 @@ export interface ConstructionMethodDefinition<TInputs extends ConstructionMethod
   industrializationLevel: ConstructionMethodIndustrializationLevel;
   getDefaultInputs: () => TInputs;
   validateInputs: (inputs: unknown) => ConstructionMethodValidationResult;
+  calculateGeometry?: (context: ConstructionMethodCalculationContext) => unknown;
+  calculateMaterialList?: (context: ConstructionMethodCalculationContext) => MaterialLine[];
+  calculateBudgetItems?: (context: ConstructionMethodCalculationContext) => BudgetItem[];
+  calculateBudget?: (context: ConstructionMethodCalculationContext) => BudgetSummary;
+  calculateWarnings?: (context: ConstructionMethodCalculationContext) => AppWarning[];
 }
 
 export function validResult(): ConstructionMethodValidationResult {
