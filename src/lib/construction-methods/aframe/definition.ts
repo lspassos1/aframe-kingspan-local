@@ -6,6 +6,10 @@ import {
   type ConstructionMethodDefinition,
   type ConstructionMethodInputs,
 } from "@/lib/construction-methods/types";
+import { calculateAFrameMethodBudget, calculateAFrameMethodBudgetItems } from "./budget";
+import { calculateAFrameMethodGeometry } from "./geometry";
+import { calculateAFrameMethodMaterialList } from "./materials";
+import { calculateAFrameMethodWarnings } from "./warnings";
 
 export const aframeDefinition = {
   id: "aframe",
@@ -44,4 +48,9 @@ export const aframeDefinition = {
     ]);
     return validationResult(issues);
   },
+  calculateGeometry: calculateAFrameMethodGeometry,
+  calculateMaterialList: calculateAFrameMethodMaterialList,
+  calculateBudgetItems: calculateAFrameMethodBudgetItems,
+  calculateBudget: calculateAFrameMethodBudget,
+  calculateWarnings: calculateAFrameMethodWarnings,
 } satisfies ConstructionMethodDefinition<ConstructionMethodInputs>;
