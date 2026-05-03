@@ -21,13 +21,11 @@ import {
   PlusCircle,
   Ruler,
   Settings,
-  Wrench,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { MandatoryWarning } from "@/components/shared/MandatoryWarning";
 import { useProjectStore } from "@/lib/store/project-store";
 import { cn } from "@/lib/utils";
 
@@ -103,15 +101,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <Separator className="my-5" />
         <NavList />
-        <div className="absolute bottom-5 left-4 right-4 rounded-md border bg-card/80 p-3 text-xs text-muted-foreground shadow-sm">
-          <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
-            <Wrench className="h-3.5 w-3.5" />
-            Uso pessoal/local
-          </div>
-          Login seguro via Clerk, sem banco proprio de usuarios e sem precos inventados.
-          <br />
-          Projetos continuam salvos no navegador.
-        </div>
       </aside>
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
@@ -140,7 +129,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
       <main className="lg:pl-72">
         <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-          <MandatoryWarning />
           {children}
         </div>
       </main>
