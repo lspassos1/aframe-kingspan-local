@@ -53,6 +53,12 @@ type MinimalMethodInputs = {
   floorHeightM?: number;
   internalWallLengthM?: number;
   blockType?: "ceramic" | "concrete";
+  blockLengthM?: number;
+  blockHeightM?: number;
+  blockWidthM?: number;
+  blocksPerM2?: number;
+  useType?: "infill" | "structural-preliminary";
+  finishType?: "exposed" | "plastered";
   wallThicknessM?: number;
   doorCount?: number;
   doorWidthM?: number;
@@ -66,6 +72,11 @@ type MinimalMethodInputs = {
   externalPlaster?: boolean;
   subfloor?: boolean;
   basicFinish?: boolean;
+  groutingEnabled?: boolean;
+  verticalRebarEnabled?: boolean;
+  horizontalRebarEnabled?: boolean;
+  baseWaterproofingEnabled?: boolean;
+  specializedLabor?: boolean;
   wastePercent?: number;
 };
 
@@ -208,6 +219,28 @@ export function StartProjectForm() {
       methodInputs.externalPlaster = formData.get("externalPlaster") === "on";
       methodInputs.subfloor = formData.get("subfloor") === "on";
       methodInputs.basicFinish = formData.get("basicFinish") === "on";
+      methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
+    }
+
+    if (selectedMethod === "eco-block") {
+      methodInputs.blockLengthM = Number(formData.get("blockLengthM") ?? selectedMethodInputs.blockLengthM ?? 0.25);
+      methodInputs.blockHeightM = Number(formData.get("blockHeightM") ?? selectedMethodInputs.blockHeightM ?? 0.125);
+      methodInputs.blockWidthM = Number(formData.get("blockWidthM") ?? selectedMethodInputs.blockWidthM ?? 0.125);
+      methodInputs.blocksPerM2 = Number(formData.get("blocksPerM2") ?? selectedMethodInputs.blocksPerM2 ?? 64);
+      methodInputs.useType = String(formData.get("useType") ?? selectedMethodInputs.useType ?? "infill") as MinimalMethodInputs["useType"];
+      methodInputs.finishType = String(formData.get("finishType") ?? selectedMethodInputs.finishType ?? "exposed") as MinimalMethodInputs["finishType"];
+      methodInputs.doorCount = Number(formData.get("doorCount") ?? selectedMethodInputs.doorCount ?? 2);
+      methodInputs.doorWidthM = Number(formData.get("doorWidthM") ?? selectedMethodInputs.doorWidthM ?? 0.8);
+      methodInputs.doorHeightM = Number(formData.get("doorHeightM") ?? selectedMethodInputs.doorHeightM ?? 2.1);
+      methodInputs.windowCount = Number(formData.get("windowCount") ?? selectedMethodInputs.windowCount ?? 4);
+      methodInputs.windowWidthM = Number(formData.get("windowWidthM") ?? selectedMethodInputs.windowWidthM ?? 1.2);
+      methodInputs.windowHeightM = Number(formData.get("windowHeightM") ?? selectedMethodInputs.windowHeightM ?? 1);
+      methodInputs.foundationType = String(formData.get("foundationType") ?? selectedMethodInputs.foundationType ?? "placeholder") as MinimalMethodInputs["foundationType"];
+      methodInputs.groutingEnabled = formData.get("groutingEnabled") === "on";
+      methodInputs.verticalRebarEnabled = formData.get("verticalRebarEnabled") === "on";
+      methodInputs.horizontalRebarEnabled = formData.get("horizontalRebarEnabled") === "on";
+      methodInputs.baseWaterproofingEnabled = formData.get("baseWaterproofingEnabled") === "on";
+      methodInputs.specializedLabor = formData.get("specializedLabor") === "on";
       methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
     }
 
@@ -422,6 +455,8 @@ export function StartProjectForm() {
               <p className="text-sm text-muted-foreground">
                 {selectedMethod === "conventional-masonry"
                   ? "Formulario MVP para quantitativos preliminares de alvenaria, sem dimensionamento estrutural real."
+                  : selectedMethod === "eco-block"
+                    ? "Formulario MVP para quantitativos preliminares de bloco solo-cimento, sem assumir funcao estrutural."
                   : "MVP preliminar para registrar dimensoes iniciais. Quantitativos, orcamento e 3D especificos entram nos proximos PRs."}
               </p>
             </CardHeader>
@@ -533,6 +568,72 @@ export function StartProjectForm() {
                           ["externalPlaster", "Reboco externo", selectedMethodInputs.externalPlaster ?? true],
                           ["subfloor", "Contrapiso", selectedMethodInputs.subfloor ?? true],
                           ["basicFinish", "Acabamento basico", selectedMethodInputs.basicFinish ?? false],
+                        ].map(([name, label, checked]) => (
+                          <label className="flex items-center gap-2 text-sm" key={String(name)}>
+                            <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                  {selectedMethod === "eco-block" ? (
+                    <>
+                      <NumberInput id="ecoBlockLength" name="blockLengthM" label="Comprimento bloco (m)" min={0.1} defaultValue={selectedMethodInputs.blockLengthM ?? 0.25} />
+                      <NumberInput id="ecoBlockHeight" name="blockHeightM" label="Altura bloco (m)" min={0.05} defaultValue={selectedMethodInputs.blockHeightM ?? 0.125} />
+                      <NumberInput id="ecoBlockWidth" name="blockWidthM" label="Largura bloco (m)" min={0.08} defaultValue={selectedMethodInputs.blockWidthM ?? 0.125} />
+                      <NumberInput id="ecoBlocksM2" name="blocksPerM2" label="Blocos por m2" min={1} defaultValue={selectedMethodInputs.blocksPerM2 ?? 64} />
+                      <div className="space-y-2">
+                        <Label htmlFor="ecoUseType">Uso</Label>
+                        <select
+                          id="ecoUseType"
+                          name="useType"
+                          defaultValue={selectedMethodInputs.useType ?? "infill"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="infill">Vedacao</option>
+                          <option value="structural-preliminary">Estrutural preliminar</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ecoFinishType">Acabamento</Label>
+                        <select
+                          id="ecoFinishType"
+                          name="finishType"
+                          defaultValue={selectedMethodInputs.finishType ?? "exposed"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="exposed">Aparente</option>
+                          <option value="plastered">Rebocado</option>
+                        </select>
+                      </div>
+                      <NumberInput id="ecoDoorCount" name="doorCount" label="Portas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.doorCount ?? 2} />
+                      <NumberInput id="ecoDoorWidth" name="doorWidthM" label="Largura porta (m)" min={0.5} defaultValue={selectedMethodInputs.doorWidthM ?? 0.8} />
+                      <NumberInput id="ecoDoorHeight" name="doorHeightM" label="Altura porta (m)" min={1.8} defaultValue={selectedMethodInputs.doorHeightM ?? 2.1} />
+                      <NumberInput id="ecoWindowCount" name="windowCount" label="Janelas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.windowCount ?? 4} />
+                      <NumberInput id="ecoWindowWidth" name="windowWidthM" label="Largura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowWidthM ?? 1.2} />
+                      <NumberInput id="ecoWindowHeight" name="windowHeightM" label="Altura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowHeightM ?? 1} />
+                      <div className="space-y-2">
+                        <Label htmlFor="ecoFoundationType">Fundacao</Label>
+                        <select
+                          id="ecoFoundationType"
+                          name="foundationType"
+                          defaultValue={selectedMethodInputs.foundationType ?? "placeholder"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="placeholder">Placeholder</option>
+                          <option value="radier">Radier</option>
+                          <option value="baldrame">Baldrame</option>
+                        </select>
+                      </div>
+                      <NumberInput id="ecoWaste" name="wastePercent" label="Perdas (%)" min={0} step={1} defaultValue={selectedMethodInputs.wastePercent ?? 10} />
+                      <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
+                        {[
+                          ["groutingEnabled", "Grauteamento", selectedMethodInputs.groutingEnabled ?? false],
+                          ["verticalRebarEnabled", "Armadura vertical", selectedMethodInputs.verticalRebarEnabled ?? false],
+                          ["horizontalRebarEnabled", "Armadura horizontal/canaletas", selectedMethodInputs.horizontalRebarEnabled ?? false],
+                          ["baseWaterproofingEnabled", "Impermeabilizacao de base", selectedMethodInputs.baseWaterproofingEnabled ?? true],
+                          ["specializedLabor", "Mao de obra especializada", selectedMethodInputs.specializedLabor ?? true],
                         ].map(([name, label, checked]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
                             <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />

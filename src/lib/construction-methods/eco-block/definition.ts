@@ -4,9 +4,14 @@ import {
   positiveNumberIssue,
   validationResult,
   type ConstructionMethodDefinition,
-  type ConstructionMethodInputs,
 } from "@/lib/construction-methods/types";
+import { calculateEcoBlockBudget, calculateEcoBlockBudgetItems } from "./budget";
+import { calculateEcoBlockGeometry } from "./geometry";
+import { defaultEcoBlockInputs, normalizeEcoBlockInputs } from "./inputs";
+import { calculateEcoBlockMaterialList } from "./materials";
 import { generateEcoBlock3DLayers } from "./three-layers";
+import type { EcoBlockInputs } from "./types";
+import { calculateEcoBlockWarnings } from "./warnings";
 
 export const ecoBlockDefinition = {
   id: "eco-block",
@@ -25,27 +30,24 @@ export const ecoBlockDefinition = {
   complexity: "medium",
   speed: "medium",
   industrializationLevel: "medium",
-  getDefaultInputs: () => ({
-    widthM: 8,
-    depthM: 12,
-    floorHeightM: 2.8,
-    blocksPerM2: 64,
-    useType: "infill",
-    finishType: "exposed",
-    groutingEnabled: false,
-    verticalRebarEnabled: false,
-    horizontalRebarEnabled: false,
-    baseWaterproofingEnabled: true,
-    wastePercent: 10,
-  }),
+  getDefaultInputs: () => ({ ...defaultEcoBlockInputs }),
   validateInputs: (inputs: unknown) => {
     if (!isRecord(inputs)) return validationResult([{ path: "", message: "Inputs devem ser um objeto." }]);
     const issues = compactValidationIssues([
       positiveNumberIssue(inputs, "widthM", "Largura deve ser maior que zero."),
       positiveNumberIssue(inputs, "depthM", "Profundidade deve ser maior que zero."),
       positiveNumberIssue(inputs, "blocksPerM2", "Blocos por metro quadrado deve ser maior que zero."),
+      positiveNumberIssue(inputs, "floorHeightM", "Pe-direito deve ser maior que zero."),
+      positiveNumberIssue(inputs, "blockLengthM", "Comprimento do bloco deve ser maior que zero."),
+      positiveNumberIssue(inputs, "blockHeightM", "Altura do bloco deve ser maior que zero."),
+      positiveNumberIssue(inputs, "blockWidthM", "Largura do bloco deve ser maior que zero."),
     ]);
     return validationResult(issues);
   },
+  calculateGeometry: calculateEcoBlockGeometry,
+  calculateMaterialList: calculateEcoBlockMaterialList,
+  calculateBudgetItems: calculateEcoBlockBudgetItems,
+  calculateBudget: calculateEcoBlockBudget,
+  calculateWarnings: ({ scenario }) => calculateEcoBlockWarnings(normalizeEcoBlockInputs(scenario.methodInputs?.["eco-block"])),
   generate3DLayers: generateEcoBlock3DLayers,
-} satisfies ConstructionMethodDefinition<ConstructionMethodInputs>;
+} satisfies ConstructionMethodDefinition<EcoBlockInputs>;

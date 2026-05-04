@@ -1,0 +1,101 @@
+import type { BudgetItem, BudgetSummary, MaterialLine } from "@/types/project";
+import type { ConstructionMethodCalculationContext } from "@/lib/construction-methods/types";
+import { calculateEcoBlockGeometry } from "./geometry";
+import { calculateEcoBlockMaterialList } from "./materials";
+
+const round = (value: number, decimals = 2) => {
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
+const asBudgetItem = (line: MaterialLine): BudgetItem => ({
+  id: line.id,
+  category: line.category,
+  description: line.description,
+  quantity: line.quantity,
+  unit: line.unit,
+  unitPriceBRL: line.unitPriceBRL,
+  grossTotalBRL: line.grossTotalBRL,
+  discountBRL: line.discountBRL,
+  netTotalBRL: line.netTotalBRL,
+  supplier: line.supplier,
+  notes: line.notes,
+  requiresConfirmation: line.requiresConfirmation,
+});
+
+function placeholderItem(id: string, description: string, value: number, category: BudgetItem["category"] = "civil"): BudgetItem {
+  return {
+    id,
+    category,
+    description,
+    quantity: 1,
+    unit: "lot",
+    unitPriceBRL: value,
+    grossTotalBRL: value,
+    discountBRL: 0,
+    netTotalBRL: value,
+    supplier: "A confirmar",
+    notes: "Valor placeholder editavel; substituir por fonte de preco revisada.",
+    requiresConfirmation: true,
+  };
+}
+
+export function calculateEcoBlockBudget(context: ConstructionMethodCalculationContext): BudgetSummary {
+  const { project } = context;
+  const geometry = calculateEcoBlockGeometry(context);
+  const items = calculateEcoBlockMaterialList(context).map(asBudgetItem);
+  const civilPlaceholderBRL = round(project.budgetAssumptions.foundationPlaceholderBRL + project.budgetAssumptions.drainagePlaceholderBRL);
+  const facadePlaceholderBRL = round(project.budgetAssumptions.doorsWindowsPlaceholderBRL + project.budgetAssumptions.frontFacadePlaceholderBRL);
+  const laborEquipmentBRL = round(project.budgetAssumptions.scaffoldingBRL + project.budgetAssumptions.liftingEquipmentBRL);
+  const technicalLegalBRL = round(
+    project.budgetAssumptions.architectPlaceholderBRL +
+      project.budgetAssumptions.engineerPlaceholderBRL +
+      project.budgetAssumptions.municipalApprovalPlaceholderBRL
+  );
+  const subtotalBeforeContingency = round(civilPlaceholderBRL + facadePlaceholderBRL + laborEquipmentBRL + technicalLegalBRL);
+  const contingencyBRL = round(subtotalBeforeContingency * (project.budgetAssumptions.contingencyPercent / 100));
+  const totalEstimatedCostBRL = round(subtotalBeforeContingency + contingencyBRL);
+
+  items.push(
+    placeholderItem("eco-foundation-placeholder", "Fundacao e impermeabilizacao complementar - placeholders", civilPlaceholderBRL),
+    placeholderItem("eco-openings-placeholder", "Esquadrias, vergas, contravergas e fechamentos - placeholders", facadePlaceholderBRL),
+    placeholderItem("eco-labor-equipment", "Mao de obra e equipamentos - placeholders", laborEquipmentBRL, "labor"),
+    placeholderItem("eco-technical-legal", "Arquitetura, engenharia, ART/RRT e aprovacao municipal", technicalLegalBRL, "technical"),
+    {
+      id: "eco-contingency",
+      category: "contingency",
+      description: `Contingencia (${project.budgetAssumptions.contingencyPercent}%)`,
+      quantity: 1,
+      unit: "lot",
+      unitPriceBRL: contingencyBRL,
+      grossTotalBRL: contingencyBRL,
+      discountBRL: 0,
+      netTotalBRL: contingencyBRL,
+      supplier: "Interno",
+      notes: "Percentual editavel nas premissas.",
+      requiresConfirmation: false,
+    }
+  );
+
+  return {
+    items,
+    panelPackageCostBRL: 0,
+    accessoriesCostBRL: 0,
+    freightBRL: 0,
+    steelStructureCostBRL: 0,
+    civilPlaceholderBRL,
+    foundationCostBRL: 0,
+    laborEquipmentBRL,
+    technicalLegalBRL,
+    contingencyBRL,
+    totalEstimatedCostBRL,
+    costPerTotalM2: round(totalEstimatedCostBRL / Math.max(1, geometry.builtAreaM2)),
+    costPerUsefulM2: round(totalEstimatedCostBRL / Math.max(1, geometry.builtAreaM2)),
+    costPerGroundUsefulM2: round(totalEstimatedCostBRL / Math.max(1, geometry.builtAreaM2)),
+    warnings: geometry.warnings,
+  };
+}
+
+export function calculateEcoBlockBudgetItems(context: ConstructionMethodCalculationContext): BudgetItem[] {
+  return calculateEcoBlockBudget(context).items;
+}

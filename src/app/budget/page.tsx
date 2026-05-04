@@ -11,6 +11,8 @@ import { calculateBudget } from "@/lib/calculations/budget";
 import { estimateRadierFoundation } from "@/lib/calculations/foundation";
 import { calculateConventionalMasonryBudget } from "@/lib/construction-methods/conventional-masonry/budget";
 import { calculateConventionalMasonryGeometry } from "@/lib/construction-methods/conventional-masonry/geometry";
+import { calculateEcoBlockBudget } from "@/lib/construction-methods/eco-block/budget";
+import { calculateEcoBlockGeometry } from "@/lib/construction-methods/eco-block/geometry";
 import { formatCurrency } from "@/lib/format";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 
@@ -39,6 +41,103 @@ export default function BudgetPage() {
   const updateFoundationAssumptions = useProjectStore((state) => state.updateFoundationAssumptions);
   const scenario = useSelectedScenario();
   const isConventionalMasonry = scenario.constructionMethod === "conventional-masonry";
+  const isEcoBlock = scenario.constructionMethod === "eco-block";
+  if (isEcoBlock) {
+    const geometry = calculateEcoBlockGeometry({ project, scenario });
+    const budget = calculateEcoBlockBudget({ project, scenario });
+    const pendingItems = budget.items.filter((item) => item.requiresConfirmation).length;
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <p className="text-sm text-muted-foreground">Orcamento</p>
+          <h1 className="text-3xl font-semibold tracking-normal">Estimativa preliminar de bloco ecologico</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Quantitativos sem preco inventado. Uso estrutural permanece bloqueado por warnings ate existir sistema validado e responsavel tecnico.
+          </p>
+        </div>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Total preliminar</p>
+              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.totalEstimatedCostBRL)}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Custo/m2</p>
+              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.costPerTotalM2)}</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Area construida</p>
+              <p className="mt-2 text-2xl font-semibold">{geometry.builtAreaM2} m2</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Itens pendentes</p>
+              <p className="mt-2 text-2xl font-semibold">{pendingItems}</p>
+            </CardContent>
+          </Card>
+        </section>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Itens preliminares</CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table className="min-w-[1120px] table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-56">Descricao</TableHead>
+                  <TableHead className="w-28">Categoria</TableHead>
+                  <TableHead className="w-24 text-right">Qtd.</TableHead>
+                  <TableHead className="w-20">Un.</TableHead>
+                  <TableHead className="w-32 text-right">Liquido</TableHead>
+                  <TableHead className="w-[360px]">Notas</TableHead>
+                  <TableHead className="w-40">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {budget.items.map((item) => (
+                  <TableRow key={item.id} className="align-top">
+                    <TableCell className="whitespace-normal break-words align-top font-medium">{item.description}</TableCell>
+                    <TableCell className="align-top">{item.category}</TableCell>
+                    <TableCell className="align-top text-right">{item.quantity}</TableCell>
+                    <TableCell className="align-top">{item.unit}</TableCell>
+                    <TableCell className="align-top text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
+                    <TableCell className="whitespace-normal break-words align-top text-xs text-muted-foreground">{item.notes}</TableCell>
+                    <TableCell className="align-top">
+                      <Badge variant={item.requiresConfirmation ? "secondary" : "outline"}>
+                        {item.requiresConfirmation ? "revisar fonte" : "parametro"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Alertas tecnicos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {budget.warnings.map((warning) => (
+              <div key={warning.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                {warning.message}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (isConventionalMasonry) {
     const geometry = calculateConventionalMasonryGeometry({ project, scenario });
     const budget = calculateConventionalMasonryBudget({ project, scenario });
