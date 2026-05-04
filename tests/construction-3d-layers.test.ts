@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
-import { getConstructionMethodDefinition, type Construction3DLayerType, type ConstructionMethodId } from "@/lib/construction-methods";
+import { getConstructionMethodDefinition, type Construction3DLayer, type Construction3DLayerType, type ConstructionMethodId } from "@/lib/construction-methods";
 import { getGeneric3DNumberControls } from "@/lib/construction-methods/generic-3d-controls";
+import { getGenericViewerFramingLayers } from "@/lib/construction-methods/generic-viewer-framing";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
 
 const genericMethodIds: ConstructionMethodId[] = ["conventional-masonry", "eco-block", "monolithic-eps"];
@@ -127,6 +128,39 @@ describe("generic construction 3D layers", () => {
     expect(buildableArea?.wireframe).toBe(true);
   });
 
+  it("keeps buildable area tied to real lot dimensions when the render plane is padded", () => {
+    const definition = getConstructionMethodDefinition("conventional-masonry");
+    const baseScenario = defaultProject.scenarios[0];
+    const scenario = {
+      ...baseScenario,
+      constructionMethod: "conventional-masonry" as const,
+      terrain: {
+        ...baseScenario.terrain,
+        width: 6,
+        depth: 8,
+        frontSetback: 1,
+        rearSetback: 1,
+        leftSetback: 1,
+        rightSetback: 1,
+      },
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "conventional-masonry": {
+          ...definition.getDefaultInputs(),
+          widthM: 10,
+          depthM: 14,
+        },
+      },
+    };
+    const terrain = definition.generate3DLayers?.({ project: defaultProject, scenario }).find((layer) => layer.type === "terrain");
+    const terrainPlane = terrain?.data.primitives.find((primitive) => primitive.id === "terrain-plane");
+    const buildableArea = terrain?.data.primitives.find((primitive) => primitive.id === "buildable-area");
+
+    expect(terrainPlane?.size[0]).toBeGreaterThan(6);
+    expect(terrainPlane?.size[2]).toBeGreaterThan(8);
+    expect(buildableArea?.size).toEqual([4, 0.04, 6]);
+  });
+
   it("exposes A-frame-like dynamic controls for non-A-frame viewers", () => {
     expect(getGeneric3DNumberControls("conventional-masonry", { widthM: 9, depthM: 12, floorHeightM: 3, floors: 2 }).map((control) => control.key)).toEqual([
       "widthM",
@@ -160,11 +194,45 @@ describe("generic construction 3D layers", () => {
       const layers = definition.generate3DLayers?.({ project: defaultProject, scenario }) ?? [];
       const dimensions = getGenericConstructionDimensions(layers);
 
-      expect(dimensions?.widthM).toBe(9);
-      expect(dimensions?.depthM).toBe(11);
+      expect(dimensions?.widthM).toBeGreaterThanOrEqual(9);
+      expect(dimensions?.depthM).toBeGreaterThanOrEqual(11);
       expect(dimensions?.heightM).toBeGreaterThan(3);
       expect(dimensions?.terrainWidthM).toBeGreaterThanOrEqual(9);
       expect(dimensions?.terrainDepthM).toBeGreaterThanOrEqual(11);
     }
+  });
+
+  it("aligns dimension values with the footprint extents used by dimension lines", () => {
+    const definition = getConstructionMethodDefinition("conventional-masonry");
+    const baseScenario = defaultProject.scenarios[0];
+    const scenario = {
+      ...baseScenario,
+      constructionMethod: "conventional-masonry" as const,
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "conventional-masonry": {
+          ...definition.getDefaultInputs(),
+          widthM: 9,
+          depthM: 11,
+          wallThicknessM: 0.2,
+        },
+      },
+    };
+    const layers = definition.generate3DLayers?.({ project: defaultProject, scenario }) ?? [];
+    const dimensions = getGenericConstructionDimensions(layers);
+
+    expect(dimensions?.widthM).toBe(9.2);
+    expect(dimensions?.depthM).toBe(11.2);
+  });
+
+  it("frames the full dimension source when dimension overlays are visible", () => {
+    const activeLayers: Construction3DLayer[] = [{ id: "walls", type: "walls", label: "Paredes", visibleByDefault: true, methodId: "conventional-masonry", data: { primitives: [] } }];
+    const dimensionLayers: Construction3DLayer[] = [
+      ...activeLayers,
+      { id: "terrain", type: "terrain", label: "Terreno", visibleByDefault: false, methodId: "conventional-masonry", data: { primitives: [] } },
+    ];
+
+    expect(getGenericViewerFramingLayers(activeLayers, dimensionLayers, true)).toBe(dimensionLayers);
+    expect(getGenericViewerFramingLayers(activeLayers, dimensionLayers, false)).toBe(activeLayers);
   });
 });

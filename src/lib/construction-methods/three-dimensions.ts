@@ -49,12 +49,6 @@ function mergeExtents(primitives: Construction3DPrimitive[]): Construction3DExte
 
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
-function nominalSpan(primitives: Construction3DPrimitive[], axis: 0 | 2, fallback: number) {
-  if (primitives.length === 0) return fallback;
-
-  return Math.max(...primitives.map((primitive) => primitive.size[axis]));
-}
-
 export function getGenericConstructionDimensions(layers: Construction3DLayer[]): GenericConstructionDimensions | null {
   const terrain = mergeExtents(layers.filter((layer) => layer.type === "terrain").flatMap((layer) => layer.data.primitives));
   const wallPrimitives = layers.filter((layer) => layer.type === "walls").flatMap((layer) => layer.data.primitives);
@@ -70,8 +64,8 @@ export function getGenericConstructionDimensions(layers: Construction3DLayer[]):
     footprint,
     vertical,
     terrain: terrain ?? undefined,
-    widthM: round(nominalSpan(wallPrimitives, 0, footprint.maxX - footprint.minX)),
-    depthM: round(nominalSpan(wallPrimitives, 2, footprint.maxZ - footprint.minZ)),
+    widthM: round(footprint.maxX - footprint.minX),
+    depthM: round(footprint.maxZ - footprint.minZ),
     heightM: round(vertical.maxY),
     terrainWidthM: terrain ? round(terrain.maxX - terrain.minX) : undefined,
     terrainDepthM: terrain ? round(terrain.maxZ - terrain.minZ) : undefined,

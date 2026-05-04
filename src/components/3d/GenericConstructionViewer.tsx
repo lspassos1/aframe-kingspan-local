@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { getGeneric3DNumberControls } from "@/lib/construction-methods/generic-3d-controls";
+import { getGenericViewerFramingLayers } from "@/lib/construction-methods/generic-viewer-framing";
 import { getScenarioMethodInputs } from "@/lib/construction-methods";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
 import { useProjectStore } from "@/lib/store/project-store";
@@ -207,9 +208,11 @@ function GenericScene({
   showDimensions: boolean;
   view: ViewMode;
 }) {
+  const framingLayers = getGenericViewerFramingLayers(layers, dimensionLayers, showDimensions);
+
   return (
     <>
-      <CameraView layers={layers} view={view} />
+      <CameraView layers={framingLayers} view={view} />
       <ambientLight intensity={0.72} />
       <directionalLight position={[8, 12, 8]} intensity={1.15} castShadow />
       {layers.map((layer) => (

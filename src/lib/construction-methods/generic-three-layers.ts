@@ -38,8 +38,8 @@ export function generateRectangularConstructionLayers(
   const terrainWidthM = Math.max(scenario.terrain.width, widthM + 4);
   const terrainDepthM = Math.max(scenario.terrain.depth, depthM + 4);
   const roofOverhangM = 0.35;
-  const buildableWidthM = Math.max(0.2, terrainWidthM - scenario.terrain.leftSetback - scenario.terrain.rightSetback);
-  const buildableDepthM = Math.max(0.2, terrainDepthM - scenario.terrain.frontSetback - scenario.terrain.rearSetback);
+  const buildableWidthM = Math.max(0.2, scenario.terrain.width - scenario.terrain.leftSetback - scenario.terrain.rightSetback);
+  const buildableDepthM = Math.max(0.2, scenario.terrain.depth - scenario.terrain.frontSetback - scenario.terrain.rearSetback);
 
   return [
     {
