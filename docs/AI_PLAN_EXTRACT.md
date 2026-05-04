@@ -28,6 +28,8 @@ Limites e seguranca:
 - `AI_RATE_LIMIT_FAIL_OPEN`: manter `false` em producao.
 - `AI_RATE_LIMIT_REDIS_TIMEOUT_MS`: timeout para Upstash Redis REST.
 - `AI_TRUST_PROXY_IP_HEADERS`: usar `true` somente quando a aplicacao esta atras de proxy confiavel que controla `x-forwarded-for`/`x-real-ip`.
+- `AI_PLAN_EXTRACT_CACHE_TTL_HOURS`: tempo de cache por hash do arquivo/modelo. Padrao: `24`.
+- `AI_PLAN_EXTRACT_CACHE_VERSION`: versao manual para invalidar cache quando prompt, schema ou provider mudarem.
 
 Armazenamento opcional de rate limit:
 
