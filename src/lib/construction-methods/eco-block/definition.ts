@@ -6,6 +6,7 @@ import {
   type ConstructionMethodDefinition,
   type ConstructionMethodInputs,
 } from "@/lib/construction-methods/types";
+import { generateEcoBlock3DLayers } from "./three-layers";
 
 export const ecoBlockDefinition = {
   id: "eco-block",
@@ -46,4 +47,5 @@ export const ecoBlockDefinition = {
     ]);
     return validationResult(issues);
   },
+  generate3DLayers: generateEcoBlock3DLayers,
 } satisfies ConstructionMethodDefinition<ConstructionMethodInputs>;

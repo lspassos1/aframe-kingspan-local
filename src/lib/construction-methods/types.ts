@@ -31,6 +31,49 @@ export interface ConstructionMethodCalculationContext {
   scenario: Scenario;
 }
 
+export type Construction3DLayerType =
+  | "terrain"
+  | "foundation"
+  | "floor"
+  | "structure"
+  | "walls"
+  | "roof"
+  | "openings"
+  | "services"
+  | "finishes"
+  | "dimensions"
+  | "warnings"
+  | "assembly-step";
+
+export type Construction3DVector3 = [number, number, number];
+
+export interface Construction3DBoxPrimitive {
+  id: string;
+  kind: "box";
+  label?: string;
+  position: Construction3DVector3;
+  size: Construction3DVector3;
+  color: string;
+  opacity?: number;
+  wireframe?: boolean;
+}
+
+export type Construction3DPrimitive = Construction3DBoxPrimitive;
+
+export interface Construction3DLayerData {
+  primitives: Construction3DPrimitive[];
+  notes?: string[];
+}
+
+export interface Construction3DLayer {
+  id: string;
+  type: Construction3DLayerType;
+  label: string;
+  visibleByDefault: boolean;
+  methodId: ConstructionMethodId;
+  data: Construction3DLayerData;
+}
+
 export interface ConstructionMethodDefinition<TInputs extends ConstructionMethodInputs = ConstructionMethodInputs> {
   id: ConstructionMethodId;
   name: string;
@@ -49,6 +92,7 @@ export interface ConstructionMethodDefinition<TInputs extends ConstructionMethod
   calculateBudgetItems?: (context: ConstructionMethodCalculationContext) => BudgetItem[];
   calculateBudget?: (context: ConstructionMethodCalculationContext) => BudgetSummary;
   calculateWarnings?: (context: ConstructionMethodCalculationContext) => AppWarning[];
+  generate3DLayers?: (context: ConstructionMethodCalculationContext) => Construction3DLayer[];
 }
 
 export function validResult(): ConstructionMethodValidationResult {

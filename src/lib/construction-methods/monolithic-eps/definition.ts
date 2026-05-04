@@ -6,6 +6,7 @@ import {
   type ConstructionMethodDefinition,
   type ConstructionMethodInputs,
 } from "@/lib/construction-methods/types";
+import { generateMonolithicEps3DLayers } from "./three-layers";
 
 export const monolithicEpsDefinition = {
   id: "monolithic-eps",
@@ -49,4 +50,5 @@ export const monolithicEpsDefinition = {
     ]);
     return validationResult(issues);
   },
+  generate3DLayers: generateMonolithicEps3DLayers,
 } satisfies ConstructionMethodDefinition<ConstructionMethodInputs>;
