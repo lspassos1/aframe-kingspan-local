@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A-frame Estudo",
-  description: "Pre-projeto A-frame com modelo 3D, materiais, estrutura preliminar e orcamento.",
+  title: "Construção Estudo",
+  description: "Plataforma modular para pré-projeto, visualização 3D, quantitativos, orçamento preliminar e cotação por método construtivo.",
 };
 
 export default function RootLayout({
@@ -30,8 +30,8 @@ export default function RootLayout({
   return (
     <ClerkProvider
       localization={ptBR}
-      signInUrl="/"
-      signUpUrl="/"
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       signInForceRedirectUrl="/start"
       signUpForceRedirectUrl="/start"
     >
