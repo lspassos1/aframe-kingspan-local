@@ -1,8 +1,10 @@
 const publicRoutePrefixes = ["/sign-in", "/sign-up"];
 const publicRoutes = new Set(["/", "/privacy", "/terms", "/feedback"]);
 const authenticatedAppShellRoutes = new Set(["/feedback"]);
+const authenticatedAppShellRoutesBeforeOnboarding = new Set(["/feedback"]);
+const appShellRoutesBeforeOnboarding = new Set(["/start", "/feedback"]);
 
-function normalizePathname(pathname: string) {
+export function normalizePathname(pathname: string) {
   const withLeadingSlash = pathname.startsWith("/") ? pathname : `/${pathname}`;
 
   if (withLeadingSlash.length > 1 && withLeadingSlash.endsWith("/")) {
@@ -10,6 +12,10 @@ function normalizePathname(pathname: string) {
   }
 
   return withLeadingSlash;
+}
+
+export function canUseAppShellBeforeOnboarding(pathname: string) {
+  return appShellRoutesBeforeOnboarding.has(normalizePathname(pathname));
 }
 
 function matchesRoutePrefix(pathname: string, prefix: string) {
@@ -29,6 +35,10 @@ export function isPublicRoute(pathname: string) {
 
 export function shouldUsePublicShell(pathname: string, isSignedIn: boolean, onboardingCompleted = false) {
   const normalizedPathname = normalizePathname(pathname);
+
+  if (isSignedIn && authenticatedAppShellRoutesBeforeOnboarding.has(normalizedPathname)) {
+    return false;
+  }
 
   if (isSignedIn && onboardingCompleted && authenticatedAppShellRoutes.has(normalizedPathname)) {
     return false;

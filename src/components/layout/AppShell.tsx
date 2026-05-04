@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useProjectStore } from "@/lib/store/project-store";
+import { canUseAppShellBeforeOnboarding } from "@/lib/routes/shell";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -81,7 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const onboardingCompleted = useProjectStore((state) => state.project.onboardingCompleted);
 
   useEffect(() => {
-    if (!onboardingCompleted && pathname !== "/start") {
+    if (!onboardingCompleted && !canUseAppShellBeforeOnboarding(pathname)) {
       router.replace("/start");
     }
   }, [onboardingCompleted, pathname, router]);
