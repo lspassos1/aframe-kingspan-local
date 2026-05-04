@@ -1,8 +1,12 @@
 import { StartProjectForm } from "@/components/onboarding/StartProjectForm";
-import { ArrowDown, FileUp, PenLine } from "lucide-react";
+import { PlanImportCard } from "@/components/ai/PlanImportCard";
+import { isAiPlanExtractEnabled } from "@/lib/ai/plan-extract-request";
+import { ArrowDown, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function StartPage() {
+  const planExtractEnabled = isAiPlanExtractEnabled();
+
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden rounded-3xl border bg-card/85 p-6 shadow-sm shadow-foreground/5 sm:p-8">
@@ -24,13 +28,7 @@ export default function StartPage() {
             <span className="mt-4 block font-semibold">Preencher manualmente</span>
             <span className="mt-1 block text-sm text-muted-foreground">Controle total dos campos do estudo.</span>
           </a>
-          <div className="rounded-2xl border border-dashed bg-muted/45 p-4 text-muted-foreground">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
-              <FileUp className="h-5 w-5" />
-            </span>
-            <span className="mt-4 block font-semibold text-foreground">Importar planta baixa</span>
-            <span className="mt-1 block text-sm">Fluxo de IA com revisão humana entra no próximo PR.</span>
-          </div>
+          {planExtractEnabled ? <PlanImportCard /> : null}
         </div>
         <Button asChild variant="outline" className="relative mt-6">
           <a href="#manual-start">
