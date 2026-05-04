@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
 import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders } from "@/lib/ai/rate-limit";
+import { createMemoryPlanExtractCacheStore, createPlanExtractCacheKey, getPlanExtractCacheTtlSeconds } from "@/lib/ai/plan-extract-cache";
 import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtractFile } from "@/lib/ai/plan-extract-request";
 import { AiPlanExtractError, AiProviderChainError } from "@/lib/ai/errors";
 
@@ -47,6 +48,23 @@ export async function POST(request: NextRequest) {
     return jsonResponse({ message: validation.message, maxBytes: validation.maxBytes }, { status: validation.status });
   }
 
+  const fileBytes = Buffer.from(await file.arrayBuffer());
+  const cacheStore = createMemoryPlanExtractCacheStore();
+  const cacheKey = createPlanExtractCacheKey({ fileBytes, mimeType: validation.mimeType });
+  const cachedExtraction = await cacheStore.get(cacheKey.key).catch(() => null);
+  if (cachedExtraction) {
+    return jsonResponse(
+      {
+        result: cachedExtraction.result,
+        provider: cachedExtraction.provider,
+        model: cachedExtraction.model,
+        tokens: cachedExtraction.tokens,
+        cached: true,
+      },
+      { headers: { "X-AI-Cache": "HIT" } }
+    );
+  }
+
   const trustProxyHeaders = process.env.AI_TRUST_PROXY_IP_HEADERS === "true";
   const rateLimitDecision = await checkAndConsumeAiDailyLimit({
     feature: "plan-extract",
@@ -60,13 +78,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const fileBase64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+    const fileBase64 = fileBytes.toString("base64");
     const extraction = await extractPlanWithProviderChain({
       mimeType: validation.mimeType,
       fileBase64,
       fileName: sanitizePlanExtractFileName(file.name),
       timeoutMs: 45_000,
     });
+    await cacheStore.set(cacheKey.key, extraction, getPlanExtractCacheTtlSeconds()).catch(() => undefined);
 
     return jsonResponse(
       {
@@ -75,7 +94,7 @@ export async function POST(request: NextRequest) {
         model: extraction.model,
         tokens: extraction.tokens,
       },
-      { headers: rateLimitHeaders }
+      { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS" } }
     );
   } catch (error) {
     const payload = getErrorMessage(error);
