@@ -72,6 +72,8 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
   const url = env.UPSTASH_REDIS_REST_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
+  const redisUrl = url;
+  const redisToken = token;
   const timeoutMs = getNumberEnv(env, "AI_RATE_LIMIT_REDIS_TIMEOUT_MS", 2500);
 
   async function fetchRedis(path: string) {
@@ -80,17 +82,23 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
     try {
       return await fetcher(path, {
         signal: controller.signal,
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${redisToken}` },
       });
     } finally {
       clearTimeout(timeout);
     }
   }
 
+  async function decrementRedis(key: string) {
+    const endpoint = redisUrl.replace(/\/$/, "");
+    const response = await fetchRedis(`${endpoint}/decr/${encodeURIComponent(key)}`);
+    if (!response.ok) throw new Error(`Redis DECR failed with ${response.status}.`);
+  }
+
   return {
     kind: "redis",
     async increment(key, ttlSeconds) {
-      const endpoint = url.replace(/\/$/, "");
+      const endpoint = redisUrl.replace(/\/$/, "");
       const incrementResponse = await fetchRedis(`${endpoint}/incr/${encodeURIComponent(key)}`);
       if (!incrementResponse.ok) throw new Error(`Redis INCR failed with ${incrementResponse.status}.`);
       const incrementPayload = (await incrementResponse.json()) as { result?: number };
@@ -98,16 +106,19 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
       if (!Number.isFinite(count)) throw new Error("Redis INCR returned an invalid count.");
 
       if (count === 1) {
-        const expireResponse = await fetchRedis(`${endpoint}/expire/${encodeURIComponent(key)}/${ttlSeconds}`);
-        if (!expireResponse.ok) throw new Error(`Redis EXPIRE failed with ${expireResponse.status}.`);
+        try {
+          const expireResponse = await fetchRedis(`${endpoint}/expire/${encodeURIComponent(key)}/${ttlSeconds}`);
+          if (!expireResponse.ok) throw new Error(`Redis EXPIRE failed with ${expireResponse.status}.`);
+        } catch (error) {
+          await decrementRedis(key).catch(() => undefined);
+          throw error;
+        }
       }
 
       return count;
     },
     async decrement(key) {
-      const endpoint = url.replace(/\/$/, "");
-      const response = await fetchRedis(`${endpoint}/decr/${encodeURIComponent(key)}`);
-      if (!response.ok) throw new Error(`Redis DECR failed with ${response.status}.`);
+      await decrementRedis(key);
     },
   };
 }
@@ -136,7 +147,8 @@ function buildHeadersDecision(decision: AiRateLimitDecision) {
   return decision;
 }
 
-export function getClientIpFromHeaders(headers: Headers) {
+export function getClientIpFromHeaders(headers: Headers, options: { trustProxyHeaders?: boolean } = {}) {
+  if (!options.trustProxyHeaders) return null;
   return headers.get("x-forwarded-for")?.split(",")[0]?.trim() || headers.get("x-real-ip") || null;
 }
 

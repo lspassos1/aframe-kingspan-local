@@ -197,6 +197,28 @@ describe("AI daily rate limit", () => {
     expect(signals[1]).toBeInstanceOf(AbortSignal);
   });
 
+  it("rolls back a first Redis increment when setting the expiration fails", async () => {
+    const calls: string[] = [];
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("/incr/")) return Response.json({ result: 1 });
+      if (url.includes("/expire/")) return new Response(null, { status: 503 });
+      return Response.json({ result: 0 });
+    };
+    const store = createRedisAiRateLimitStore(
+      {
+        UPSTASH_REDIS_REST_URL: "https://redis.example.com",
+        UPSTASH_REDIS_REST_TOKEN: "redis-token",
+      },
+      fetcher
+    );
+
+    await expect(store?.increment("ai:plan-extract:global:2026-05-04:test", 60)).rejects.toThrow("Redis EXPIRE failed");
+
+    expect(calls.some((url) => url.includes("/decr/"))).toBe(true);
+  });
+
   it("extracts client IP and builds response headers", async () => {
     const headers = new Headers({
       "x-forwarded-for": "203.0.113.14, 10.0.0.1",
@@ -205,13 +227,14 @@ describe("AI daily rate limit", () => {
       {
         feature: "plan-extract",
         userId: "user-3",
-        ip: getClientIpFromHeaders(headers),
+        ip: getClientIpFromHeaders(headers, { trustProxyHeaders: true }),
         now: new Date("2026-05-04T12:00:00.000Z"),
       },
       { env: baseEnv, store: createMemoryAiRateLimitStore(new Map()) }
     );
 
-    expect(getClientIpFromHeaders(headers)).toBe("203.0.113.14");
+    expect(getClientIpFromHeaders(headers)).toBeNull();
+    expect(getClientIpFromHeaders(headers, { trustProxyHeaders: true })).toBe("203.0.113.14");
     expect(createAiRateLimitHeaders(decision)).toMatchObject({
       "X-RateLimit-Limit": "3",
       "X-RateLimit-Remaining": "2",
