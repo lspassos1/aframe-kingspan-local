@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, type InputHTMLAttributes } from "react";
+import { useEffect, useMemo, type InputHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, MapPinned, RotateCcw, Triangle } from "lucide-react";
+import { ArrowRight, ChevronDown, MapPinned, RotateCcw, Triangle } from "lucide-react";
 import { defaultProject } from "@/data/defaultProject";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +48,29 @@ function NumberInput({
       <Input type="number" step="0.01" aria-invalid={Boolean(error)} className={cn(fieldClass(Boolean(error)), className)} {...props} />
       <FieldError message={error} />
     </div>
+  );
+}
+
+function ProgressiveDetails({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className="group rounded-2xl border bg-muted/15 p-4 md:col-span-2">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+        <span>
+          <span className="block text-sm font-semibold">{title}</span>
+          <span className="mt-1 block text-sm leading-6 text-muted-foreground">{description}</span>
+        </span>
+        <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">{children}</div>
+    </details>
   );
 }
 
@@ -637,8 +660,34 @@ export function StartProjectForm() {
                     error={methodForm.formState.errors.floorHeightM?.message}
                     {...methodForm.register("floorHeightM")}
                   />
+                  <Controller
+                    control={methodForm.control}
+                    name="state"
+                    render={({ field: stateField, fieldState: stateFieldState }) => (
+                      <Controller
+                        control={methodForm.control}
+                        name="city"
+                        render={({ field: cityField, fieldState: cityFieldState }) => (
+                          <BrazilLocationSelectFields
+                            className="md:col-span-2"
+                            stateId="methodState"
+                            cityId="methodCity"
+                            stateValue={stateField.value}
+                            cityValue={cityField.value}
+                            onStateChange={stateField.onChange}
+                            onCityChange={cityField.onChange}
+                            stateError={stateFieldState.error?.message}
+                            cityError={cityFieldState.error?.message}
+                          />
+                        )}
+                      />
+                    )}
+                  />
                   {selectedMethod === "conventional-masonry" ? (
-                    <>
+                    <ProgressiveDetails
+                      title="Detalhes de alvenaria"
+                      description="Blocos, aberturas, fundacao, cobertura e acabamentos ficam aqui para nao travar o inicio do estudo."
+                    >
                       <NumberInput
                         id="methodFloors"
                         label="Pavimentos"
@@ -717,10 +766,13 @@ export function StartProjectForm() {
                           </label>
                         ))}
                       </div>
-                    </>
+                    </ProgressiveDetails>
                   ) : null}
                   {selectedMethod === "eco-block" ? (
-                    <>
+                    <ProgressiveDetails
+                      title="Detalhes do bloco ecologico"
+                      description="Modulacao, uso, acabamento, aberturas e reforcos preliminares podem ser ajustados depois dos dados basicos."
+                    >
                       <NumberInput id="ecoBlockLength" label="Comprimento bloco (m)" min={0.1} error={methodForm.formState.errors.blockLengthM?.message} {...methodForm.register("blockLengthM")} />
                       <NumberInput id="ecoBlockHeight" label="Altura bloco (m)" min={0.05} error={methodForm.formState.errors.blockHeightM?.message} {...methodForm.register("blockHeightM")} />
                       <NumberInput id="ecoBlockWidth" label="Largura bloco (m)" min={0.08} error={methodForm.formState.errors.blockWidthM?.message} {...methodForm.register("blockWidthM")} />
@@ -780,10 +832,13 @@ export function StartProjectForm() {
                           </label>
                         ))}
                       </div>
-                    </>
+                    </ProgressiveDetails>
                   ) : null}
                   {selectedMethod === "monolithic-eps" ? (
-                    <>
+                    <ProgressiveDetails
+                      title="Detalhes dos paineis EPS"
+                      description="Camadas do painel, aberturas, arranques e condicoes de montagem ficam recolhidos para revisao tecnica."
+                    >
                       <NumberInput id="epsCoreThickness" label="Núcleo EPS (m)" min={0.03} error={methodForm.formState.errors.epsCoreThicknessM?.message} {...methodForm.register("epsCoreThicknessM")} />
                       <NumberInput id="epsRenderThickness" label="Revest. por face (m)" min={0.01} error={methodForm.formState.errors.renderThicknessPerFaceM?.message} {...methodForm.register("renderThicknessPerFaceM")} />
                       <NumberInput id="epsFinalThickness" label="Espessura final (m)" min={0.08} error={methodForm.formState.errors.finalWallThicknessM?.message} {...methodForm.register("finalWallThicknessM")} />
@@ -833,31 +888,8 @@ export function StartProjectForm() {
                           </label>
                         ))}
                       </div>
-                    </>
+                    </ProgressiveDetails>
                   ) : null}
-                  <Controller
-                    control={methodForm.control}
-                    name="state"
-                    render={({ field: stateField, fieldState: stateFieldState }) => (
-                      <Controller
-                        control={methodForm.control}
-                        name="city"
-                        render={({ field: cityField, fieldState: cityFieldState }) => (
-                          <BrazilLocationSelectFields
-                            className="md:col-span-2"
-                            stateId="methodState"
-                            cityId="methodCity"
-                            stateValue={stateField.value}
-                            cityValue={cityField.value}
-                            onStateChange={stateField.onChange}
-                            onCityChange={cityField.onChange}
-                            stateError={stateFieldState.error?.message}
-                            cityError={cityFieldState.error?.message}
-                          />
-                        )}
-                      />
-                    )}
-                  />
                 </section>
 
                 <div className="flex justify-end border-t pt-5">
