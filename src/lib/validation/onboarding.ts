@@ -1,32 +1,30 @@
 import { z } from "zod";
 import type { ConstructionMethodId } from "@/lib/construction-methods/types";
-import { isBrazilCityInState, isBrazilState } from "@/lib/locations/brazil";
+import { addBrazilCityIssue, brazilCitySchema, brazilStateSchema } from "@/lib/validation/brazil-location";
 
 const constructionMethodIds = ["aframe", "conventional-masonry", "eco-block", "monolithic-eps"] as const satisfies readonly ConstructionMethodId[];
 
-const optionalNumber = z.preprocess((value) => {
+const emptyToUndefined = (value: unknown) => {
   if (value === "" || value === null || value === undefined) return undefined;
   return value;
-}, z.coerce.number().optional());
+};
 
-const brazilStateSchema = z
-  .string()
-  .trim()
-  .min(1, "Estado obrigatorio")
-  .max(80)
-  .refine((value) => isBrazilState(value), "Selecione um estado do Brasil");
-
-const brazilCitySchema = z.string().trim().min(1, "Cidade obrigatoria").max(80);
-
-function addBrazilCityIssue(values: { state: string; city: string }, context: z.RefinementCtx) {
-  if (values.state && values.city && !isBrazilCityInState(values.state, values.city)) {
-    context.addIssue({
-      code: "custom",
-      path: ["city"],
-      message: "Selecione uma cidade do estado informado",
-    });
-  }
-}
+const optionalPositiveNumber = (min: number, max: number, message: string) =>
+  z.preprocess(emptyToUndefined, z.coerce.number().min(min, message).max(max, "Revise o valor informado").optional());
+const optionalNonNegativeNumber = (max: number) =>
+  z.preprocess(emptyToUndefined, z.coerce.number().min(0, "Informe um valor zero ou maior").max(max, "Revise o valor informado").optional());
+const optionalCount = z.preprocess(
+  emptyToUndefined,
+  z.coerce.number().int("Informe um numero inteiro").min(0, "Informe zero ou mais").max(500, "Revise a quantidade").optional()
+);
+const optionalFloorCount = z.preprocess(
+  emptyToUndefined,
+  z.coerce.number().int("Informe um numero inteiro").min(1, "Informe pelo menos 1 pavimento").max(100, "Revise o numero de pavimentos").optional()
+);
+const optionalWastePercent = z.preprocess(
+  emptyToUndefined,
+  z.coerce.number().min(0, "Informe uma perda zero ou maior").max(100, "Perdas nao podem passar de 100%").optional()
+);
 
 function requireNumber(
   values: Record<string, unknown>,
@@ -67,30 +65,30 @@ export const methodProjectSchema = z
     projectName: z.string().trim().min(2, "Informe o nome do projeto").max(120),
     city: brazilCitySchema,
     state: brazilStateSchema,
-    widthM: optionalNumber,
-    depthM: optionalNumber,
-    floorHeightM: optionalNumber,
-    floors: optionalNumber,
-    internalWallLengthM: optionalNumber,
+    widthM: optionalPositiveNumber(2, 200, "Informe uma largura de pelo menos 2 m"),
+    depthM: optionalPositiveNumber(2, 300, "Informe uma profundidade de pelo menos 2 m"),
+    floorHeightM: optionalPositiveNumber(2, 6, "Informe um pe-direito de pelo menos 2 m"),
+    floors: optionalFloorCount,
+    internalWallLengthM: optionalNonNegativeNumber(1000),
     blockType: z.enum(["ceramic", "concrete"]).optional(),
-    blockLengthM: optionalNumber,
-    blockHeightM: optionalNumber,
-    blockWidthM: optionalNumber,
-    blocksPerM2: optionalNumber,
+    blockLengthM: optionalPositiveNumber(0.1, 1, "Informe o comprimento do bloco"),
+    blockHeightM: optionalPositiveNumber(0.05, 0.5, "Informe a altura do bloco"),
+    blockWidthM: optionalPositiveNumber(0.08, 0.5, "Informe a largura do bloco"),
+    blocksPerM2: optionalPositiveNumber(1, 200, "Informe os blocos por m2"),
     useType: z.enum(["infill", "structural-preliminary"]).optional(),
     finishType: z.enum(["exposed", "plastered"]).optional(),
-    epsCoreThicknessM: optionalNumber,
-    renderThicknessPerFaceM: optionalNumber,
-    finalWallThicknessM: optionalNumber,
-    panelWidthM: optionalNumber,
-    panelHeightM: optionalNumber,
-    wallThicknessM: optionalNumber,
-    doorCount: optionalNumber,
-    doorWidthM: optionalNumber,
-    doorHeightM: optionalNumber,
-    windowCount: optionalNumber,
-    windowWidthM: optionalNumber,
-    windowHeightM: optionalNumber,
+    epsCoreThicknessM: optionalPositiveNumber(0.03, 0.5, "Informe a espessura do nucleo EPS"),
+    renderThicknessPerFaceM: optionalPositiveNumber(0.01, 0.2, "Informe o revestimento por face"),
+    finalWallThicknessM: optionalPositiveNumber(0.08, 1, "Informe a espessura final"),
+    panelWidthM: optionalPositiveNumber(0.3, 3, "Informe a largura do painel"),
+    panelHeightM: optionalPositiveNumber(1, 6, "Informe a altura do painel"),
+    wallThicknessM: optionalPositiveNumber(0.09, 1, "Informe a espessura da parede"),
+    doorCount: optionalCount,
+    doorWidthM: optionalPositiveNumber(0.5, 5, "Informe a largura da porta"),
+    doorHeightM: optionalPositiveNumber(1.8, 5, "Informe a altura da porta"),
+    windowCount: optionalCount,
+    windowWidthM: optionalPositiveNumber(0.4, 8, "Informe a largura da janela"),
+    windowHeightM: optionalPositiveNumber(0.4, 4, "Informe a altura da janela"),
     foundationType: z.enum(["radier", "baldrame", "placeholder"]).optional(),
     roofType: z.enum(["simple-roof", "slab", "placeholder"]).optional(),
     internalPlaster: z.boolean().optional(),
@@ -107,7 +105,7 @@ export const methodProjectSchema = z
     projectionEquipmentRequired: z.boolean().optional(),
     specializedLaborRequired: z.boolean().optional(),
     finalFinish: z.boolean().optional(),
-    wastePercent: optionalNumber,
+    wastePercent: optionalWastePercent,
   })
   .superRefine((values, context) => {
     if (values.constructionMethod === "aframe") return;

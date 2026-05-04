@@ -75,4 +75,34 @@ describe("onboarding location validation", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("rejects invalid count and percentage values for method forms", () => {
+    const result = methodProjectSchema.safeParse({
+      constructionMethod: "conventional-masonry",
+      projectName: "Alvenaria preliminar",
+      city: "Salvador",
+      state: "Bahia",
+      widthM: 8,
+      depthM: 12,
+      floorHeightM: 2.8,
+      floors: 1.5,
+      doorCount: -2,
+      windowCount: 3.2,
+      wastePercent: 120,
+      wallThicknessM: 0.14,
+      doorWidthM: 0.8,
+      doorHeightM: 2.1,
+      windowWidthM: 1.2,
+      windowHeightM: 1,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issuePaths = result.error.issues.map((issue) => issue.path.join("."));
+      expect(issuePaths).toContain("floors");
+      expect(issuePaths).toContain("doorCount");
+      expect(issuePaths).toContain("windowCount");
+      expect(issuePaths).toContain("wastePercent");
+    }
+  });
 });
