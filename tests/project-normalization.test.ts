@@ -76,12 +76,13 @@ describe("project serialization and normalization", () => {
             id: "source-1",
             type: "manual",
             title: "Cotacao local",
-            supplier: "Fornecedor ABC",
-            state: "BA",
-            city: "Cruz das Almas",
-            referenceDate: "2026-05-04",
-            reliability: "low",
-            notes: "",
+          },
+        ],
+        priceSources: [
+          {
+            id: "price-source-1",
+            type: "supplier_quote",
+            title: "Base regional",
           },
         ],
         costItems: [],
@@ -98,13 +99,26 @@ describe("project serialization and normalization", () => {
           },
         ],
       },
-    } as Project;
+    } as unknown as Project;
 
     expect(normalizeProject(legacyProject).budgetAssistant).toMatchObject(defaultProject.budgetAssistant);
     expect(normalizeProject(savedProject).budgetAssistant.costSources[0]).toMatchObject({
       title: "Cotacao local",
-      supplier: "Fornecedor ABC",
-      referenceDate: "2026-05-04",
+      supplier: "",
+      state: "",
+      city: "",
+      referenceDate: "",
+      reliability: "low",
+      notes: "",
+    });
+    expect(normalizeProject(savedProject).budgetAssistant.priceSources[0]).toMatchObject({
+      title: "Base regional",
+      supplier: "",
+      state: "",
+      city: "",
+      referenceDate: "",
+      reliability: "low",
+      notes: "",
     });
     expect(normalizeProject(savedProject).budgetAssistant.matches[0].approvedByUser).toBe(true);
   });
