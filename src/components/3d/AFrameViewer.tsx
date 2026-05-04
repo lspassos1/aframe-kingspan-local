@@ -46,17 +46,20 @@ const defaultToggles: ToggleState = {
   panelNumbers: false,
 };
 
+const dimensionNumberFormatter = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+const formatDimension = (value: number) => dimensionNumberFormatter.format(value);
+
 function CameraView({ view, geometry, scenario }: { view: ViewMode; geometry: AFrameGeometry; scenario: Scenario }) {
   const { camera } = useThree();
   useEffect(() => {
     const distance = Math.max(scenario.terrain.width, scenario.terrain.depth, geometry.ridgeHeight) * 1.2;
     const positions: Record<ViewMode, [number, number, number]> = {
-      iso: [distance, distance * 0.75, distance],
+      iso: [distance, distance * 0.75, -distance],
       top: [0, distance * 1.4, 0.01],
-      front: [0, geometry.ridgeHeight * 0.65, distance],
-      rear: [0, geometry.ridgeHeight * 0.65, -distance],
+      front: [0, geometry.ridgeHeight * 0.65, -distance],
+      rear: [0, geometry.ridgeHeight * 0.65, distance],
       side: [distance, geometry.ridgeHeight * 0.65, 0],
-      section: [distance * 0.85, geometry.ridgeHeight * 0.7, distance * 0.35],
+      section: [distance * 0.85, geometry.ridgeHeight * 0.7, -distance * 0.35],
     };
     camera.position.set(...positions[view]);
     camera.lookAt(0, geometry.ridgeHeight / 2, 0);
@@ -132,7 +135,7 @@ function DimensionLine({
   return (
     <group>
       <Line points={points} color={color} lineWidth={2} />
-      <Text position={labelPosition} fontSize={0.24} color={color} anchorX="center" anchorY="middle">
+      <Text position={labelPosition} fontSize={0.24} color={color} anchorX="center" anchorY="middle" outlineColor="#ffffff" outlineWidth={0.01}>
         {label}
       </Text>
     </group>
@@ -305,14 +308,14 @@ function AFrameScene({
         <group>
           {dimensionMode === "basic" ? (
             <>
-              <Text position={[0, 0.25, frontHouseDimensionZ]} fontSize={0.35} color="#111827">
-                {`Casa ${geometry.baseWidth} m x ${geometry.effectiveHouseDepth} m`}
+              <Text position={[0, 0.25, frontHouseDimensionZ]} fontSize={0.35} color="#111827" outlineColor="#ffffff" outlineWidth={0.012}>
+                {`Casa ${formatDimension(geometry.baseWidth)} m x ${formatDimension(geometry.effectiveHouseDepth)} m`}
               </Text>
-              <Text position={[0, geometry.ridgeHeight + 0.45, frontHeightDimensionZ]} fontSize={0.35} color="#111827">
-                {`Cumeeira ${geometry.ridgeHeight} m`}
+              <Text position={[0, geometry.ridgeHeight + 0.45, frontHeightDimensionZ]} fontSize={0.35} color="#111827" outlineColor="#ffffff" outlineWidth={0.012}>
+                {`Cumeeira ${formatDimension(geometry.ridgeHeight)} m`}
               </Text>
-              <Text position={[0, 0.25, frontTerrainDimensionZ]} fontSize={0.32} color="#0f766e">
-                {`Lote ${scenario.terrain.width} m x ${scenario.terrain.depth} m`}
+              <Text position={[0, 0.25, frontTerrainDimensionZ]} fontSize={0.32} color="#0f766e" outlineColor="#ffffff" outlineWidth={0.012}>
+                {`Lote ${formatDimension(scenario.terrain.width)} m x ${formatDimension(scenario.terrain.depth)} m`}
               </Text>
             </>
           ) : null}
@@ -323,7 +326,7 @@ function AFrameScene({
                   [-geometry.baseWidth / 2, 0.16, frontHouseDimensionZ],
                   [geometry.baseWidth / 2, 0.16, frontHouseDimensionZ],
                 ]}
-                label={`Largura casa ${geometry.baseWidth} m`}
+                label={`Largura casa ${formatDimension(geometry.baseWidth)} m`}
                 labelPosition={[0, 0.42, frontHouseDimensionZ]}
                 color="#111827"
               />
@@ -332,7 +335,7 @@ function AFrameScene({
                   [geometry.baseWidth / 2 + 0.55, 0.16, frontHouseZ],
                   [geometry.baseWidth / 2 + 0.55, 0.16, rearHouseZ],
                 ]}
-                label={`Prof. ${geometry.effectiveHouseDepth} m`}
+                label={`Prof. ${formatDimension(geometry.effectiveHouseDepth)} m`}
                 labelPosition={[geometry.baseWidth / 2 + 0.9, 0.45, 0]}
                 color="#111827"
               />
@@ -341,7 +344,7 @@ function AFrameScene({
                   [-geometry.baseWidth / 2 - 0.75, 0.16, frontHeightDimensionZ],
                   [-geometry.baseWidth / 2 - 0.75, geometry.ridgeHeight, frontHeightDimensionZ],
                 ]}
-                label={`Altura ${geometry.ridgeHeight} m`}
+                label={`Altura ${formatDimension(geometry.ridgeHeight)} m`}
                 labelPosition={[-geometry.baseWidth / 2 - 1.15, geometry.ridgeHeight / 2, frontHeightDimensionZ]}
                 color="#7c2d12"
               />
@@ -350,7 +353,7 @@ function AFrameScene({
                   [-geometry.groundUsefulWidth / 2, 0.18, frontUsefulDimensionZ],
                   [geometry.groundUsefulWidth / 2, 0.18, frontUsefulDimensionZ],
                 ]}
-                label={`Largura util terreo ${geometry.groundUsefulWidth} m`}
+                label={`Largura util terreo ${formatDimension(geometry.groundUsefulWidth)} m`}
                 labelPosition={[0, 0.45, frontUsefulDimensionZ]}
                 color="#15803d"
               />
@@ -361,7 +364,7 @@ function AFrameScene({
                       [-geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, frontUpperFloorDimensionZ],
                       [geometry.upperFloorTotalWidth / 2, scenario.aFrame.upperFloorLevelHeight + 0.2, frontUpperFloorDimensionZ],
                     ]}
-                    label={`Largura sup. ${geometry.upperFloorTotalWidth} m`}
+                    label={`Largura sup. ${formatDimension(geometry.upperFloorTotalWidth)} m`}
                     labelPosition={[0, scenario.aFrame.upperFloorLevelHeight + 0.5, frontUpperFloorDimensionZ]}
                     color="#92400e"
                   />
@@ -370,7 +373,7 @@ function AFrameScene({
                       [geometry.baseWidth / 2 + 1.1, 0.16, frontHeightDimensionZ],
                       [geometry.baseWidth / 2 + 1.1, scenario.aFrame.upperFloorLevelHeight, frontHeightDimensionZ],
                     ]}
-                    label={`Piso superior ${scenario.aFrame.upperFloorLevelHeight} m`}
+                    label={`Piso superior ${formatDimension(scenario.aFrame.upperFloorLevelHeight)} m`}
                     labelPosition={[geometry.baseWidth / 2 + 1.75, scenario.aFrame.upperFloorLevelHeight / 2, frontHeightDimensionZ]}
                     color="#92400e"
                   />
@@ -381,7 +384,7 @@ function AFrameScene({
                   [-scenario.terrain.width / 2, 0.08, frontTerrainDimensionZ],
                   [scenario.terrain.width / 2, 0.08, frontTerrainDimensionZ],
                 ]}
-                label={`Largura lote ${scenario.terrain.width} m`}
+                label={`Largura lote ${formatDimension(scenario.terrain.width)} m`}
                 labelPosition={[0, 0.35, frontTerrainDimensionZ]}
                 color="#0f766e"
               />
@@ -390,7 +393,7 @@ function AFrameScene({
                   [-scenario.terrain.width / 2 - 0.45, 0.08, -scenario.terrain.depth / 2],
                   [-scenario.terrain.width / 2 - 0.45, 0.08, scenario.terrain.depth / 2],
                 ]}
-                label={`Prof. lote ${scenario.terrain.depth} m`}
+                label={`Prof. lote ${formatDimension(scenario.terrain.depth)} m`}
                 labelPosition={[-scenario.terrain.width / 2 - 0.85, 0.35, 0]}
                 color="#0f766e"
               />
