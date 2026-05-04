@@ -18,6 +18,7 @@ import {
   type BudgetConfidenceLevel,
   type PriceSourceType,
 } from "@/lib/budget-assistant";
+import { formatLocalDateInputValue } from "@/lib/date";
 import { formatCompactNumber, formatCurrency, formatDate } from "@/lib/format";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 
@@ -37,7 +38,11 @@ const sourceTypeOptions: Array<{ value: PriceSourceType; label: string }> = [
   { value: "web_reference", label: "Referencia web" },
 ];
 
-const today = () => new Date().toISOString().slice(0, 10);
+interface SourceLocationFormState {
+  locationKey: string;
+  city: string;
+  state: string;
+}
 
 export default function BudgetAssistantPage() {
   const project = useProjectStore((state) => state.project);
@@ -49,14 +54,18 @@ export default function BudgetAssistantPage() {
   const scenario = useSelectedScenario();
   const baseViewModel = useMemo(() => createBudgetAssistantViewModel(project, scenario), [project, scenario]);
   const firstQuantity = baseViewModel.pendingPriceItems[0] ?? baseViewModel.quantityItems[0];
+  const scenarioLocationKey = `${scenario.id}:${scenario.location.city}:${scenario.location.state}`;
   const [selectedQuantityId, setSelectedQuantityId] = useState(firstQuantity?.id ?? "");
   const [selectedSourceId, setSelectedSourceId] = useState(baseViewModel.costSources[0]?.id ?? "");
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourceType, setSourceType] = useState<PriceSourceType>("manual");
   const [sourceSupplier, setSourceSupplier] = useState("");
-  const [sourceCity, setSourceCity] = useState(scenario.location.city);
-  const [sourceState, setSourceState] = useState(scenario.location.state);
-  const [sourceDate, setSourceDate] = useState(today);
+  const [sourceLocation, setSourceLocation] = useState<SourceLocationFormState>(() => ({
+    locationKey: scenarioLocationKey,
+    city: scenario.location.city,
+    state: scenario.location.state,
+  }));
+  const [sourceDate, setSourceDate] = useState(formatLocalDateInputValue);
   const [sourceNotes, setSourceNotes] = useState("");
   const [itemDescription, setItemDescription] = useState(firstQuantity?.description ?? "");
   const [unitPrice, setUnitPrice] = useState("");
@@ -69,6 +78,8 @@ export default function BudgetAssistantPage() {
   const availableCostItems = project.budgetAssistant.costItems.filter((item) => item.constructionMethod === scenario.constructionMethod);
   const costItemById = new Map(availableCostItems.map((item) => [item.id, item]));
   const suggestedMatches = viewModel.matches.filter((match) => !match.approvedByUser);
+  const sourceCity = sourceLocation.locationKey === scenarioLocationKey ? sourceLocation.city : scenario.location.city;
+  const sourceState = sourceLocation.locationKey === scenarioLocationKey ? sourceLocation.state : scenario.location.state;
   const priceNumber = Number(unitPrice.replace(",", "."));
   const canAddSource = Boolean(sourceTitle.trim() && sourceType && sourceSupplier.trim() && sourceDate);
   const canAddManualPrice = Boolean(selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0);
@@ -77,6 +88,14 @@ export default function BudgetAssistantPage() {
     setSelectedQuantityId(quantityId);
     const quantity = viewModel.quantityItems.find((item) => item.id === quantityId);
     if (quantity) setItemDescription(quantity.description);
+  };
+
+  const handleSourceCityChange = (city: string) => {
+    setSourceLocation({ locationKey: scenarioLocationKey, city, state: sourceState });
+  };
+
+  const handleSourceStateChange = (state: string) => {
+    setSourceLocation({ locationKey: scenarioLocationKey, city: sourceCity, state });
   };
 
   const handleAddSource = (event: FormEvent<HTMLFormElement>) => {
@@ -192,11 +211,11 @@ export default function BudgetAssistantPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="source-city">Cidade</Label>
-                <Input id="source-city" value={sourceCity} onChange={(event) => setSourceCity(event.target.value)} />
+                <Input id="source-city" value={sourceCity} onChange={(event) => handleSourceCityChange(event.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="source-state">Estado</Label>
-                <Input id="source-state" value={sourceState} onChange={(event) => setSourceState(event.target.value)} />
+                <Input id="source-state" value={sourceState} onChange={(event) => handleSourceStateChange(event.target.value)} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="source-notes">Observacoes</Label>
