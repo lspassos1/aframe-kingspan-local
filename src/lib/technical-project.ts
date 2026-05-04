@@ -1,4 +1,5 @@
 import { generateAssemblyDrawings } from "@/lib/calculations/drawings";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { calculateScenarioMaterials, generateScenarioTechnicalSummary } from "@/lib/construction-methods/scenario-calculations";
 import type { AssemblyDrawing, MaterialLine, Project, Scenario } from "@/types/project";
 
@@ -20,10 +21,12 @@ export interface TechnicalProjectSummaryViewModel {
 export type TechnicalProjectViewModel = TechnicalProjectDrawingViewModel | TechnicalProjectSummaryViewModel;
 
 export function getTechnicalProjectViewModel(project: Project, scenario: Scenario): TechnicalProjectViewModel {
+  const methodDefinition = getConstructionMethodDefinition(scenario.constructionMethod);
+
   if (scenario.constructionMethod === "aframe") {
     return {
       mode: "drawings",
-      methodName: "A-frame com paineis",
+      methodName: methodDefinition.name,
       drawings: generateAssemblyDrawings(project, scenario),
     };
   }

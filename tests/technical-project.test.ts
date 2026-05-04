@@ -39,7 +39,36 @@ describe("technical project view model", () => {
 
     expect(viewModel.mode).toBe("drawings");
     if (viewModel.mode === "drawings") {
-      expect(viewModel.drawings.some((drawing) => drawing.svg.includes("Projeto preliminar A-frame"))).toBe(true);
+      expect(viewModel.methodName).toBe("A-frame com paineis");
+      expect(viewModel.drawings.length).toBeGreaterThan(0);
+      expect(viewModel.drawings.some((drawing) => drawing.svg.includes("A-frame"))).toBe(true);
+    }
+  });
+
+  it("escapes user-provided text before rendering A-frame SVG drawings", () => {
+    const unsafeProject = {
+      ...defaultProject,
+      name: '<script>alert("x")</script>',
+    };
+    const unsafeScenario = {
+      ...defaultProject.scenarios[0],
+      location: {
+        ...defaultProject.scenarios[0].location,
+        city: "Cidade <img>",
+        state: "SP & RJ",
+      },
+    };
+
+    const viewModel = getTechnicalProjectViewModel(unsafeProject, unsafeScenario);
+
+    expect(viewModel.mode).toBe("drawings");
+    if (viewModel.mode === "drawings") {
+      const coverSvg = viewModel.drawings.find((drawing) => drawing.id === "cover")?.svg ?? "";
+
+      expect(coverSvg).not.toContain("<script>");
+      expect(coverSvg).not.toContain("<img>");
+      expect(coverSvg).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
+      expect(coverSvg).toContain("Cidade &lt;img&gt;, SP &amp; RJ");
     }
   });
 

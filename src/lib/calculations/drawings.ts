@@ -6,10 +6,21 @@ import { estimateSteelStructure } from "./structure";
 const svgWrap = (width: number, height: number, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">${body}</svg>`;
 
+const escapeSvgText = (value: unknown) =>
+  String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
 export function generateAssemblyDrawings(project: Project, scenario: Scenario): AssemblyDrawing[] {
   const geometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
   const materials = calculateMaterialList(project, scenario);
   const structural = estimateSteelStructure(project, scenario);
+  const projectName = escapeSvgText(project.name);
+  const locationCity = escapeSvgText(scenario.location.city);
+  const locationState = escapeSvgText(scenario.location.state);
   const scalePlan = Math.min(620 / scenario.terrain.width, 380 / scenario.terrain.depth);
   const terrainW = scenario.terrain.width * scalePlan;
   const terrainD = scenario.terrain.depth * scalePlan;
@@ -34,7 +45,7 @@ export function generateAssemblyDrawings(project: Project, scenario: Scenario): 
       svg: svgWrap(
         720,
         480,
-        `<rect width="720" height="480" fill="#f8fafc"/><text x="48" y="92" font-size="30" font-family="Arial" font-weight="700">Projeto preliminar A-frame</text><text x="48" y="138" font-size="18" font-family="Arial">${project.name}</text><text x="48" y="178" font-size="14" font-family="Arial">${scenario.location.city}, ${scenario.location.state}</text><text x="48" y="420" font-size="12" fill="#9a3412" font-family="Arial">Estimativa preliminar. Nao substitui projeto arquitetonico, estrutural, ART/RRT ou aprovacao municipal.</text>`
+        `<rect width="720" height="480" fill="#f8fafc"/><text x="48" y="92" font-size="30" font-family="Arial" font-weight="700">Projeto preliminar A-frame</text><text x="48" y="138" font-size="18" font-family="Arial">${projectName}</text><text x="48" y="178" font-size="14" font-family="Arial">${locationCity}, ${locationState}</text><text x="48" y="420" font-size="12" fill="#9a3412" font-family="Arial">Estimativa preliminar. Nao substitui projeto arquitetonico, estrutural, ART/RRT ou aprovacao municipal.</text>`
       ),
     },
     {
@@ -107,7 +118,7 @@ export function generateAssemblyDrawings(project: Project, scenario: Scenario): 
           .slice(0, 10)
           .map(
             (line, index) =>
-              `<text x="48" y="${78 + index * 30}" font-size="12" font-family="Arial">${line.quantity} ${line.unit} - ${line.code}</text>`
+              `<text x="48" y="${78 + index * 30}" font-size="12" font-family="Arial">${escapeSvgText(line.quantity)} ${escapeSvgText(line.unit)} - ${escapeSvgText(line.code)}</text>`
           )
           .join("")}`
       ),
