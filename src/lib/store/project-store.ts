@@ -78,6 +78,9 @@ interface ProjectStore {
   updateFoundationAssumptions: (updates: Partial<FoundationAssumptions>) => void;
   addBudgetCostSource: (source: CostSource) => void;
   addBudgetCostItem: (costItem: CostItem, match: BudgetMatch) => void;
+  addBudgetMatchSuggestion: (match: BudgetMatch) => void;
+  approveBudgetMatch: (matchId: string) => void;
+  rejectBudgetMatch: (matchId: string) => void;
   setOnboardingCompleted: (completed: boolean) => void;
   duplicateSelectedScenario: () => void;
   deleteScenario: (scenarioId: string) => void;
@@ -355,6 +358,48 @@ export const useProjectStore = create<ProjectStore>()(
             },
           },
         })),
+      addBudgetMatchSuggestion: (match) =>
+        set((state) => {
+          const existingMatch = state.project.budgetAssistant.matches.some((item) => item.id === match.id);
+          if (existingMatch) return state;
+          return {
+            project: {
+              ...state.project,
+              budgetAssistant: {
+                ...state.project.budgetAssistant,
+                matches: [...state.project.budgetAssistant.matches, match],
+              },
+            },
+          };
+        }),
+      approveBudgetMatch: (matchId) =>
+        set((state) => ({
+          project: {
+            ...state.project,
+            budgetAssistant: {
+              ...state.project.budgetAssistant,
+              matches: state.project.budgetAssistant.matches.map((match) =>
+                match.id === matchId
+                  ? {
+                      ...match,
+                      approvedByUser: true,
+                      requiresReview: match.confidence === "low" || match.confidence === "unverified" || !match.unitCompatible,
+                    }
+                  : match
+              ),
+            },
+          },
+        })),
+      rejectBudgetMatch: (matchId) =>
+        set((state) => ({
+          project: {
+            ...state.project,
+            budgetAssistant: {
+              ...state.project.budgetAssistant,
+              matches: state.project.budgetAssistant.matches.filter((match) => match.id !== matchId),
+            },
+          },
+        })),
       setOnboardingCompleted: (completed) =>
         set((state) => {
           const project = { ...state.project, onboardingCompleted: completed };
@@ -393,7 +438,7 @@ export const useProjectStore = create<ProjectStore>()(
     }),
     {
       name: "aframe-project-store",
-      version: 7,
+      version: 8,
       partialize: (state) => ({ project: state.project, savedProjects: state.savedProjects }),
       migrate: (persisted) => {
         const persistedState = persisted as { project?: Project; savedProjects?: Project[] } | undefined;
