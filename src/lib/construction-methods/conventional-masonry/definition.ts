@@ -4,9 +4,14 @@ import {
   positiveNumberIssue,
   validationResult,
   type ConstructionMethodDefinition,
-  type ConstructionMethodInputs,
 } from "@/lib/construction-methods/types";
+import { calculateConventionalMasonryBudget, calculateConventionalMasonryBudgetItems } from "./budget";
+import { calculateConventionalMasonryGeometry } from "./geometry";
+import { defaultConventionalMasonryInputs } from "./inputs";
+import { calculateConventionalMasonryMaterialList } from "./materials";
 import { generateConventionalMasonry3DLayers } from "./three-layers";
+import type { ConventionalMasonryInputs } from "./types";
+import { calculateConventionalMasonryWarnings } from "./warnings";
 
 export const conventionalMasonryDefinition = {
   id: "conventional-masonry",
@@ -25,26 +30,24 @@ export const conventionalMasonryDefinition = {
   complexity: "medium",
   speed: "medium",
   industrializationLevel: "low",
-  getDefaultInputs: () => ({
-    widthM: 8,
-    depthM: 12,
-    floors: 1,
-    floorHeightM: 2.8,
-    internalWallLengthM: 20,
-    blockType: "ceramic",
-    wallThicknessM: 0.14,
-    foundationType: "placeholder",
-    roofType: "simple-roof",
-    wastePercent: 10,
-  }),
+  getDefaultInputs: () => ({ ...defaultConventionalMasonryInputs }),
   validateInputs: (inputs: unknown) => {
     if (!isRecord(inputs)) return validationResult([{ path: "", message: "Inputs devem ser um objeto." }]);
     const issues = compactValidationIssues([
       positiveNumberIssue(inputs, "widthM", "Largura deve ser maior que zero."),
       positiveNumberIssue(inputs, "depthM", "Profundidade deve ser maior que zero."),
       positiveNumberIssue(inputs, "floorHeightM", "Pe-direito deve ser maior que zero."),
+      positiveNumberIssue(inputs, "floors", "Numero de pavimentos deve ser maior que zero."),
+      positiveNumberIssue(inputs, "wallThicknessM", "Espessura de parede deve ser maior que zero."),
+      positiveNumberIssue(inputs, "doorWidthM", "Largura de porta deve ser maior que zero."),
+      positiveNumberIssue(inputs, "windowWidthM", "Largura de janela deve ser maior que zero."),
     ]);
     return validationResult(issues);
   },
+  calculateGeometry: calculateConventionalMasonryGeometry,
+  calculateMaterialList: calculateConventionalMasonryMaterialList,
+  calculateBudgetItems: calculateConventionalMasonryBudgetItems,
+  calculateBudget: calculateConventionalMasonryBudget,
+  calculateWarnings: calculateConventionalMasonryWarnings,
   generate3DLayers: generateConventionalMasonry3DLayers,
-} satisfies ConstructionMethodDefinition<ConstructionMethodInputs>;
+} satisfies ConstructionMethodDefinition<ConventionalMasonryInputs>;

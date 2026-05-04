@@ -49,7 +49,24 @@ function NumberInput({
 type MinimalMethodInputs = {
   widthM?: number;
   depthM?: number;
+  floors?: number;
   floorHeightM?: number;
+  internalWallLengthM?: number;
+  blockType?: "ceramic" | "concrete";
+  wallThicknessM?: number;
+  doorCount?: number;
+  doorWidthM?: number;
+  doorHeightM?: number;
+  windowCount?: number;
+  windowWidthM?: number;
+  windowHeightM?: number;
+  foundationType?: "radier" | "baldrame" | "placeholder";
+  roofType?: "simple-roof" | "slab" | "placeholder";
+  internalPlaster?: boolean;
+  externalPlaster?: boolean;
+  subfloor?: boolean;
+  basicFinish?: boolean;
+  wastePercent?: number;
 };
 
 export function StartProjectForm() {
@@ -167,6 +184,32 @@ export function StartProjectForm() {
     const widthM = Number(formData.get("widthM") ?? selectedMethodInputs.widthM ?? 8);
     const depthM = Number(formData.get("depthM") ?? selectedMethodInputs.depthM ?? 12);
     const floorHeightM = Number(formData.get("floorHeightM") ?? selectedMethodInputs.floorHeightM ?? 2.8);
+    const methodInputs: MinimalMethodInputs = {
+      ...selectedMethodInputs,
+      widthM,
+      depthM,
+      floorHeightM,
+    };
+
+    if (selectedMethod === "conventional-masonry") {
+      methodInputs.floors = Number(formData.get("floors") ?? selectedMethodInputs.floors ?? 1);
+      methodInputs.internalWallLengthM = Number(formData.get("internalWallLengthM") ?? selectedMethodInputs.internalWallLengthM ?? 20);
+      methodInputs.blockType = String(formData.get("blockType") ?? selectedMethodInputs.blockType ?? "ceramic") as MinimalMethodInputs["blockType"];
+      methodInputs.wallThicknessM = Number(formData.get("wallThicknessM") ?? selectedMethodInputs.wallThicknessM ?? 0.14);
+      methodInputs.doorCount = Number(formData.get("doorCount") ?? selectedMethodInputs.doorCount ?? 2);
+      methodInputs.doorWidthM = Number(formData.get("doorWidthM") ?? selectedMethodInputs.doorWidthM ?? 0.8);
+      methodInputs.doorHeightM = Number(formData.get("doorHeightM") ?? selectedMethodInputs.doorHeightM ?? 2.1);
+      methodInputs.windowCount = Number(formData.get("windowCount") ?? selectedMethodInputs.windowCount ?? 4);
+      methodInputs.windowWidthM = Number(formData.get("windowWidthM") ?? selectedMethodInputs.windowWidthM ?? 1.2);
+      methodInputs.windowHeightM = Number(formData.get("windowHeightM") ?? selectedMethodInputs.windowHeightM ?? 1);
+      methodInputs.foundationType = String(formData.get("foundationType") ?? selectedMethodInputs.foundationType ?? "placeholder") as MinimalMethodInputs["foundationType"];
+      methodInputs.roofType = String(formData.get("roofType") ?? selectedMethodInputs.roofType ?? "simple-roof") as MinimalMethodInputs["roofType"];
+      methodInputs.internalPlaster = formData.get("internalPlaster") === "on";
+      methodInputs.externalPlaster = formData.get("externalPlaster") === "on";
+      methodInputs.subfloor = formData.get("subfloor") === "on";
+      methodInputs.basicFinish = formData.get("basicFinish") === "on";
+      methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
+    }
 
     updateProjectName(projectName);
     updateScenarioName(scenario.id, "Cenario inicial");
@@ -175,12 +218,7 @@ export function StartProjectForm() {
       city: city || scenario.location.city || "Cidade a definir",
       state: state || scenario.location.state || "Estado a definir",
     });
-    updateScenarioMethodInputs(scenario.id, selectedMethod, {
-      ...selectedMethodInputs,
-      widthM,
-      depthM,
-      floorHeightM,
-    });
+    updateScenarioMethodInputs(scenario.id, selectedMethod, methodInputs);
     setOnboardingCompleted(true);
     router.push("/dashboard");
   };
@@ -382,7 +420,9 @@ export function StartProjectForm() {
             <CardHeader>
               <CardTitle>{selectedMethodDefinition.name}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                MVP preliminar para registrar dimensoes iniciais. Quantitativos, orcamento e 3D especificos entram nos proximos PRs.
+                {selectedMethod === "conventional-masonry"
+                  ? "Formulario MVP para quantitativos preliminares de alvenaria, sem dimensionamento estrutural real."
+                  : "MVP preliminar para registrar dimensoes iniciais. Quantitativos, orcamento e 3D especificos entram nos proximos PRs."}
               </p>
             </CardHeader>
             <CardContent>
@@ -416,6 +456,92 @@ export function StartProjectForm() {
                     defaultValue={selectedMethodInputs.floorHeightM ?? 2.8}
                     required
                   />
+                  {selectedMethod === "conventional-masonry" ? (
+                    <>
+                      <NumberInput
+                        id="methodFloors"
+                        name="floors"
+                        label="Pavimentos"
+                        min={1}
+                        step={1}
+                        defaultValue={selectedMethodInputs.floors ?? 1}
+                        required
+                      />
+                      <NumberInput
+                        id="methodInternalWalls"
+                        name="internalWallLengthM"
+                        label="Paredes internas estimadas (m)"
+                        min={0}
+                        defaultValue={selectedMethodInputs.internalWallLengthM ?? 20}
+                      />
+                      <div className="space-y-2">
+                        <Label htmlFor="methodBlockType">Tipo de bloco</Label>
+                        <select
+                          id="methodBlockType"
+                          name="blockType"
+                          defaultValue={selectedMethodInputs.blockType ?? "ceramic"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="ceramic">Ceramico</option>
+                          <option value="concrete">Concreto</option>
+                        </select>
+                      </div>
+                      <NumberInput
+                        id="methodWallThickness"
+                        name="wallThicknessM"
+                        label="Espessura parede (m)"
+                        min={0.09}
+                        step={0.01}
+                        defaultValue={selectedMethodInputs.wallThicknessM ?? 0.14}
+                      />
+                      <NumberInput id="methodDoorCount" name="doorCount" label="Portas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.doorCount ?? 2} />
+                      <NumberInput id="methodDoorWidth" name="doorWidthM" label="Largura porta (m)" min={0.5} defaultValue={selectedMethodInputs.doorWidthM ?? 0.8} />
+                      <NumberInput id="methodDoorHeight" name="doorHeightM" label="Altura porta (m)" min={1.8} defaultValue={selectedMethodInputs.doorHeightM ?? 2.1} />
+                      <NumberInput id="methodWindowCount" name="windowCount" label="Janelas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.windowCount ?? 4} />
+                      <NumberInput id="methodWindowWidth" name="windowWidthM" label="Largura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowWidthM ?? 1.2} />
+                      <NumberInput id="methodWindowHeight" name="windowHeightM" label="Altura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowHeightM ?? 1} />
+                      <div className="space-y-2">
+                        <Label htmlFor="methodFoundationType">Fundacao</Label>
+                        <select
+                          id="methodFoundationType"
+                          name="foundationType"
+                          defaultValue={selectedMethodInputs.foundationType ?? "placeholder"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="placeholder">Placeholder</option>
+                          <option value="radier">Radier</option>
+                          <option value="baldrame">Baldrame</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="methodRoofType">Cobertura</Label>
+                        <select
+                          id="methodRoofType"
+                          name="roofType"
+                          defaultValue={selectedMethodInputs.roofType ?? "simple-roof"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="simple-roof">Telhado simples</option>
+                          <option value="slab">Laje</option>
+                          <option value="placeholder">Placeholder</option>
+                        </select>
+                      </div>
+                      <NumberInput id="methodWaste" name="wastePercent" label="Perdas (%)" min={0} step={1} defaultValue={selectedMethodInputs.wastePercent ?? 10} />
+                      <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
+                        {[
+                          ["internalPlaster", "Reboco interno", selectedMethodInputs.internalPlaster ?? true],
+                          ["externalPlaster", "Reboco externo", selectedMethodInputs.externalPlaster ?? true],
+                          ["subfloor", "Contrapiso", selectedMethodInputs.subfloor ?? true],
+                          ["basicFinish", "Acabamento basico", selectedMethodInputs.basicFinish ?? false],
+                        ].map(([name, label, checked]) => (
+                          <label className="flex items-center gap-2 text-sm" key={String(name)}>
+                            <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
                   <div className="space-y-2">
                     <Label htmlFor="methodCity">Cidade</Label>
                     <Input id="methodCity" name="city" defaultValue={requiresFreshInput ? "" : scenario.location.city} required />
