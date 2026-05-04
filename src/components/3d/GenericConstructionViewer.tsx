@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { getGeneric3DNumberControls } from "@/lib/construction-methods/generic-3d-controls";
+import { getGenericViewerFramingLayers } from "@/lib/construction-methods/generic-viewer-framing";
 import { getScenarioMethodInputs } from "@/lib/construction-methods";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
 import { useProjectStore } from "@/lib/store/project-store";
@@ -194,22 +195,22 @@ function DimensionOverlay({ layers, mode }: { layers: Construction3DLayer[]; mod
 
 function GenericScene({
   layers,
-  dimensionLayers,
   dimensionMode,
   modelOpacity,
   showDimensions,
   view,
 }: {
   layers: Construction3DLayer[];
-  dimensionLayers: Construction3DLayer[];
   dimensionMode: DimensionMode;
   modelOpacity: number;
   showDimensions: boolean;
   view: ViewMode;
 }) {
+  const framingLayers = getGenericViewerFramingLayers(layers, showDimensions);
+
   return (
     <>
-      <CameraView layers={layers} view={view} />
+      <CameraView layers={framingLayers} view={view} />
       <ambientLight intensity={0.72} />
       <directionalLight position={[8, 12, 8]} intensity={1.15} castShadow />
       {layers.map((layer) => (
@@ -219,7 +220,7 @@ function GenericScene({
           ))}
         </group>
       ))}
-      {showDimensions ? <DimensionOverlay layers={dimensionLayers} mode={dimensionMode} /> : null}
+      {showDimensions ? <DimensionOverlay layers={layers} mode={dimensionMode} /> : null}
       <gridHelper args={[40, 40, "#cbd5e1", "#e2e8f0"]} position={[0, 0.01, 0]} />
       <OrbitControls makeDefault enableDamping />
     </>
@@ -299,7 +300,6 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
         <Canvas shadows camera={{ position: [16, 12, 16], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
           <GenericScene
             layers={activeLayers}
-            dimensionLayers={layers}
             dimensionMode={dimensionMode}
             modelOpacity={modelOpacity}
             showDimensions={showDimensions}
