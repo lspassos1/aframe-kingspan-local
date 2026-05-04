@@ -7,6 +7,6 @@ export function isAFrameOnlyAppRoute(pathname: string) {
   return aframeOnlyRoutes.has(normalizePathname(pathname));
 }
 
-export function isAppNavigationItemVisible(pathname: string, constructionMethod: ConstructionMethodId) {
-  return constructionMethod === "aframe" || !isAFrameOnlyAppRoute(pathname);
+export function isAppNavigationItemVisible(pathname: string, constructionMethod?: ConstructionMethodId) {
+  return !isAFrameOnlyAppRoute(pathname) || constructionMethod === "aframe";
 }

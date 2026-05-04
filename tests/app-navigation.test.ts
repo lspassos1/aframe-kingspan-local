@@ -15,4 +15,9 @@ describe("app navigation visibility by construction method", () => {
     expect(isAppNavigationItemVisible("/structure", "monolithic-eps")).toBe(false);
     expect(isAppNavigationItemVisible("/materials", "conventional-masonry")).toBe(true);
   });
+
+  it("hides A-frame-only navigation when the active method is unknown", () => {
+    expect(isAppNavigationItemVisible("/structure", undefined)).toBe(false);
+    expect(isAppNavigationItemVisible("/materials", undefined)).toBe(true);
+  });
 });

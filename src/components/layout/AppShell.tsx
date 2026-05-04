@@ -52,7 +52,7 @@ const navItems = [
   { href: "/help", label: "Ajuda", icon: HelpCircle },
 ];
 
-function NavList({ constructionMethod, onNavigate }: { constructionMethod: ConstructionMethodId; onNavigate?: () => void }) {
+function NavList({ constructionMethod, onNavigate }: { constructionMethod?: ConstructionMethodId; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <nav className="grid gap-1">
@@ -84,7 +84,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const project = useProjectStore((state) => state.project);
   const onboardingCompleted = project.onboardingCompleted;
   const selectedScenario = project.scenarios.find((scenario) => scenario.id === project.selectedScenarioId) ?? project.scenarios[0];
-  const constructionMethod = selectedScenario?.constructionMethod ?? "aframe";
+  const constructionMethod = selectedScenario?.constructionMethod;
 
   useEffect(() => {
     if (!onboardingCompleted && !canUseAppShellBeforeOnboarding(pathname)) {
