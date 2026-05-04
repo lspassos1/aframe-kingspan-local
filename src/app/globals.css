@@ -81,6 +81,8 @@
   --sidebar-accent-foreground: oklch(0.24 0.02 250);
   --sidebar-border: oklch(0.89 0.012 106);
   --sidebar-ring: oklch(0.54 0.085 184);
+  --app-background-glow: oklch(0.94 0.032 178 / 52%);
+  --app-background-top: oklch(0.99 0.004 106);
 }
 
 .dark {
@@ -115,6 +117,8 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --app-background-glow: oklch(0.31 0.035 190 / 22%);
+  --app-background-top: oklch(0.18 0.01 250);
 }
 
 @layer base {
@@ -124,8 +128,8 @@
   body {
     @apply bg-background text-foreground;
     background:
-      radial-gradient(circle at top left, oklch(0.94 0.032 178 / 52%), transparent 30rem),
-      linear-gradient(180deg, oklch(0.99 0.004 106), var(--background) 24rem);
+      radial-gradient(circle at top left, var(--app-background-glow), transparent 30rem),
+      linear-gradient(180deg, var(--app-background-top), var(--background) 24rem);
     text-rendering: geometricPrecision;
   }
   html {
