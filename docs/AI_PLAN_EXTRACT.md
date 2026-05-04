@@ -72,7 +72,7 @@ O app deve registrar apenas metadados operacionais seguros, como provider usado,
 
 ## Fluxo esperado
 
-1. Usuario autenticado envia PNG, JPG, WebP ou PDF.
+1. Usuario autenticado envia PNG, JPG, WebP ou PDF; se `AI_ALLOW_ANONYMOUS_PLAN_EXTRACT=true`, usuario anonimo tambem pode enviar usando limite por IP.
 2. O servidor valida tipo e tamanho.
 3. O rate limit consome quota diaria por usuario/IP/global.
 4. O provider chain tenta os providers configurados na ordem definida.
