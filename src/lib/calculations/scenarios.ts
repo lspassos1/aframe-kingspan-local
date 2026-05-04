@@ -1,8 +1,9 @@
 import type { Project, Scenario } from "@/types/project";
 import { calculateBudget } from "./budget";
 import { calculateAFrameGeometry } from "./geometry";
-import { calculateMaterialList, calculatePanelLayout } from "./materials";
+import { calculatePanelLayout } from "./materials";
 import { estimateSteelStructure } from "./structure";
+import { calculateScenarioBudget, calculateScenarioGeometry, calculateScenarioMaterials } from "@/lib/construction-methods/scenario-calculations";
 
 export interface ScenarioComparisonRow {
   id: string;
@@ -30,6 +31,38 @@ export function compareScenarios(project: Project): ScenarioComparisonRow[] {
 }
 
 export function scenarioComparisonRow(project: Project, scenario: Scenario): ScenarioComparisonRow {
+  if (scenario.constructionMethod !== "aframe") {
+    const geometry = calculateScenarioGeometry(project, scenario) as Record<string, unknown>;
+    const budget = calculateScenarioBudget(project, scenario);
+    const materials = calculateScenarioMaterials(project, scenario);
+    const width = numberMetric(geometry.widthM ?? geometry.baseWidth);
+    const depth = numberMetric(geometry.depthM ?? geometry.effectiveHouseDepth);
+    const height = numberMetric(geometry.floorHeightM ?? geometry.ridgeHeight);
+    const builtArea = numberMetric(geometry.builtAreaM2 ?? geometry.netWallAreaM2 ?? geometry.netPanelAreaM2);
+    const unitCount = numberMetric(geometry.totalBlocks ?? geometry.panelCount);
+
+    return {
+      id: scenario.id,
+      name: scenario.name,
+      width,
+      depth,
+      height,
+      groundTotalArea: builtArea,
+      groundUsefulArea: builtArea,
+      mezzanineTotalArea: 0,
+      mezzanineUsefulArea: 0,
+      totalPanels: unitCount || materials.length,
+      roofArea: 0,
+      facadeArea: numberMetric(geometry.grossWallAreaM2 ?? geometry.grossPanelAreaM2),
+      steelKg: numberMetric(geometry.verticalSteelKg ?? 0) + numberMetric(geometry.horizontalSteelKg ?? 0),
+      panelPackageCostBRL: budget.panelPackageCostBRL,
+      steelCostBRL: budget.steelStructureCostBRL,
+      totalCostBRL: budget.totalEstimatedCostBRL,
+      fitsTerrain: true,
+      costPerUsefulM2: budget.costPerUsefulM2,
+    };
+  }
+
   const panel = project.panelProducts.find((item) => item.id === scenario.panelProductId) ?? project.panelProducts[0];
   const geometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
   const layout = calculatePanelLayout(scenario, geometry, panel, project.materialAssumptions.sparePanelCount);
@@ -75,5 +108,9 @@ export function duplicateScenario(source: Scenario): Scenario {
 }
 
 export function materialLinesForScenario(project: Project, scenario: Scenario) {
-  return calculateMaterialList(project, scenario);
+  return calculateScenarioMaterials(project, scenario);
+}
+
+function numberMetric(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }

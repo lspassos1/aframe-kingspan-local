@@ -4,9 +4,12 @@ import { ChangeEvent, useRef } from "react";
 import { Download, FileJson, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { calculateBudget } from "@/lib/calculations/budget";
-import { calculateMaterialList } from "@/lib/calculations/materials";
-import { generateQuotationRequests } from "@/lib/calculations/quotation";
+import {
+  calculateScenarioBudget,
+  calculateScenarioMaterials,
+  generateScenarioQuotationRequests,
+} from "@/lib/construction-methods/scenario-calculations";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import {
   exportMaterialsCsv,
   exportMaterialsXlsx,
@@ -24,9 +27,10 @@ export default function ExportPage() {
   const importProject = useProjectStore((state) => state.importProject);
   const resetProject = useProjectStore((state) => state.resetProject);
   const scenario = useSelectedScenario();
-  const materials = calculateMaterialList(project, scenario);
-  const budget = calculateBudget(project, scenario);
-  const requests = generateQuotationRequests(project, scenario);
+  const methodDefinition = getConstructionMethodDefinition(scenario.constructionMethod);
+  const materials = calculateScenarioMaterials(project, scenario);
+  const budget = calculateScenarioBudget(project, scenario);
+  const requests = generateScenarioQuotationRequests(project, scenario);
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -49,33 +53,33 @@ export default function ExportPage() {
       title: "Lista XLSX",
       description: "Planilha editavel da lista de materiais e acessorios.",
       icon: FileSpreadsheet,
-      action: () => exportMaterialsXlsx(project.name, materials),
+      action: () => exportMaterialsXlsx(project.name, materials, methodDefinition.name),
       label: "Baixar XLSX",
     },
     {
       title: "Lista CSV",
       description: "CSV simples para importar em planilhas ou ERPs.",
       icon: FileSpreadsheet,
-      action: () => exportMaterialsCsv(project.name, materials),
+      action: () => exportMaterialsCsv(project.name, materials, methodDefinition.name),
       label: "Baixar CSV",
     },
     {
       title: "Relatorio PDF",
-      description: "Resumo com geometria, areas, materiais, orcamento e avisos.",
+      description: "Resumo com metodo construtivo, status preliminar, materiais, orcamento e avisos.",
       icon: FileText,
       action: () => exportReportPdf(project, scenario, materials, budget),
       label: "Baixar PDF",
     },
     {
       title: "Projeto tecnico PDF",
-      description: "PDF com desenhos SVG preliminares gerados pela geometria.",
+      description: "PDF tecnico preliminar; A-frame inclui desenhos, demais metodos incluem resumo tecnico.",
       icon: FileText,
       action: () => void exportTechnicalPdf(project, scenario),
       label: "Baixar PDF tecnico",
     },
     {
       title: "Pedidos de cotacao",
-      description: "Texto para paineis, aco, fabricacao metalica e orcamento geral.",
+      description: "Texto de cotacao gerado pelo metodo construtivo selecionado.",
       icon: FileText,
       action: () => exportRfqText(project.name, requests),
       label: "Baixar TXT",

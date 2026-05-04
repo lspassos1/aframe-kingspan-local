@@ -3,8 +3,9 @@
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import type { BudgetSummary, MaterialLine, Project, QuotationRequest, Scenario } from "@/types/project";
-import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { generateAssemblyDrawings } from "@/lib/calculations/drawings";
+import { generateScenarioTechnicalSummary } from "@/lib/construction-methods/scenario-calculations";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { formatCurrency, slugify } from "@/lib/format";
 
 export function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
@@ -21,8 +22,9 @@ export function exportProjectJson(project: Project) {
   downloadTextFile(`${slugify(project.name) || "projeto-aframe"}.json`, JSON.stringify(project, null, 2), "application/json");
 }
 
-export function exportMaterialsCsv(projectName: string, materials: MaterialLine[]) {
+export function exportMaterialsCsv(projectName: string, materials: MaterialLine[], methodName: string) {
   const rows = materials.map((line) => ({
+    metodo: methodName,
     codigo: line.code,
     descricao: line.description,
     categoria: line.category,
@@ -41,10 +43,11 @@ export function exportMaterialsCsv(projectName: string, materials: MaterialLine[
   downloadTextFile(`${slugify(projectName)}-materiais.csv`, csv, "text/csv;charset=utf-8");
 }
 
-export function exportMaterialsXlsx(projectName: string, materials: MaterialLine[]) {
+export function exportMaterialsXlsx(projectName: string, materials: MaterialLine[], methodName: string) {
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(
     materials.map((line) => ({
+      Metodo: methodName,
       Codigo: line.code,
       Descricao: line.description,
       Categoria: line.category,
@@ -69,41 +72,39 @@ export function exportRfqText(projectName: string, requests: QuotationRequest[])
 }
 
 export function exportReportPdf(project: Project, scenario: Scenario, materials: MaterialLine[], budget: BudgetSummary) {
-  const geometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
+  const summary = generateScenarioTechnicalSummary(project, scenario);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("Relatorio preliminar A-frame", 15, 18);
+  doc.text(`Relatorio preliminar - ${summary.methodName}`, 15, 18);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(project.name, 15, 28);
   doc.text(`${scenario.location.city}, ${scenario.location.state} - ${scenario.location.country}`, 15, 34);
+  doc.text(`Metodo construtivo: ${summary.methodName}`, 15, 40);
+  doc.text("Status: preliminar", 15, 46);
   doc.setTextColor(154, 52, 18);
-  doc.text("Estimativa preliminar. Nao substitui projeto estrutural, arquitetonico, ART/RRT ou aprovacao municipal.", 15, 44, {
+  doc.text("Estimativa preliminar. Nao substitui projeto estrutural, arquitetonico, ART/RRT, sondagem, fornecedor ou aprovacao municipal.", 15, 56, {
     maxWidth: 180,
   });
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
-  doc.text("Geometria", 15, 58);
+  doc.text("Resumo tecnico", 15, 72);
   doc.setFont("helvetica", "normal");
-  const geometryLines = [
-    `Lote: ${scenario.terrain.width} x ${scenario.terrain.depth} m`,
-    `Casa: ${geometry.baseWidth} x ${geometry.effectiveHouseDepth} m`,
-    `Cumeeira: ${geometry.ridgeHeight} m`,
-    `Area total terreo: ${geometry.groundFloorTotalArea} m2`,
-    `Area util terreo: ${geometry.groundUsefulArea} m2`,
-    `Area total combinada: ${geometry.combinedTotalArea} m2`,
-    `Area util combinada: ${geometry.combinedUsefulArea} m2`,
-  ];
-  geometryLines.forEach((line, index) => doc.text(line, 15, 68 + index * 6));
+  const geometryLines = [`Lote: ${scenario.terrain.width} x ${scenario.terrain.depth} m`, ...summary.metrics.map((metric) => `${metric.label}: ${metric.value}`)];
+  geometryLines.forEach((line, index) => doc.text(line, 15, 82 + index * 6));
   doc.setFont("helvetica", "bold");
-  doc.text("Orcamento", 15, 116);
+  doc.text("Orcamento", 15, 130);
   doc.setFont("helvetica", "normal");
-  doc.text(`Pacote de paineis: ${formatCurrency(budget.panelPackageCostBRL)}`, 15, 126);
-  doc.text(`Acessorios: ${formatCurrency(budget.accessoriesCostBRL)}`, 15, 132);
-  doc.text(`Frete: ${formatCurrency(budget.freightBRL)}`, 15, 138);
-  doc.text(`Estrutura metalica: ${formatCurrency(budget.steelStructureCostBRL)}`, 15, 144);
-  doc.text(`Total estimado: ${formatCurrency(budget.totalEstimatedCostBRL)}`, 15, 154);
+  doc.text(`Total preliminar: ${formatCurrency(budget.totalEstimatedCostBRL)}`, 15, 140);
+  doc.text(`Custo/m2: ${formatCurrency(budget.costPerTotalM2)}`, 15, 146);
+  doc.text(`Itens sem fonte/preco revisado: ${budget.items.filter((item) => item.requiresConfirmation).length}`, 15, 152);
+  doc.setFont("helvetica", "bold");
+  doc.text("Alertas", 15, 164);
+  doc.setFont("helvetica", "normal");
+  summary.warnings.slice(0, 6).forEach((warning, index) => {
+    doc.text(`- ${warning}`, 15, 174 + index * 6, { maxWidth: 180 });
+  });
 
   doc.addPage();
   doc.setFont("helvetica", "bold");
@@ -145,13 +146,32 @@ function svgToPngDataUrl(svg: string, width = 720, height = 480): Promise<string
 }
 
 export async function exportTechnicalPdf(project: Project, scenario: Scenario) {
+  if (scenario.constructionMethod !== "aframe") {
+    const summary = generateScenarioTechnicalSummary(project, scenario);
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text(`Projeto tecnico preliminar - ${summary.methodName}`, 12, 14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("Resumo preliminar por metodo construtivo. Validar com arquiteto, engenheiro, fornecedor e ART/RRT.", 12, 22, { maxWidth: 185 });
+    summary.metrics.forEach((metric, index) => doc.text(`${metric.label}: ${metric.value}`, 12, 36 + index * 6));
+    doc.setFont("helvetica", "bold");
+    doc.text("Alertas", 12, 86);
+    doc.setFont("helvetica", "normal");
+    summary.warnings.slice(0, 10).forEach((warning, index) => doc.text(`- ${warning}`, 12, 96 + index * 7, { maxWidth: 185 }));
+    doc.save(`${slugify(project.name)}-projeto-tecnico.pdf`);
+    return;
+  }
+
+  const methodDefinition = getConstructionMethodDefinition(scenario.constructionMethod);
   const drawings = generateAssemblyDrawings(project, scenario);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   for (const [index, drawing] of drawings.entries()) {
     if (index > 0) doc.addPage();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text(drawing.title, 12, 14);
+    doc.text(`${drawing.title} - ${methodDefinition.name}`, 12, 14);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.text("Desenho SVG preliminar gerado por geometria parametrica. Validar com arquiteto/engenheiro.", 12, 20);
