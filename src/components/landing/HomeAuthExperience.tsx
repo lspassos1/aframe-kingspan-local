@@ -53,7 +53,8 @@ export function HomeAuthExperience() {
           playsInline
           preload="metadata"
           poster="/hero/aframe-transform-poster.svg"
-          aria-label="Modelo 3D de estudo construtivo com casa A-frame"
+          aria-hidden="true"
+          tabIndex={-1}
         >
           <source src="/hero/aframe-transform.webm" type="video/webm" />
           <source src="/hero/aframe-transform.mp4" type="video/mp4" />
@@ -199,7 +200,8 @@ export function HomeAuthExperience() {
               playsInline
               preload="metadata"
               poster="/hero/aframe-transform-poster.svg"
-              aria-label="Modelo 3D com terreno, estrutura, painéis e fachada"
+              aria-hidden="true"
+              tabIndex={-1}
             >
               <source src="/hero/aframe-transform.webm" type="video/webm" />
               <source src="/hero/aframe-transform.mp4" type="video/mp4" />
