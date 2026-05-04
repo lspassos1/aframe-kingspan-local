@@ -32,7 +32,7 @@ export function ConstructionMethodSelector({
       <div className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-4">
         {constructionMethodDefinitions.map((definition) => {
           const active = definition.id === selectedMethod;
-          const firstLimitation = definition.limitations[0];
+          const visibleLimitations = definition.limitations.slice(0, 1);
           return (
             <article
               key={definition.id}
@@ -71,7 +71,9 @@ export function ConstructionMethodSelector({
                     <ChevronDown className="ml-auto h-3.5 w-3.5 transition-transform group-open/details:rotate-180" />
                   </summary>
                   <div className="mt-2 space-y-2 rounded-xl bg-muted/55 p-3">
-                    {firstLimitation ? <p>{firstLimitation}</p> : null}
+                    {visibleLimitations.map((limitation) => (
+                      <p key={limitation}>{limitation}</p>
+                    ))}
                     {definition.defaultWarnings.slice(0, 2).map((warning) => (
                       <p key={warning.id}>{warning.message}</p>
                     ))}

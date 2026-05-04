@@ -83,6 +83,8 @@
   --sidebar-ring: oklch(0.54 0.085 184);
   --app-background-glow: oklch(0.94 0.032 178 / 52%);
   --app-background-top: oklch(0.99 0.004 106);
+  --selection-background: oklch(0.84 0.07 178 / 55%);
+  --selection-foreground: oklch(0.16 0.018 250);
 }
 
 .dark {
@@ -119,6 +121,8 @@
   --sidebar-ring: oklch(0.556 0 0);
   --app-background-glow: oklch(0.31 0.035 190 / 22%);
   --app-background-top: oklch(0.18 0.01 250);
+  --selection-background: oklch(0.54 0.08 184 / 46%);
+  --selection-foreground: oklch(0.985 0 0);
 }
 
 @layer base {
@@ -136,6 +140,7 @@
     @apply font-sans;
   }
   ::selection {
-    background: oklch(0.84 0.07 178 / 55%);
+    color: var(--selection-foreground);
+    background: var(--selection-background);
   }
 }
