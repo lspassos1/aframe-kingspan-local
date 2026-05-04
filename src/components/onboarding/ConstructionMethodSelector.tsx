@@ -32,6 +32,7 @@ export function ConstructionMethodSelector({
       <div className="grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-4">
         {constructionMethodDefinitions.map((definition) => {
           const active = definition.id === selectedMethod;
+          const firstLimitation = definition.limitations[0];
           return (
             <article
               key={definition.id}
@@ -40,7 +41,7 @@ export function ConstructionMethodSelector({
                 active && "border-primary/50 bg-primary/[0.035] ring-2 ring-primary/15"
               )}
             >
-              <button type="button" onClick={() => onSelect(definition.id)} className="w-full text-left">
+              <button type="button" aria-pressed={active} onClick={() => onSelect(definition.id)} className="w-full text-left">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold tracking-normal">{definition.name}</p>
@@ -70,7 +71,7 @@ export function ConstructionMethodSelector({
                     <ChevronDown className="ml-auto h-3.5 w-3.5 transition-transform group-open/details:rotate-180" />
                   </summary>
                   <div className="mt-2 space-y-2 rounded-xl bg-muted/55 p-3">
-                    <p>{definition.limitations[0]}</p>
+                    {firstLimitation ? <p>{firstLimitation}</p> : null}
                     {definition.defaultWarnings.slice(0, 2).map((warning) => (
                       <p key={warning.id}>{warning.message}</p>
                     ))}
