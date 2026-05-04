@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import type { BudgetSummary, MaterialLine, Project, QuotationRequest, Scenario } from "@/types/project";
 import { generateAssemblyDrawings } from "@/lib/calculations/drawings";
+import { createBudgetSourceExport, createBudgetSourceWorkbookRows } from "@/lib/budget-assistant";
 import { generateScenarioTechnicalSummary } from "@/lib/construction-methods/scenario-calculations";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { formatCurrency, slugify } from "@/lib/format";
@@ -69,6 +70,82 @@ export function exportMaterialsXlsx(projectName: string, materials: MaterialLine
 export function exportRfqText(projectName: string, requests: QuotationRequest[]) {
   const content = requests.map((request) => `${request.title}\n\n${request.body}`).join("\n\n---\n\n");
   downloadTextFile(`${slugify(projectName)}-pedidos-cotacao.txt`, content);
+}
+
+export function exportBudgetSourceJson(project: Project, scenario: Scenario) {
+  const report = createBudgetSourceExport(project, scenario);
+  downloadTextFile(`${slugify(project.name)}-orcamento-fontes.json`, JSON.stringify(report, null, 2), "application/json");
+}
+
+export function exportBudgetSourceXlsx(project: Project, scenario: Scenario) {
+  const report = createBudgetSourceExport(project, scenario);
+  const rows = createBudgetSourceWorkbookRows(report);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.summary), "Resumo");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.sources), "Fontes");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.compositions), "Composicoes");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.serviceLines), "Servicos");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.laborHours), "HH");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.pendingItems), "Pendencias");
+  XLSX.writeFile(workbook, `${slugify(project.name)}-orcamento-fontes.xlsx`);
+}
+
+export function exportBudgetSourcePdf(project: Project, scenario: Scenario) {
+  const report = createBudgetSourceExport(project, scenario);
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(`Orcamento por fontes - ${report.constructionMethod.name}`, 12, 14);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`${report.projectName} | ${report.scenarioName} | ${report.location.city}/${report.location.state}`, 12, 22);
+  doc.text(`Status: ${report.budgetStatusLabel}. Orcamento final: nao.`, 12, 28);
+  doc.setTextColor(154, 52, 18);
+  doc.text(report.technicalNotice, 12, 36, { maxWidth: 185 });
+  doc.setTextColor(0, 0, 0);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Resumo financeiro", 12, 52);
+  doc.setFont("helvetica", "normal");
+  [
+    `Material: ${formatCurrency(report.totals.materialCostBRL)}`,
+    `Mao de obra: ${formatCurrency(report.totals.laborCostBRL)} | H/H: ${report.totals.totalLaborHours}`,
+    `Equipamento: ${formatCurrency(report.totals.equipmentCostBRL)}`,
+    `BDI: ${formatCurrency(report.totals.bdiBRL)} | Contingencia: ${formatCurrency(report.totals.contingencyBRL)}`,
+    `Total revisavel/preliminar: ${formatCurrency(report.totals.totalBRL)}`,
+    `Itens sem preco: ${report.totals.unpricedCount} | Linhas revisaveis: ${report.totals.reviewableLineCount}`,
+  ].forEach((line, index) => doc.text(line, 12, 62 + index * 6));
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Fontes", 12, 104);
+  doc.setFont("helvetica", "normal");
+  report.sources.slice(0, 8).forEach((source, index) => {
+    doc.text(`${source.title} | ${source.city}/${source.state} | ${source.referenceDate} | ${source.reliability}`, 12, 114 + index * 6, {
+      maxWidth: 185,
+    });
+  });
+
+  doc.addPage();
+  doc.setFont("helvetica", "bold");
+  doc.text("Servicos e composicoes", 12, 14);
+  doc.setFont("helvetica", "normal");
+  const rows = report.serviceLines.length > 0 ? report.serviceLines : report.serviceCompositions;
+  rows.slice(0, 26).forEach((line, index) => {
+    const total = "totalBRL" in line ? line.totalBRL : line.directUnitCostBRL;
+    doc.text(
+      `${line.sourceCode} | ${line.description} | ${line.referenceDate} | ${line.confidence} | ${formatCurrency(total)}`,
+      12,
+      24 + index * 7,
+      { maxWidth: 185 }
+    );
+  });
+
+  doc.addPage();
+  doc.setFont("helvetica", "bold");
+  doc.text("Pendencias", 12, 14);
+  doc.setFont("helvetica", "normal");
+  report.warnings.slice(0, 12).forEach((warning, index) => doc.text(`- ${warning}`, 12, 24 + index * 7, { maxWidth: 185 }));
+  doc.save(`${slugify(project.name)}-orcamento-fontes.pdf`);
 }
 
 export function exportReportPdf(project: Project, scenario: Scenario, materials: MaterialLine[], budget: BudgetSummary) {

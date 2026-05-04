@@ -11,6 +11,9 @@ import {
 } from "@/lib/construction-methods/scenario-calculations";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import {
+  exportBudgetSourceJson,
+  exportBudgetSourcePdf,
+  exportBudgetSourceXlsx,
   exportMaterialsCsv,
   exportMaterialsXlsx,
   exportProjectJson,
@@ -68,6 +71,27 @@ export default function ExportPage() {
       description: "Resumo com metodo construtivo, status preliminar, materiais, orcamento e avisos.",
       icon: FileText,
       action: () => exportReportPdf(project, scenario, materials, budget),
+      label: "Baixar PDF",
+    },
+    {
+      title: "Orcamento por fontes XLSX",
+      description: "Planilha com fontes, data-base, cidade/UF, confianca, HH, BDI, contingencia e pendencias.",
+      icon: FileSpreadsheet,
+      action: () => exportBudgetSourceXlsx(project, scenario),
+      label: "Baixar XLSX",
+    },
+    {
+      title: "Orcamento por fontes JSON",
+      description: "JSON method-aware para auditoria de fontes, itens sem preco e composicoes revisaveis.",
+      icon: FileJson,
+      action: () => exportBudgetSourceJson(project, scenario),
+      label: "Baixar JSON",
+    },
+    {
+      title: "Orcamento por fontes PDF",
+      description: "Relatorio preliminar com separacao de custos, fontes e avisos de revisao humana.",
+      icon: FileText,
+      action: () => exportBudgetSourcePdf(project, scenario),
       label: "Baixar PDF",
     },
     {
