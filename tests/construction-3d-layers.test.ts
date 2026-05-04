@@ -225,14 +225,54 @@ describe("generic construction 3D layers", () => {
     expect(dimensions?.depthM).toBe(11.2);
   });
 
-  it("frames the full dimension source when dimension overlays are visible", () => {
-    const activeLayers: Construction3DLayer[] = [{ id: "walls", type: "walls", label: "Paredes", visibleByDefault: true, methodId: "conventional-masonry", data: { primitives: [] } }];
+  it("frames visible layers plus only the bounds needed by dimension overlays", () => {
+    const activeLayers: Construction3DLayer[] = [
+      {
+        id: "walls",
+        type: "walls",
+        label: "Paredes",
+        visibleByDefault: true,
+        methodId: "conventional-masonry",
+        data: {
+          primitives: [{ id: "front-wall", kind: "box", position: [0, 1.5, -5], size: [10, 3, 0.2], color: "#64748b" }],
+        },
+      },
+    ];
+    const hiddenRoofLayer: Construction3DLayer = {
+      id: "roof",
+      type: "roof",
+      label: "Cobertura",
+      visibleByDefault: false,
+      methodId: "conventional-masonry",
+      data: {
+        primitives: [{ id: "roof-plane", kind: "box", position: [0, 3.2, 0], size: [12, 0.25, 10], color: "#475569" }],
+      },
+    };
     const dimensionLayers: Construction3DLayer[] = [
       ...activeLayers,
-      { id: "terrain", type: "terrain", label: "Terreno", visibleByDefault: false, methodId: "conventional-masonry", data: { primitives: [] } },
+      hiddenRoofLayer,
+      {
+        id: "terrain",
+        type: "terrain",
+        label: "Terreno",
+        visibleByDefault: false,
+        methodId: "conventional-masonry",
+        data: {
+          primitives: [{ id: "terrain-plane", kind: "box", position: [0, -0.03, 0], size: [18, 0.04, 22], color: "#d9f99d" }],
+        },
+      },
     ];
+    const framingLayers = getGenericViewerFramingLayers(activeLayers, dimensionLayers, true);
 
-    expect(getGenericViewerFramingLayers(activeLayers, dimensionLayers, true)).toBe(dimensionLayers);
+    expect(framingLayers).toEqual(expect.arrayContaining(activeLayers));
+    expect(framingLayers).not.toContain(hiddenRoofLayer);
+    expect(framingLayers.map((layer) => layer.id)).toEqual(
+      expect.arrayContaining(["dimension-overlay-building-framing", "dimension-overlay-terrain-framing"])
+    );
+    const terrainFramingSize = framingLayers.find((layer) => layer.id === "dimension-overlay-terrain-framing")?.data.primitives[0].size;
+    expect(terrainFramingSize?.[0]).toBe(18);
+    expect(terrainFramingSize?.[1]).toBeCloseTo(0.04);
+    expect(terrainFramingSize?.[2]).toBe(22);
     expect(getGenericViewerFramingLayers(activeLayers, dimensionLayers, false)).toBe(activeLayers);
   });
 });
