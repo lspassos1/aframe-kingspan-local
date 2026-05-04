@@ -51,12 +51,12 @@ function CameraView({ view, geometry, scenario }: { view: ViewMode; geometry: AF
   useEffect(() => {
     const distance = Math.max(scenario.terrain.width, scenario.terrain.depth, geometry.ridgeHeight) * 1.2;
     const positions: Record<ViewMode, [number, number, number]> = {
-      iso: [distance, distance * 0.75, distance],
+      iso: [distance, distance * 0.75, -distance],
       top: [0, distance * 1.4, 0.01],
-      front: [0, geometry.ridgeHeight * 0.65, distance],
-      rear: [0, geometry.ridgeHeight * 0.65, -distance],
+      front: [0, geometry.ridgeHeight * 0.65, -distance],
+      rear: [0, geometry.ridgeHeight * 0.65, distance],
       side: [distance, geometry.ridgeHeight * 0.65, 0],
-      section: [distance * 0.85, geometry.ridgeHeight * 0.7, distance * 0.35],
+      section: [distance * 0.85, geometry.ridgeHeight * 0.7, -distance * 0.35],
     };
     camera.position.set(...positions[view]);
     camera.lookAt(0, geometry.ridgeHeight / 2, 0);
@@ -132,7 +132,7 @@ function DimensionLine({
   return (
     <group>
       <Line points={points} color={color} lineWidth={2} />
-      <Text position={labelPosition} fontSize={0.24} color={color} anchorX="center" anchorY="middle">
+      <Text position={labelPosition} fontSize={0.24} color={color} anchorX="center" anchorY="middle" outlineColor="#ffffff" outlineWidth={0.01}>
         {label}
       </Text>
     </group>
@@ -305,13 +305,13 @@ function AFrameScene({
         <group>
           {dimensionMode === "basic" ? (
             <>
-              <Text position={[0, 0.25, frontHouseDimensionZ]} fontSize={0.35} color="#111827">
+              <Text position={[0, 0.25, frontHouseDimensionZ]} fontSize={0.35} color="#111827" outlineColor="#ffffff" outlineWidth={0.012}>
                 {`Casa ${geometry.baseWidth} m x ${geometry.effectiveHouseDepth} m`}
               </Text>
-              <Text position={[0, geometry.ridgeHeight + 0.45, frontHeightDimensionZ]} fontSize={0.35} color="#111827">
+              <Text position={[0, geometry.ridgeHeight + 0.45, frontHeightDimensionZ]} fontSize={0.35} color="#111827" outlineColor="#ffffff" outlineWidth={0.012}>
                 {`Cumeeira ${geometry.ridgeHeight} m`}
               </Text>
-              <Text position={[0, 0.25, frontTerrainDimensionZ]} fontSize={0.32} color="#0f766e">
+              <Text position={[0, 0.25, frontTerrainDimensionZ]} fontSize={0.32} color="#0f766e" outlineColor="#ffffff" outlineWidth={0.012}>
                 {`Lote ${scenario.terrain.width} m x ${scenario.terrain.depth} m`}
               </Text>
             </>
