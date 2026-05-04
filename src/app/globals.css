@@ -135,7 +135,6 @@
     background:
       radial-gradient(circle at top left, var(--app-background-glow), transparent 30rem),
       linear-gradient(180deg, var(--app-background-top), var(--background) 24rem);
-
     text-rendering: geometricprecision;
   }
   html {
