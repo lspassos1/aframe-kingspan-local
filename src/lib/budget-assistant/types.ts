@@ -7,6 +7,8 @@ export type BudgetConfidenceLevel = "high" | "medium" | "low" | "unverified";
 
 export type BudgetStatus = "preliminary" | "ai_assisted" | "reviewed" | "final_reviewed";
 
+export type PriceSourceRegionalScope = "city" | "state" | "national" | "manual";
+
 export interface CostSource {
   id: string;
   type: PriceSourceType;
@@ -90,6 +92,13 @@ export interface BudgetAssistantViewModel {
   status: BudgetStatus;
   quantityItems: BudgetAssistantQuantityItem[];
   costSources: CostSource[];
+  applicableCostSources: Array<{
+    source: CostSource;
+    scope: PriceSourceRegionalScope;
+    label: string;
+  }>;
+  selectedPriceSourceIds: string[];
+  regionalFallbackWarnings: string[];
   costItems: CostItem[];
   matches: BudgetMatch[];
   pendingPriceItems: BudgetAssistantQuantityItem[];
