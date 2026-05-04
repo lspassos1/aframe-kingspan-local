@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Construção Estudo",
+  title: "Estudo Construtivo",
   description: "Plataforma modular para pré-projeto, visualização 3D, quantitativos, orçamento preliminar e cotação por método construtivo.",
 };
 

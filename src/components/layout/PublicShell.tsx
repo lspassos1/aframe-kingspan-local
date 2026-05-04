@@ -21,7 +21,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                 <Box className="h-5 w-5" />
               </span>
               <span>
-                <span className="block text-sm font-semibold">Construção Estudo</span>
+                <span className="block text-sm font-semibold">Estudo Construtivo</span>
                 <span className="block text-xs text-muted-foreground">pré-projeto modular</span>
               </span>
             </Link>

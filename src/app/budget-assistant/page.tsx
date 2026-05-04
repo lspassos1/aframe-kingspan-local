@@ -179,7 +179,7 @@ export default function BudgetAssistantPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">Budget Assistant</p>
+          <p className="text-sm text-muted-foreground">Assistente de orcamento</p>
           <h1 className="text-3xl font-semibold tracking-normal">Orcamento assistido</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             Quantitativos do cenario atual, fontes cadastradas, precos pendentes e confianca. Nenhum preco e criado automaticamente.

@@ -6,7 +6,7 @@ export default function SignUpPage() {
     <main className="grid min-h-[100svh] place-items-center bg-[#f5f3ed] px-5 py-10 text-neutral-950">
       <div className="w-full max-w-[420px]">
         <Link href="/" className="mb-6 block text-center text-sm font-semibold tracking-normal">
-          Construção Estudo
+          Estudo Construtivo
         </Link>
         <div className="rounded-md border border-neutral-950/12 bg-white p-1.5 shadow-sm">
           <SignUp

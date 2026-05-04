@@ -14,6 +14,10 @@ describe("root shell route selection", () => {
     expect(shouldUsePublicShell("/feedback", true, true)).toBe(false);
   });
 
+  it("keeps feedback inside the app shell for local projects after onboarding is complete", () => {
+    expect(shouldUsePublicShell("/feedback", false, true)).toBe(false);
+  });
+
   it("keeps auth routes public even for signed-in users", () => {
     expect(shouldUsePublicShell("/sign-in", true, true)).toBe(true);
     expect(shouldUsePublicShell("/sign-up", true, true)).toBe(true);
@@ -28,6 +32,7 @@ describe("root shell route selection", () => {
 
   it("handles trailing slash routes like their canonical paths", () => {
     expect(shouldUsePublicShell("/feedback/", false)).toBe(true);
+    expect(shouldUsePublicShell("/feedback/", false, true)).toBe(false);
     expect(shouldUsePublicShell("/feedback/", true, false)).toBe(false);
     expect(shouldUsePublicShell("/feedback/", true, true)).toBe(false);
   });
