@@ -55,6 +55,20 @@ describe("AI plan extract application", () => {
     expect(selected.houseDepthM).toBe(true);
   });
 
+  it("falls back to overall confidence when field confidence is missing", () => {
+    const selected = getDefaultPlanExtractSelectedFields({
+      ...baseResult,
+      confidence: "low",
+      fieldConfidence: {
+        city: "high",
+      },
+    });
+
+    expect(selected.city).toBe(true);
+    expect(selected.terrainWidthM).toBe(false);
+    expect(selected.houseDepthM).toBe(false);
+  });
+
   it("keeps unselected project data untouched", () => {
     const project = cloneProject(defaultProject);
     const selected: PlanExtractSelectedFields = {

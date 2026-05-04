@@ -14,7 +14,7 @@ function fieldSelected(selectedFields: PlanExtractSelectedFields, field: keyof P
 export function getDefaultPlanExtractSelectedFields(result: PlanExtractResult): PlanExtractSelectedFields {
   return Object.keys(result.extracted).reduce<PlanExtractSelectedFields>((selected, key) => {
     const field = key as keyof PlanExtractResult["extracted"];
-    selected[field] = result.fieldConfidence[field] !== "low";
+    selected[field] = (result.fieldConfidence[field] ?? result.confidence) !== "low";
     return selected;
   }, {});
 }

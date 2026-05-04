@@ -4,12 +4,14 @@ import { useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { PlanExtractReview } from "@/components/ai/PlanExtractReview";
+import { PlanExtractReview, type PlanExtractCurrentValues, type PlanExtractModifiedValues } from "@/components/ai/PlanExtractReview";
 import { applyPlanExtractToProject, getDefaultPlanExtractSelectedFields, type PlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
 import { planExtractResultSchema, type PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import { supportedPlanExtractMimeTypes } from "@/lib/ai/plan-extract-request";
+import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { useProjectStore } from "@/lib/store/project-store";
 import { cn } from "@/lib/utils";
+import type { Project, Scenario } from "@/types/project";
 
 type PlanExtractApiPayload = {
   result?: unknown;
@@ -28,21 +30,71 @@ function getPayloadMessage(payload: unknown) {
   return "Nao foi possivel analisar a planta agora.";
 }
 
+function getActiveScenario(project: Project): Scenario {
+  return project.scenarios.find((scenario) => scenario.id === project.selectedScenarioId) ?? project.scenarios[0];
+}
+
+function readNumber(inputs: Record<string, unknown>, key: string) {
+  const value = inputs[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function getCurrentPlanExtractValues(project: Project): PlanExtractCurrentValues {
+  const scenario = getActiveScenario(project);
+  const methodInputs = (scenario.methodInputs?.[scenario.constructionMethod] ?? {}) as Record<string, unknown>;
+  const methodWidth = readNumber(methodInputs, "widthM");
+  const methodDepth = readNumber(methodInputs, "depthM");
+  const methodFloors = readNumber(methodInputs, "floors");
+  const aFrameGeometry = scenario.constructionMethod === "aframe" ? calculateAFrameGeometry(scenario.terrain, scenario.aFrame) : null;
+
+  return {
+    projectName: project.name,
+    address: scenario.location.address,
+    city: scenario.location.city,
+    state: scenario.location.state,
+    country: scenario.location.country,
+    constructionMethod: scenario.constructionMethod,
+    terrainWidthM: scenario.terrain.width,
+    terrainDepthM: scenario.terrain.depth,
+    houseWidthM: aFrameGeometry?.baseWidth ?? methodWidth,
+    houseDepthM: scenario.constructionMethod === "aframe" ? scenario.aFrame.houseDepth : methodDepth,
+    builtAreaM2: aFrameGeometry?.combinedTotalArea ?? (methodWidth && methodDepth ? methodWidth * methodDepth * (methodFloors ?? 1) : undefined),
+    floorHeightM: scenario.constructionMethod === "aframe" ? scenario.aFrame.minimumUsefulHeight : readNumber(methodInputs, "floorHeightM"),
+    floors: scenario.constructionMethod === "aframe" ? (scenario.aFrame.upperFloorMode === "none" ? 1 : 2) : methodFloors,
+    doorCount: readNumber(methodInputs, "doorCount"),
+    windowCount: readNumber(methodInputs, "windowCount"),
+  };
+}
+
+function mergeModifiedValues(result: PlanExtractResult, modifiedValues: PlanExtractModifiedValues): PlanExtractResult {
+  return {
+    ...result,
+    extracted: {
+      ...result.extracted,
+      ...(modifiedValues as Partial<PlanExtractResult["extracted"]>),
+    },
+  };
+}
+
 export function PlanImportCard() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const project = useProjectStore((state) => state.project);
   const setProject = useProjectStore((state) => state.setProject);
   const [state, setState] = useState<UploadState>("idle");
   const [result, setResult] = useState<PlanExtractResult | null>(null);
   const [selectedFields, setSelectedFields] = useState<PlanExtractSelectedFields>({});
+  const [modifiedValues, setModifiedValues] = useState<PlanExtractModifiedValues>({});
   const [message, setMessage] = useState("");
   const [providerMeta, setProviderMeta] = useState<{ provider?: string; model?: string; remaining?: string; limit?: string }>({});
 
   const isUploading = state === "uploading";
+  const currentValues = getCurrentPlanExtractValues(project);
 
   async function uploadFile(file: File) {
     setState("uploading");
     setMessage("");
     setResult(null);
+    setModifiedValues({});
     setProviderMeta({});
 
     const formData = new FormData();
@@ -69,6 +121,7 @@ export function PlanImportCard() {
 
       setResult(parsed.data);
       setSelectedFields(getDefaultPlanExtractSelectedFields(parsed.data));
+      setModifiedValues({});
       setProviderMeta({
         provider: payload?.provider,
         model: payload?.model,
@@ -89,8 +142,10 @@ export function PlanImportCard() {
   function applyExtractedFields() {
     if (!result) return;
     const current = useProjectStore.getState().project;
-    const updatedProject = applyPlanExtractToProject(current, current.selectedScenarioId, result, selectedFields);
+    const reviewedResult = mergeModifiedValues(result, modifiedValues);
+    const updatedProject = applyPlanExtractToProject(current, current.selectedScenarioId, reviewedResult, selectedFields);
     setProject(updatedProject);
+    setModifiedValues({});
     setState("applied");
     setMessage("Campos aplicados. Revise os dados antes de continuar.");
     setTimeout(() => {
@@ -166,9 +221,15 @@ export function PlanImportCard() {
         <PlanExtractReview
           result={result}
           selectedFields={selectedFields}
+          currentValues={currentValues}
+          modifiedValues={modifiedValues}
           onSelectedFieldsChange={setSelectedFields}
+          onModifiedValuesChange={setModifiedValues}
           onApply={applyExtractedFields}
-          onDismiss={() => setState("idle")}
+          onDismiss={() => {
+            setModifiedValues({});
+            setState("idle");
+          }}
         />
       )}
     </div>
