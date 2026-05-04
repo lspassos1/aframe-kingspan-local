@@ -32,11 +32,14 @@ export function generateRectangularConstructionLayers(
   const depthM = readNumber(inputs, "depthM", 12);
   const floorHeightM = readNumber(inputs, "floorHeightM", 2.8);
   const floors = readNumber(inputs, "floors", 1);
-  const wallThicknessM = readNumber(inputs, "wallThicknessM", 0.15);
+  const methodWallThicknessM = readNumber(inputs, "blockWidthM", readNumber(inputs, "finalWallThicknessM", 0.15));
+  const wallThicknessM = readNumber(inputs, "wallThicknessM", methodWallThicknessM);
   const totalHeightM = floorHeightM * floors;
   const terrainWidthM = Math.max(scenario.terrain.width, widthM + 4);
   const terrainDepthM = Math.max(scenario.terrain.depth, depthM + 4);
   const roofOverhangM = 0.35;
+  const buildableWidthM = Math.max(0.2, terrainWidthM - scenario.terrain.leftSetback - scenario.terrain.rightSetback);
+  const buildableDepthM = Math.max(0.2, terrainDepthM - scenario.terrain.frontSetback - scenario.terrain.rearSetback);
 
   return [
     {
@@ -53,6 +56,16 @@ export function generateRectangularConstructionLayers(
             position: [0, -0.04, 0],
             size: [terrainWidthM, 0.08, terrainDepthM],
             color: "#e5efe7",
+          },
+          {
+            id: "buildable-area",
+            kind: "box",
+            label: "Area implantavel",
+            position: [(scenario.terrain.leftSetback - scenario.terrain.rightSetback) / 2, 0.02, (scenario.terrain.frontSetback - scenario.terrain.rearSetback) / 2],
+            size: [buildableWidthM, 0.04, buildableDepthM],
+            color: "#f59e0b",
+            opacity: 0.42,
+            wireframe: true,
           },
         ],
       },

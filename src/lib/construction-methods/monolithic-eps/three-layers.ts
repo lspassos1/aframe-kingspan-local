@@ -10,6 +10,9 @@ export function generateMonolithicEps3DLayers({ scenario }: ConstructionMethodCa
     foundationColor: "#94a3b8",
     floorColor: "#cbd5e1",
   });
+  const frontFaceZ = -inputs.depthM / 2 - inputs.finalWallThicknessM / 2 - 0.02;
+  const coreDepth = Math.max(0.02, inputs.epsCoreThicknessM);
+  const renderDepth = Math.max(0.01, inputs.renderThicknessPerFaceM);
 
   return [
     ...baseLayers,
@@ -25,8 +28,8 @@ export function generateMonolithicEps3DLayers({ scenario }: ConstructionMethodCa
             id: "eps-core-front",
             kind: "box",
             label: "EPS",
-            position: [0, inputs.floorHeightM / 2 + 0.24, -inputs.depthM / 2 - 0.08],
-            size: [inputs.widthM, inputs.floorHeightM, 0.04],
+            position: [0, inputs.floorHeightM / 2 + 0.24, frontFaceZ],
+            size: [inputs.widthM, inputs.floorHeightM, coreDepth],
             color: "#bae6fd",
             opacity: 0.68,
           },
@@ -34,7 +37,7 @@ export function generateMonolithicEps3DLayers({ scenario }: ConstructionMethodCa
             id: "eps-mesh-front",
             kind: "box",
             label: "Malha",
-            position: [0, inputs.floorHeightM / 2 + 0.24, -inputs.depthM / 2 - 0.125],
+            position: [0, inputs.floorHeightM / 2 + 0.24, frontFaceZ - coreDepth / 2 - 0.015],
             size: [inputs.widthM, inputs.floorHeightM, 0.015],
             color: "#0f172a",
             opacity: 0.46,
@@ -44,8 +47,8 @@ export function generateMonolithicEps3DLayers({ scenario }: ConstructionMethodCa
             id: "eps-render-front",
             kind: "box",
             label: "Revest.",
-            position: [0, inputs.floorHeightM / 2 + 0.24, -inputs.depthM / 2 - 0.17],
-            size: [inputs.widthM, inputs.floorHeightM, 0.035],
+            position: [0, inputs.floorHeightM / 2 + 0.24, frontFaceZ - coreDepth / 2 - renderDepth / 2 - 0.035],
+            size: [inputs.widthM, inputs.floorHeightM, renderDepth],
             color: "#f8fafc",
             opacity: 0.52,
           },
