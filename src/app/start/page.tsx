@@ -6,7 +6,6 @@ export default function StartPage() {
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden rounded-3xl border bg-card/85 p-6 shadow-sm shadow-foreground/5 sm:p-8">
-        <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_center,oklch(0.86_0.07_178_/_48%),transparent_24rem)] lg:block" aria-hidden="true" />
         <div className="relative max-w-3xl">
           <p className="text-sm font-medium text-muted-foreground">Novo estudo</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-normal text-balance sm:text-5xl">Comece pelo método, avance com dados claros.</h1>

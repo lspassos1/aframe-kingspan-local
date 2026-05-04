@@ -131,10 +131,12 @@
   }
   body {
     @apply bg-background text-foreground;
+
     background:
       radial-gradient(circle at top left, var(--app-background-glow), transparent 30rem),
       linear-gradient(180deg, var(--app-background-top), var(--background) 24rem);
-    text-rendering: geometricPrecision;
+
+    text-rendering: geometricprecision;
   }
   html {
     @apply font-sans;

@@ -26,6 +26,9 @@ function fieldClass(hasError?: boolean) {
   return cn(hasError && "border-destructive bg-destructive/5 ring-2 ring-destructive/20");
 }
 
+const methodNativeSelectClass =
+  "h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35";
+
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="text-xs font-medium text-destructive">{message}</p>;
@@ -655,7 +658,7 @@ export function StartProjectForm() {
                         <Label htmlFor="methodBlockType">Tipo de bloco</Label>
                         <select
                           id="methodBlockType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("blockType")}
                         >
                           <option value="ceramic">Cerâmico</option>
@@ -680,7 +683,7 @@ export function StartProjectForm() {
                         <Label htmlFor="methodFoundationType">Fundação</Label>
                         <select
                           id="methodFoundationType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("foundationType")}
                         >
                           <option value="placeholder">Placeholder</option>
@@ -692,7 +695,7 @@ export function StartProjectForm() {
                         <Label htmlFor="methodRoofType">Cobertura</Label>
                         <select
                           id="methodRoofType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("roofType")}
                         >
                           <option value="simple-roof">Telhado simples</option>
@@ -726,7 +729,7 @@ export function StartProjectForm() {
                         <Label htmlFor="ecoUseType">Uso</Label>
                         <select
                           id="ecoUseType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("useType")}
                         >
                           <option value="infill">Vedação</option>
@@ -737,7 +740,7 @@ export function StartProjectForm() {
                         <Label htmlFor="ecoFinishType">Acabamento</Label>
                         <select
                           id="ecoFinishType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("finishType")}
                         >
                           <option value="exposed">Aparente</option>
@@ -754,7 +757,7 @@ export function StartProjectForm() {
                         <Label htmlFor="ecoFoundationType">Fundação</Label>
                         <select
                           id="ecoFoundationType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("foundationType")}
                         >
                           <option value="placeholder">Placeholder</option>
@@ -790,7 +793,7 @@ export function StartProjectForm() {
                         <Label htmlFor="epsUseType">Uso</Label>
                         <select
                           id="epsUseType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("useType")}
                         >
                           <option value="infill">Vedação</option>
@@ -801,7 +804,7 @@ export function StartProjectForm() {
                         <Label htmlFor="epsFoundationType">Fundação</Label>
                         <select
                           id="epsFoundationType"
-                          className="h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("foundationType")}
                         >
                           <option value="radier">Radier</option>
