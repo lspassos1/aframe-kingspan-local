@@ -2,6 +2,7 @@ const publicRoutePrefixes = ["/sign-in", "/sign-up"];
 const publicRoutes = new Set(["/", "/privacy", "/terms", "/feedback"]);
 const authenticatedAppShellRoutes = new Set(["/feedback"]);
 const authenticatedAppShellRoutesBeforeOnboarding = new Set(["/feedback"]);
+const localProjectAppShellRoutes = new Set(["/feedback"]);
 const appShellRoutesBeforeOnboarding = new Set(["/start", "/feedback"]);
 
 export function normalizePathname(pathname: string) {
@@ -35,6 +36,10 @@ export function isPublicRoute(pathname: string) {
 
 export function shouldUsePublicShell(pathname: string, isSignedIn: boolean, onboardingCompleted = false) {
   const normalizedPathname = normalizePathname(pathname);
+
+  if (onboardingCompleted && localProjectAppShellRoutes.has(normalizedPathname)) {
+    return false;
+  }
 
   if (isSignedIn && authenticatedAppShellRoutesBeforeOnboarding.has(normalizedPathname)) {
     return false;

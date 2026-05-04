@@ -62,11 +62,11 @@ export function HomeAuthExperience() {
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.82),rgba(0,0,0,0.42)_48%,rgba(0,0,0,0.18)),linear-gradient(180deg,rgba(0,0,0,0.24),rgba(0,0,0,0.72))]" />
 
         <header className="relative z-10 flex items-center justify-between px-5 py-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-3" aria-label="Construção Estudo">
+          <Link href="/" className="flex items-center gap-3" aria-label="Estudo Construtivo">
             <span className="grid h-10 w-10 place-items-center rounded-md bg-white text-neutral-950">
               <Box className="h-5 w-5" />
             </span>
-            <span className="text-sm font-semibold tracking-normal">Construção Estudo</span>
+            <span className="text-sm font-semibold tracking-normal">Estudo Construtivo</span>
           </Link>
           <nav className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm" className="hidden text-white/75 hover:bg-white/10 hover:text-white sm:inline-flex">

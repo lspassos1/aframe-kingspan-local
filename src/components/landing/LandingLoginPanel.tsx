@@ -25,11 +25,11 @@ export function LandingLoginPanel() {
   return (
     <section className="order-2 flex min-h-[64svh] flex-col bg-[#f8f7f3] px-6 py-6 text-neutral-950 sm:px-10 lg:order-1 lg:min-h-[100svh] lg:px-14">
       <div className="flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3" aria-label="A-frame Estudo">
+        <Link href="/" className="flex items-center gap-3" aria-label="Estudo Construtivo">
           <span className="grid h-10 w-10 place-items-center rounded-md bg-neutral-950 text-white">
             <Box className="h-5 w-5" />
           </span>
-          <span className="text-sm font-semibold tracking-normal">A-frame Estudo</span>
+          <span className="text-sm font-semibold tracking-normal">Estudo Construtivo</span>
         </Link>
         <Button asChild variant="ghost" size="sm" className="text-neutral-600 hover:bg-neutral-200/70">
           <Link href="/feedback">Melhorias</Link>
