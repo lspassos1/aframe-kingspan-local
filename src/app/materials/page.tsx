@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { calculateMaterialList, calculatePanelLayout, splitLengthByAvailability } from "@/lib/calculations/materials";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
-import { formatCurrency } from "@/lib/format";
+import { calculateConventionalMasonryGeometry } from "@/lib/construction-methods/conventional-masonry/geometry";
+import { calculateConventionalMasonryMaterialList } from "@/lib/construction-methods/conventional-masonry/materials";
+import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 
 export default function MaterialsPage() {
@@ -23,6 +25,97 @@ export default function MaterialsPage() {
   const addCustomMaterial = useProjectStore((state) => state.addCustomMaterial);
   const deleteCustomMaterial = useProjectStore((state) => state.deleteCustomMaterial);
   const scenario = useSelectedScenario();
+  const isConventionalMasonry = scenario.constructionMethod === "conventional-masonry";
+  if (isConventionalMasonry) {
+    const geometry = calculateConventionalMasonryGeometry({ project, scenario });
+    const materials = calculateConventionalMasonryMaterialList({ project, scenario });
+    const pendingItems = materials.filter((line) => line.requiresConfirmation).length;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">Materiais</p>
+            <h1 className="text-3xl font-semibold tracking-normal">Quantitativos preliminares de alvenaria</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Blocos, argamassa, revestimentos, contrapiso e placeholders. Precos devem vir de composicoes ou cotacoes formais.
+            </p>
+          </div>
+          <Badge variant="outline" className="w-fit text-sm">
+            {pendingItems} itens a precificar
+          </Badge>
+        </div>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Alvenaria liquida</p>
+              <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(geometry.netMasonryAreaM2)} m2</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Blocos</p>
+              <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(geometry.totalBlocks)} un</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Argamassa</p>
+              <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(geometry.layingMortarM3)} m3</p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-md shadow-none">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Area construida</p>
+              <p className="mt-2 text-2xl font-semibold">{formatCompactNumber(geometry.builtAreaM2)} m2</p>
+            </CardContent>
+          </Card>
+        </section>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PackageCheck className="h-5 w-5" />
+              Material take-off
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table className="min-w-[980px] table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-44">Codigo</TableHead>
+                  <TableHead className="w-[360px]">Descricao</TableHead>
+                  <TableHead className="w-28">Categoria</TableHead>
+                  <TableHead className="w-24 text-right">Qtd.</TableHead>
+                  <TableHead className="w-20">Un.</TableHead>
+                  <TableHead className="w-44">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {materials.map((line) => (
+                  <TableRow key={line.id} className="align-top">
+                    <TableCell className="whitespace-normal break-words align-top font-mono text-xs leading-relaxed">{line.code}</TableCell>
+                    <TableCell className="whitespace-normal break-words align-top">
+                      <div className="font-medium">{line.description}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{line.notes}</div>
+                    </TableCell>
+                    <TableCell className="whitespace-normal break-words align-top">{line.category}</TableCell>
+                    <TableCell className="align-top text-right">{line.quantity}</TableCell>
+                    <TableCell className="align-top">{line.unit}</TableCell>
+                    <TableCell className="align-top">
+                      <Badge variant="secondary">preco/fonte pendente</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const panel = project.panelProducts.find((item) => item.id === scenario.panelProductId) ?? project.panelProducts[0];
   const geometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
   const layout = calculatePanelLayout(scenario, geometry, panel, project.materialAssumptions.sparePanelCount);

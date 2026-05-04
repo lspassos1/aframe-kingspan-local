@@ -11,6 +11,9 @@ import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { calculateBudget } from "@/lib/calculations/budget";
 import { calculatePanelLayout } from "@/lib/calculations/materials";
 import { estimateSteelStructure } from "@/lib/calculations/structure";
+import { calculateConventionalMasonryBudget } from "@/lib/construction-methods/conventional-masonry/budget";
+import { calculateConventionalMasonryGeometry } from "@/lib/construction-methods/conventional-masonry/geometry";
+import { calculateConventionalMasonryMaterialList } from "@/lib/construction-methods/conventional-masonry/materials";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 
 export default function DashboardPage() {
@@ -27,7 +30,12 @@ export default function DashboardPage() {
   const layout = calculatePanelLayout(scenario, geometry, panel, project.materialAssumptions.sparePanelCount);
   const budget = calculateBudget(project, scenario);
   const structural = estimateSteelStructure(project, scenario);
-  const warnings = budget.warnings.filter((warning) => warning.level !== "info");
+  const isConventionalMasonry = scenario.constructionMethod === "conventional-masonry";
+  const conventionalGeometry = isConventionalMasonry ? calculateConventionalMasonryGeometry({ project, scenario }) : null;
+  const conventionalBudget = isConventionalMasonry ? calculateConventionalMasonryBudget({ project, scenario }) : null;
+  const conventionalMaterials = isConventionalMasonry ? calculateConventionalMasonryMaterialList({ project, scenario }) : [];
+  const warnings = (conventionalBudget?.warnings ?? budget.warnings).filter((warning) => warning.level !== "info");
+  const pendingConventionalPrices = conventionalBudget?.items.filter((item) => item.requiresConfirmation).length ?? 0;
   const savedSummaries = savedProjects.map(getSavedProjectSummary);
   const activeProjectSaved = savedProjects.some((item) => item.id === project.id);
 
@@ -68,8 +76,8 @@ export default function DashboardPage() {
               Fechar detalhes
             </Button>
           ) : null}
-          <Badge variant={geometry.fitsTerrain ? "default" : "destructive"} className="h-9 px-3">
-            {geometry.fitsTerrain ? "Cabe no lote com os recuos" : "Revisar implantacao"}
+          <Badge variant={isConventionalMasonry ? "outline" : geometry.fitsTerrain ? "default" : "destructive"} className="h-9 px-3">
+            {isConventionalMasonry ? "Alvenaria preliminar" : geometry.fitsTerrain ? "Cabe no lote com os recuos" : "Revisar implantacao"}
           </Badge>
         </div>
       </div>
@@ -132,7 +140,81 @@ export default function DashboardPage() {
       </section>
 
       {!detailsOpen ? null : (
-        <>
+        isConventionalMasonry && conventionalGeometry && conventionalBudget ? (
+          <>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Lote"
+          value={`${scenario.terrain.width} x ${scenario.terrain.depth} m`}
+          detail="Dimensoes e endereco editaveis"
+          icon={<Ruler className="h-5 w-5" />}
+        />
+        <MetricCard
+          label="Area construida"
+          value={`${formatCompactNumber(conventionalGeometry.builtAreaM2)} m2`}
+          detail={`${conventionalGeometry.floors} pav. | pe-direito ${conventionalGeometry.floorHeightM} m`}
+          icon={<Home className="h-5 w-5" />}
+        />
+        <MetricCard
+          label="Blocos"
+          value={`${formatCompactNumber(conventionalGeometry.totalBlocks)} un`}
+          detail={`${conventionalGeometry.blocksPerM2} blocos/m2 | ${conventionalGeometry.netMasonryAreaM2} m2 liquidos`}
+          icon={<Package className="h-5 w-5" />}
+        />
+        <MetricCard
+          label="Custo preliminar"
+          value={formatCurrency(conventionalBudget.totalEstimatedCostBRL)}
+          detail={`${pendingConventionalPrices} itens dependem de preco/fonte`}
+          icon={<Wallet className="h-5 w-5" />}
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Quantitativos de alvenaria</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard label="Perimetro externo" value={`${formatCompactNumber(conventionalGeometry.perimeterM)} m`} />
+            <MetricCard label="Parede externa bruta" value={`${formatCompactNumber(conventionalGeometry.externalWallGrossAreaM2)} m2`} />
+            <MetricCard label="Paredes internas" value={`${formatCompactNumber(conventionalGeometry.internalWallGrossAreaM2)} m2`} />
+            <MetricCard label="Aberturas" value={`${formatCompactNumber(conventionalGeometry.openingsAreaM2)} m2`} />
+            <MetricCard label="Alvenaria liquida" value={`${formatCompactNumber(conventionalGeometry.netMasonryAreaM2)} m2`} />
+            <MetricCard label="Argamassa" value={`${formatCompactNumber(conventionalGeometry.layingMortarM3)} m3`} />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div>
+              <p className="font-medium">Metodo selecionado</p>
+              <p className="text-muted-foreground">Alvenaria convencional com quantitativos preliminares.</p>
+            </div>
+            <div>
+              <p className="font-medium">Materiais gerados</p>
+              <p className="text-muted-foreground">
+                {conventionalMaterials.length} linhas iniciais, todas marcadas para confirmacao de preco e fonte.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Alertas</p>
+              <div className="mt-2 space-y-2">
+                {warnings.slice(0, 5).map((warning) => (
+                  <div key={warning.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                    {warning.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+          </>
+        ) : (
+          <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Lote"
@@ -221,6 +303,7 @@ export default function DashboardPage() {
         </Card>
       </section>
         </>
+        )
       )}
     </div>
   );
