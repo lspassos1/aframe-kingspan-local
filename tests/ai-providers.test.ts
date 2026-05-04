@@ -66,11 +66,25 @@ describe("AI plan extraction providers", () => {
     expect(result.fieldConfidence.houseWidthM).toBe("medium");
   });
 
-  it("allows Groq image fallback when configured", () => {
+  it("does not route image files to Groq when the configured model is text-only", () => {
     const providers = getConfiguredAiPlanExtractProviders({
       AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq",
       GROQ_API_KEY: "groq-key",
       AI_GROQ_MODEL: "llama-3.1-8b-instant",
+    });
+
+    expect(providers).toHaveLength(1);
+    expect(providers[0]).toMatchObject({
+      id: "groq",
+      supports: [],
+    });
+  });
+
+  it("allows Groq image fallback when a vision model is configured", () => {
+    const providers = getConfiguredAiPlanExtractProviders({
+      AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq",
+      GROQ_API_KEY: "groq-key",
+      AI_GROQ_MODEL: "llama-3.2-11b-vision-preview",
     });
 
     expect(providers).toHaveLength(1);

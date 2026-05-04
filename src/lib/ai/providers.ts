@@ -70,6 +70,11 @@ export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.en
   return supportedOrder.length > 0 ? supportedOrder : defaultProviderOrder;
 }
 
+function getProviderSupportedMimeTypes(id: AiPlanExtractProviderId, model: string, defaults: (typeof providerDefaults)[AiPlanExtractProviderId]) {
+  if (id !== "groq") return defaults.supports;
+  return model.toLowerCase().includes("vision") ? defaults.supports : [];
+}
+
 export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.env): AiPlanExtractProviderConfig[] {
   return getAiPlanExtractProviderOrder(env).map((id) => {
     const defaults = providerDefaults[id];
@@ -82,7 +87,7 @@ export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.
       baseUrl,
       apiKey,
       configured: Boolean(model && baseUrl && apiKey),
-      supports: defaults.supports,
+      supports: getProviderSupportedMimeTypes(id, model, defaults),
     };
   });
 }

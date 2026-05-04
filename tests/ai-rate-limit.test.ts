@@ -176,6 +176,32 @@ describe("AI daily rate limit", () => {
     });
   });
 
+  it("treats whitespace-only production salt as missing", async () => {
+    const decision = await checkAndConsumeAiDailyLimit(
+      {
+        feature: "plan-extract",
+        userId: "user-prod",
+        ip: "203.0.113.25",
+        now: new Date("2026-05-04T12:00:00.000Z"),
+      },
+      {
+        env: {
+          NODE_ENV: "production",
+          AI_RATE_LIMIT_SALT: "   ",
+          AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "3",
+          AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP: "5",
+          AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT: "50",
+        },
+        store: createMemoryAiRateLimitStore(new Map()),
+      }
+    );
+
+    expect(decision).toMatchObject({
+      allowed: false,
+      reason: "rate-limit-salt-required",
+    });
+  });
+
   it("uses AbortSignal timeouts for Redis REST calls", async () => {
     const signals: Array<AbortSignal | null | undefined> = [];
     const fetcher: typeof fetch = async (_input, init) => {
@@ -239,6 +265,29 @@ describe("AI daily rate limit", () => {
       "X-RateLimit-Limit": "3",
       "X-RateLimit-Remaining": "2",
       "X-RateLimit-Scope": "user",
+    });
+  });
+
+  it("falls back to x-real-ip when trusted proxy headers are enabled", async () => {
+    const headers = new Headers({
+      "x-real-ip": "198.51.100.22",
+    });
+    const decision = await checkAndConsumeAiDailyLimit(
+      {
+        feature: "plan-extract",
+        userId: null,
+        ip: getClientIpFromHeaders(headers, { trustProxyHeaders: true }),
+        now: new Date("2026-05-04T12:00:00.000Z"),
+      },
+      { env: { ...baseEnv, AI_ALLOW_ANONYMOUS_PLAN_EXTRACT: "true" }, store: createMemoryAiRateLimitStore(new Map()) }
+    );
+
+    expect(getClientIpFromHeaders(headers)).toBeNull();
+    expect(getClientIpFromHeaders(headers, { trustProxyHeaders: true })).toBe("198.51.100.22");
+    expect(createAiRateLimitHeaders(decision)).toMatchObject({
+      "X-RateLimit-Limit": "5",
+      "X-RateLimit-Remaining": "4",
+      "X-RateLimit-Scope": "ip",
     });
   });
 });
