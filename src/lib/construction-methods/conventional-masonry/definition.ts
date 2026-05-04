@@ -6,6 +6,7 @@ import {
   type ConstructionMethodDefinition,
   type ConstructionMethodInputs,
 } from "@/lib/construction-methods/types";
+import { generateConventionalMasonry3DLayers } from "./three-layers";
 
 export const conventionalMasonryDefinition = {
   id: "conventional-masonry",
@@ -45,4 +46,5 @@ export const conventionalMasonryDefinition = {
     ]);
     return validationResult(issues);
   },
+  generate3DLayers: generateConventionalMasonry3DLayers,
 } satisfies ConstructionMethodDefinition<ConstructionMethodInputs>;
