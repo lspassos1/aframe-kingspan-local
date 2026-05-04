@@ -26,6 +26,8 @@ Copie `.env.example` para `.env.local` e configure:
 
 O app nao armazena senhas, hashes, OAuth tokens ou refresh tokens. Autenticacao e email ficam no Clerk; projetos continuam no LocalStorage do navegador. O token do GitHub deve ter permissao minima para criar issues no repositorio privado.
 
+Para a extracao opcional de planta baixa com IA, consulte `docs/AI_PLAN_EXTRACT.md` antes de habilitar `AI_PLAN_EXTRACT_ENABLED=true`. A planta enviada e processada pelo provider configurado e deve passar por revisao humana antes de aplicar dados ao projeto.
+
 ## O que o MVP faz
 
 - calcula geometria A-frame, areas totais, areas uteis, zonas mortas e fit no lote;
