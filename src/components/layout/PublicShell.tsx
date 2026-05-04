@@ -14,10 +14,10 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {!hideHeader ? (
-        <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b bg-background/88 backdrop-blur-xl">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shadow-primary/15">
                 <Box className="h-5 w-5" />
               </span>
               <span>

@@ -26,6 +26,9 @@ function fieldClass(hasError?: boolean) {
   return cn(hasError && "border-destructive bg-destructive/5 ring-2 ring-destructive/20");
 }
 
+const methodNativeSelectClass =
+  "h-10 w-full rounded-xl border border-input/85 bg-background/75 px-3 text-sm shadow-inner shadow-foreground/[0.015] outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/35";
+
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="text-xs font-medium text-destructive">{message}</p>;
@@ -399,17 +402,15 @@ export function StartProjectForm() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <ConstructionMethodSelector selectedMethod={selectedMethod} onSelect={selectConstructionMethod} />
 
       {selectedMethod === "aframe" ? (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <Card className="rounded-md shadow-none">
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <Card className="rounded-3xl shadow-sm">
         <CardHeader>
-          <CardTitle>Dados minimos para abrir o 3D</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Campos obrigatorios ficam destacados em vermelho ate ficarem validos. Depois disso o modelo 3D pode recalcular lote, painel, altura e profundidade.
-          </p>
+          <CardTitle>Dados mínimos</CardTitle>
+          <p className="text-sm text-muted-foreground">Preencha lote, painel e geometria principal para abrir o 3D.</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(applyValues)} className="space-y-6">
@@ -427,7 +428,7 @@ export function StartProjectForm() {
                 <FieldError message={form.formState.errors.projectName?.message} />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="address">Endereco ou referencia do lote</Label>
+                <Label htmlFor="address">Endereço ou referência do lote</Label>
                 <Input id="address" placeholder="Opcional nesta etapa" {...form.register("address")} />
               </div>
               <Controller
@@ -455,7 +456,7 @@ export function StartProjectForm() {
               />
               <div className="space-y-2">
                 <Label htmlFor="country" className={cn(form.formState.errors.country && "text-destructive")}>
-                  Pais
+                  País
                 </Label>
                 <Input id="country" aria-invalid={Boolean(form.formState.errors.country)} className={fieldClass(Boolean(form.formState.errors.country))} {...form.register("country")} />
                 <FieldError message={form.formState.errors.country?.message} />
@@ -496,7 +497,7 @@ export function StartProjectForm() {
                   name="panelLength"
                   render={({ field, fieldState }) => (
                     <div className="space-y-2">
-                      <Label className={cn(fieldState.error && "text-destructive")}>Comprimento disponivel</Label>
+                      <Label className={cn(fieldState.error && "text-destructive")}>Comprimento disponível</Label>
                       <Select value={String(field.value)} onValueChange={(value) => field.onChange(Number(value))}>
                         <SelectTrigger aria-invalid={Boolean(fieldState.error)} className={fieldClass(Boolean(fieldState.error))}>
                           <SelectValue />
@@ -514,7 +515,7 @@ export function StartProjectForm() {
                   )}
                 />
               )}
-              <NumberInput id="baseAngleDeg" label="Angulo da casa (graus)" step="1" error={form.formState.errors.baseAngleDeg?.message} {...form.register("baseAngleDeg")} />
+              <NumberInput id="baseAngleDeg" label="Ângulo da casa (graus)" step="1" error={form.formState.errors.baseAngleDeg?.message} {...form.register("baseAngleDeg")} />
               <NumberInput id="houseDepth" label="Profundidade da casa (m)" error={form.formState.errors.houseDepth?.message} {...form.register("houseDepth")} />
             </section>
 
@@ -524,7 +525,7 @@ export function StartProjectForm() {
                 Usar projeto exemplo
               </Button>
               <Button type="submit" disabled={!form.formState.isValid}>
-                Iniciar Modelo 3D
+                Abrir modelo 3D
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -533,11 +534,11 @@ export function StartProjectForm() {
       </Card>
 
       <aside className="space-y-4">
-        <Card className="rounded-md shadow-none">
+        <Card className="rounded-3xl shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Triangle className="h-4 w-4" />
-              Previa geometrica
+              Prévia geométrica
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -550,48 +551,53 @@ export function StartProjectForm() {
               <strong>{formatNumber(geometry.ridgeHeight)} m</strong>
             </div>
             <div className="flex justify-between gap-3">
-              <span className="text-muted-foreground">Terreo util</span>
-              <strong>{formatNumber(geometry.groundUsefulArea)} m2</strong>
+              <span className="text-muted-foreground">Térreo útil</span>
+              <strong>{formatNumber(geometry.groundUsefulArea)} m²</strong>
             </div>
             <div className="flex justify-between gap-3">
               <span className="text-muted-foreground">Cabe no lote</span>
-              <strong>{geometry.fitsTerrain ? "Sim" : "Nao"}</strong>
+              <strong>{geometry.fitsTerrain ? "Sim" : "Não"}</strong>
             </div>
-            {geometry.warnings.slice(0, 3).map((warning) => (
-              <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950" key={warning.id}>
-                {warning.message}
-              </p>
-            ))}
+            {geometry.warnings.length > 0 ? (
+              <details className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                <summary className="cursor-pointer font-medium">Ver alertas técnicos</summary>
+                <div className="mt-2 space-y-2">
+                  {geometry.warnings.slice(0, 3).map((warning) => (
+                    <p key={warning.id}>{warning.message}</p>
+                  ))}
+                </div>
+              </details>
+            ) : null}
           </CardContent>
         </Card>
-        <Card className="rounded-md shadow-none">
+        <Card className="rounded-3xl shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPinned className="h-4 w-4" />
-              Privacidade nesta etapa
+              Privacidade
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Esses dados ficam no LocalStorage do navegador. O app nao envia projeto, endereco ou medidas para um banco proprio.</p>
-            <p>Autenticacao e email ficam no Clerk. Senhas e tokens OAuth nao passam pelo app.</p>
-            <p>Estimativa inicial exibida: {formatCurrency(0)} ate voce preencher precos reais nas abas internas.</p>
+            <p>Projetos continuam salvos no navegador.</p>
+            <p>Login seguro via Clerk.</p>
+            <p>Preços dependem de fontes revisadas. Valor inicial: {formatCurrency(0)}.</p>
           </CardContent>
         </Card>
       </aside>
     </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Card className="rounded-md shadow-none">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Card className="rounded-3xl shadow-sm">
             <CardHeader>
               <CardTitle>{selectedMethodDefinition.name}</CardTitle>
               <p className="text-sm text-muted-foreground">
                 {selectedMethod === "conventional-masonry"
-                  ? "Formulario MVP para quantitativos preliminares de alvenaria, sem dimensionamento estrutural real."
+                  ? "Casa retangular em blocos, com custo preliminar."
                   : selectedMethod === "eco-block"
-                    ? "Formulario MVP para quantitativos preliminares de bloco solo-cimento, sem assumir funcao estrutural."
+                    ? "Modulação preliminar em bloco solo-cimento."
                     : selectedMethod === "monolithic-eps"
-                      ? "Formulario MVP para paineis EPS monoliticos, sem assumir desempenho estrutural sem fornecedor validado."
-                  : "MVP preliminar para registrar dimensoes iniciais. Quantitativos, orcamento e 3D especificos entram nos proximos PRs."}
+                      ? "Painéis EPS com quantitativos preliminares."
+                  : "Dimensões iniciais para estudo preliminar."}
               </p>
             </CardHeader>
             <CardContent>
@@ -626,7 +632,7 @@ export function StartProjectForm() {
                   />
                   <NumberInput
                     id="methodFloorHeightM"
-                    label="Pe-direito (m)"
+                    label="Pé-direito (m)"
                     min={2}
                     error={methodForm.formState.errors.floorHeightM?.message}
                     {...methodForm.register("floorHeightM")}
@@ -652,10 +658,10 @@ export function StartProjectForm() {
                         <Label htmlFor="methodBlockType">Tipo de bloco</Label>
                         <select
                           id="methodBlockType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("blockType")}
                         >
-                          <option value="ceramic">Ceramico</option>
+                          <option value="ceramic">Cerâmico</option>
                           <option value="concrete">Concreto</option>
                         </select>
                       </div>
@@ -674,10 +680,10 @@ export function StartProjectForm() {
                       <NumberInput id="methodWindowWidth" label="Largura janela (m)" min={0.4} error={methodForm.formState.errors.windowWidthM?.message} {...methodForm.register("windowWidthM")} />
                       <NumberInput id="methodWindowHeight" label="Altura janela (m)" min={0.4} error={methodForm.formState.errors.windowHeightM?.message} {...methodForm.register("windowHeightM")} />
                       <div className="space-y-2">
-                        <Label htmlFor="methodFoundationType">Fundacao</Label>
+                        <Label htmlFor="methodFoundationType">Fundação</Label>
                         <select
                           id="methodFoundationType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("foundationType")}
                         >
                           <option value="placeholder">Placeholder</option>
@@ -689,7 +695,7 @@ export function StartProjectForm() {
                         <Label htmlFor="methodRoofType">Cobertura</Label>
                         <select
                           id="methodRoofType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("roofType")}
                         >
                           <option value="simple-roof">Telhado simples</option>
@@ -703,7 +709,7 @@ export function StartProjectForm() {
                           ["internalPlaster", "Reboco interno"],
                           ["externalPlaster", "Reboco externo"],
                           ["subfloor", "Contrapiso"],
-                          ["basicFinish", "Acabamento basico"],
+                          ["basicFinish", "Acabamento básico"],
                         ].map(([name, label]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
                             <input type="checkbox" className="h-4 w-4 accent-primary" {...methodForm.register(name as keyof MethodProjectFormValues)} />
@@ -718,15 +724,15 @@ export function StartProjectForm() {
                       <NumberInput id="ecoBlockLength" label="Comprimento bloco (m)" min={0.1} error={methodForm.formState.errors.blockLengthM?.message} {...methodForm.register("blockLengthM")} />
                       <NumberInput id="ecoBlockHeight" label="Altura bloco (m)" min={0.05} error={methodForm.formState.errors.blockHeightM?.message} {...methodForm.register("blockHeightM")} />
                       <NumberInput id="ecoBlockWidth" label="Largura bloco (m)" min={0.08} error={methodForm.formState.errors.blockWidthM?.message} {...methodForm.register("blockWidthM")} />
-                      <NumberInput id="ecoBlocksM2" label="Blocos por m2" min={1} error={methodForm.formState.errors.blocksPerM2?.message} {...methodForm.register("blocksPerM2")} />
+                      <NumberInput id="ecoBlocksM2" label="Blocos por m²" min={1} error={methodForm.formState.errors.blocksPerM2?.message} {...methodForm.register("blocksPerM2")} />
                       <div className="space-y-2">
                         <Label htmlFor="ecoUseType">Uso</Label>
                         <select
                           id="ecoUseType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("useType")}
                         >
-                          <option value="infill">Vedacao</option>
+                          <option value="infill">Vedação</option>
                           <option value="structural-preliminary">Estrutural preliminar</option>
                         </select>
                       </div>
@@ -734,7 +740,7 @@ export function StartProjectForm() {
                         <Label htmlFor="ecoFinishType">Acabamento</Label>
                         <select
                           id="ecoFinishType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("finishType")}
                         >
                           <option value="exposed">Aparente</option>
@@ -748,10 +754,10 @@ export function StartProjectForm() {
                       <NumberInput id="ecoWindowWidth" label="Largura janela (m)" min={0.4} error={methodForm.formState.errors.windowWidthM?.message} {...methodForm.register("windowWidthM")} />
                       <NumberInput id="ecoWindowHeight" label="Altura janela (m)" min={0.4} error={methodForm.formState.errors.windowHeightM?.message} {...methodForm.register("windowHeightM")} />
                       <div className="space-y-2">
-                        <Label htmlFor="ecoFoundationType">Fundacao</Label>
+                        <Label htmlFor="ecoFoundationType">Fundação</Label>
                         <select
                           id="ecoFoundationType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("foundationType")}
                         >
                           <option value="placeholder">Placeholder</option>
@@ -765,8 +771,8 @@ export function StartProjectForm() {
                           ["groutingEnabled", "Grauteamento"],
                           ["verticalRebarEnabled", "Armadura vertical"],
                           ["horizontalRebarEnabled", "Armadura horizontal/canaletas"],
-                          ["baseWaterproofingEnabled", "Impermeabilizacao de base"],
-                          ["specializedLabor", "Mao de obra especializada"],
+                          ["baseWaterproofingEnabled", "Impermeabilização de base"],
+                          ["specializedLabor", "Mão de obra especializada"],
                         ].map(([name, label]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
                             <input type="checkbox" className="h-4 w-4 accent-primary" {...methodForm.register(name as keyof MethodProjectFormValues)} />
@@ -778,7 +784,7 @@ export function StartProjectForm() {
                   ) : null}
                   {selectedMethod === "monolithic-eps" ? (
                     <>
-                      <NumberInput id="epsCoreThickness" label="Nucleo EPS (m)" min={0.03} error={methodForm.formState.errors.epsCoreThicknessM?.message} {...methodForm.register("epsCoreThicknessM")} />
+                      <NumberInput id="epsCoreThickness" label="Núcleo EPS (m)" min={0.03} error={methodForm.formState.errors.epsCoreThicknessM?.message} {...methodForm.register("epsCoreThicknessM")} />
                       <NumberInput id="epsRenderThickness" label="Revest. por face (m)" min={0.01} error={methodForm.formState.errors.renderThicknessPerFaceM?.message} {...methodForm.register("renderThicknessPerFaceM")} />
                       <NumberInput id="epsFinalThickness" label="Espessura final (m)" min={0.08} error={methodForm.formState.errors.finalWallThicknessM?.message} {...methodForm.register("finalWallThicknessM")} />
                       <NumberInput id="epsPanelWidth" label="Largura painel (m)" min={0.3} error={methodForm.formState.errors.panelWidthM?.message} {...methodForm.register("panelWidthM")} />
@@ -787,18 +793,18 @@ export function StartProjectForm() {
                         <Label htmlFor="epsUseType">Uso</Label>
                         <select
                           id="epsUseType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("useType")}
                         >
-                          <option value="infill">Vedacao</option>
+                          <option value="infill">Vedação</option>
                           <option value="structural-preliminary">Estrutural preliminar</option>
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="epsFoundationType">Fundacao</Label>
+                        <Label htmlFor="epsFoundationType">Fundação</Label>
                         <select
                           id="epsFoundationType"
-                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          className={methodNativeSelectClass}
                           {...methodForm.register("foundationType")}
                         >
                           <option value="radier">Radier</option>
@@ -815,10 +821,10 @@ export function StartProjectForm() {
                       <NumberInput id="epsWaste" label="Perdas (%)" min={0} step={1} error={methodForm.formState.errors.wastePercent?.message} {...methodForm.register("wastePercent")} />
                       <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
                         {[
-                          ["starterBarsEnabled", "Arranques na fundacao"],
-                          ["openingReinforcementEnabled", "Reforcos em aberturas"],
-                          ["projectionEquipmentRequired", "Equipamento de projecao"],
-                          ["specializedLaborRequired", "Mao de obra especializada"],
+                          ["starterBarsEnabled", "Arranques na fundação"],
+                          ["openingReinforcementEnabled", "Reforços em aberturas"],
+                          ["projectionEquipmentRequired", "Equipamento de projeção"],
+                          ["specializedLaborRequired", "Mão de obra especializada"],
                           ["finalFinish", "Acabamento final"],
                         ].map(([name, label]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
@@ -865,19 +871,20 @@ export function StartProjectForm() {
           </Card>
 
           <aside className="space-y-4">
-            <Card className="rounded-md shadow-none">
+            <Card className="rounded-3xl shadow-sm">
               <CardHeader>
-                <CardTitle>Escopo deste metodo</CardTitle>
+                <CardTitle>Escopo deste método</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-muted-foreground">
                 <p>{selectedMethodDefinition.bestFor}</p>
-                <div className="space-y-2">
-                  {selectedMethodDefinition.defaultWarnings.map((warning) => (
-                    <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950" key={warning.id}>
-                      {warning.message}
-                    </p>
-                  ))}
-                </div>
+                <details className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                  <summary className="cursor-pointer font-medium">Ver alertas técnicos</summary>
+                  <div className="mt-2 space-y-2">
+                    {selectedMethodDefinition.defaultWarnings.map((warning) => (
+                      <p key={warning.id}>{warning.message}</p>
+                    ))}
+                  </div>
+                </details>
               </CardContent>
             </Card>
           </aside>
