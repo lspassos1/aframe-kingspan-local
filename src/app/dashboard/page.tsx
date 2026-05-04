@@ -17,6 +17,9 @@ import { calculateConventionalMasonryMaterialList } from "@/lib/construction-met
 import { calculateEcoBlockBudget } from "@/lib/construction-methods/eco-block/budget";
 import { calculateEcoBlockGeometry } from "@/lib/construction-methods/eco-block/geometry";
 import { calculateEcoBlockMaterialList } from "@/lib/construction-methods/eco-block/materials";
+import { calculateMonolithicEpsBudget } from "@/lib/construction-methods/monolithic-eps/budget";
+import { calculateMonolithicEpsGeometry } from "@/lib/construction-methods/monolithic-eps/geometry";
+import { calculateMonolithicEpsMaterialList } from "@/lib/construction-methods/monolithic-eps/materials";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 
 export default function DashboardPage() {
@@ -35,15 +38,20 @@ export default function DashboardPage() {
   const structural = estimateSteelStructure(project, scenario);
   const isConventionalMasonry = scenario.constructionMethod === "conventional-masonry";
   const isEcoBlock = scenario.constructionMethod === "eco-block";
+  const isMonolithicEps = scenario.constructionMethod === "monolithic-eps";
   const conventionalGeometry = isConventionalMasonry ? calculateConventionalMasonryGeometry({ project, scenario }) : null;
   const conventionalBudget = isConventionalMasonry ? calculateConventionalMasonryBudget({ project, scenario }) : null;
   const conventionalMaterials = isConventionalMasonry ? calculateConventionalMasonryMaterialList({ project, scenario }) : [];
   const ecoGeometry = isEcoBlock ? calculateEcoBlockGeometry({ project, scenario }) : null;
   const ecoBudget = isEcoBlock ? calculateEcoBlockBudget({ project, scenario }) : null;
   const ecoMaterials = isEcoBlock ? calculateEcoBlockMaterialList({ project, scenario }) : [];
-  const warnings = (ecoBudget?.warnings ?? conventionalBudget?.warnings ?? budget.warnings).filter((warning) => warning.level !== "info");
+  const epsGeometry = isMonolithicEps ? calculateMonolithicEpsGeometry({ project, scenario }) : null;
+  const epsBudget = isMonolithicEps ? calculateMonolithicEpsBudget({ project, scenario }) : null;
+  const epsMaterials = isMonolithicEps ? calculateMonolithicEpsMaterialList({ project, scenario }) : [];
+  const warnings = (epsBudget?.warnings ?? ecoBudget?.warnings ?? conventionalBudget?.warnings ?? budget.warnings).filter((warning) => warning.level !== "info");
   const pendingConventionalPrices = conventionalBudget?.items.filter((item) => item.requiresConfirmation).length ?? 0;
   const pendingEcoPrices = ecoBudget?.items.filter((item) => item.requiresConfirmation).length ?? 0;
+  const pendingEpsPrices = epsBudget?.items.filter((item) => item.requiresConfirmation).length ?? 0;
   const savedSummaries = savedProjects.map(getSavedProjectSummary);
   const activeProjectSaved = savedProjects.some((item) => item.id === project.id);
 
@@ -84,8 +92,8 @@ export default function DashboardPage() {
               Fechar detalhes
             </Button>
           ) : null}
-          <Badge variant={isConventionalMasonry || isEcoBlock ? "outline" : geometry.fitsTerrain ? "default" : "destructive"} className="h-9 px-3">
-            {isEcoBlock ? "Bloco ecologico preliminar" : isConventionalMasonry ? "Alvenaria preliminar" : geometry.fitsTerrain ? "Cabe no lote com os recuos" : "Revisar implantacao"}
+          <Badge variant={isConventionalMasonry || isEcoBlock || isMonolithicEps ? "outline" : geometry.fitsTerrain ? "default" : "destructive"} className="h-9 px-3">
+            {isMonolithicEps ? "EPS preliminar" : isEcoBlock ? "Bloco ecologico preliminar" : isConventionalMasonry ? "Alvenaria preliminar" : geometry.fitsTerrain ? "Cabe no lote com os recuos" : "Revisar implantacao"}
           </Badge>
         </div>
       </div>
@@ -148,7 +156,58 @@ export default function DashboardPage() {
       </section>
 
       {!detailsOpen ? null : (
-        isEcoBlock && ecoGeometry && ecoBudget ? (
+        isMonolithicEps && epsGeometry && epsBudget ? (
+          <>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Lote" value={`${scenario.terrain.width} x ${scenario.terrain.depth} m`} detail="Dimensoes e endereco editaveis" icon={<Ruler className="h-5 w-5" />} />
+        <MetricCard label="Area construida" value={`${formatCompactNumber(epsGeometry.builtAreaM2)} m2`} detail={`Pe-direito ${epsGeometry.floorHeightM} m | perimetro ${epsGeometry.perimeterM} m`} icon={<Home className="h-5 w-5" />} />
+        <MetricCard label="Paineis EPS" value={`${formatCompactNumber(epsGeometry.panelCount)} un`} detail={`${epsGeometry.netPanelAreaM2} m2 liquidos`} icon={<Package className="h-5 w-5" />} />
+        <MetricCard label="Custo preliminar" value={formatCurrency(epsBudget.totalEstimatedCostBRL)} detail={`${pendingEpsPrices} itens dependem de preco/fonte`} icon={<Wallet className="h-5 w-5" />} />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Quantitativos de EPS monolitico</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard label="Painel liquido" value={`${formatCompactNumber(epsGeometry.netPanelAreaM2)} m2`} />
+            <MetricCard label="Aberturas" value={`${formatCompactNumber(epsGeometry.openingsAreaM2)} m2`} />
+            <MetricCard label="Revestimento" value={`${formatCompactNumber(epsGeometry.renderVolumeM3)} m3`} />
+            <MetricCard label="Malha" value={`${formatCompactNumber(epsGeometry.meshAreaM2)} m2`} />
+            <MetricCard label="Conectores" value={`${formatCompactNumber(epsGeometry.connectorCount)} un`} />
+            <MetricCard label="Arranques" value={`${formatCompactNumber(epsGeometry.starterBars)} un`} />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div>
+              <p className="font-medium">Metodo selecionado</p>
+              <p className="text-muted-foreground">Paineis monoliticos EPS com quantitativos preliminares.</p>
+            </div>
+            <div>
+              <p className="font-medium">Materiais gerados</p>
+              <p className="text-muted-foreground">{epsMaterials.length} linhas iniciais, todas marcadas para confirmacao de preco e fonte.</p>
+            </div>
+            <div>
+              <p className="font-medium">Alertas</p>
+              <div className="mt-2 space-y-2">
+                {warnings.slice(0, 6).map((warning) => (
+                  <div key={warning.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                    {warning.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+          </>
+        ) : isEcoBlock && ecoGeometry && ecoBudget ? (
           <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Lote" value={`${scenario.terrain.width} x ${scenario.terrain.depth} m`} detail="Dimensoes e endereco editaveis" icon={<Ruler className="h-5 w-5" />} />

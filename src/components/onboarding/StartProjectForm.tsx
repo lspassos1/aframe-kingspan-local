@@ -59,6 +59,11 @@ type MinimalMethodInputs = {
   blocksPerM2?: number;
   useType?: "infill" | "structural-preliminary";
   finishType?: "exposed" | "plastered";
+  epsCoreThicknessM?: number;
+  renderThicknessPerFaceM?: number;
+  finalWallThicknessM?: number;
+  panelWidthM?: number;
+  panelHeightM?: number;
   wallThicknessM?: number;
   doorCount?: number;
   doorWidthM?: number;
@@ -77,6 +82,11 @@ type MinimalMethodInputs = {
   horizontalRebarEnabled?: boolean;
   baseWaterproofingEnabled?: boolean;
   specializedLabor?: boolean;
+  starterBarsEnabled?: boolean;
+  openingReinforcementEnabled?: boolean;
+  projectionEquipmentRequired?: boolean;
+  specializedLaborRequired?: boolean;
+  finalFinish?: boolean;
   wastePercent?: number;
 };
 
@@ -241,6 +251,28 @@ export function StartProjectForm() {
       methodInputs.horizontalRebarEnabled = formData.get("horizontalRebarEnabled") === "on";
       methodInputs.baseWaterproofingEnabled = formData.get("baseWaterproofingEnabled") === "on";
       methodInputs.specializedLabor = formData.get("specializedLabor") === "on";
+      methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
+    }
+
+    if (selectedMethod === "monolithic-eps") {
+      methodInputs.epsCoreThicknessM = Number(formData.get("epsCoreThicknessM") ?? selectedMethodInputs.epsCoreThicknessM ?? 0.08);
+      methodInputs.renderThicknessPerFaceM = Number(formData.get("renderThicknessPerFaceM") ?? selectedMethodInputs.renderThicknessPerFaceM ?? 0.03);
+      methodInputs.finalWallThicknessM = Number(formData.get("finalWallThicknessM") ?? selectedMethodInputs.finalWallThicknessM ?? 0.14);
+      methodInputs.panelWidthM = Number(formData.get("panelWidthM") ?? selectedMethodInputs.panelWidthM ?? 1.2);
+      methodInputs.panelHeightM = Number(formData.get("panelHeightM") ?? selectedMethodInputs.panelHeightM ?? 2.8);
+      methodInputs.useType = String(formData.get("useType") ?? selectedMethodInputs.useType ?? "infill") as MinimalMethodInputs["useType"];
+      methodInputs.foundationType = String(formData.get("foundationType") ?? selectedMethodInputs.foundationType ?? "radier") as MinimalMethodInputs["foundationType"];
+      methodInputs.doorCount = Number(formData.get("doorCount") ?? selectedMethodInputs.doorCount ?? 2);
+      methodInputs.doorWidthM = Number(formData.get("doorWidthM") ?? selectedMethodInputs.doorWidthM ?? 0.8);
+      methodInputs.doorHeightM = Number(formData.get("doorHeightM") ?? selectedMethodInputs.doorHeightM ?? 2.1);
+      methodInputs.windowCount = Number(formData.get("windowCount") ?? selectedMethodInputs.windowCount ?? 4);
+      methodInputs.windowWidthM = Number(formData.get("windowWidthM") ?? selectedMethodInputs.windowWidthM ?? 1.2);
+      methodInputs.windowHeightM = Number(formData.get("windowHeightM") ?? selectedMethodInputs.windowHeightM ?? 1);
+      methodInputs.starterBarsEnabled = formData.get("starterBarsEnabled") === "on";
+      methodInputs.openingReinforcementEnabled = formData.get("openingReinforcementEnabled") === "on";
+      methodInputs.projectionEquipmentRequired = formData.get("projectionEquipmentRequired") === "on";
+      methodInputs.specializedLaborRequired = formData.get("specializedLaborRequired") === "on";
+      methodInputs.finalFinish = formData.get("finalFinish") === "on";
       methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
     }
 
@@ -457,6 +489,8 @@ export function StartProjectForm() {
                   ? "Formulario MVP para quantitativos preliminares de alvenaria, sem dimensionamento estrutural real."
                   : selectedMethod === "eco-block"
                     ? "Formulario MVP para quantitativos preliminares de bloco solo-cimento, sem assumir funcao estrutural."
+                    : selectedMethod === "monolithic-eps"
+                      ? "Formulario MVP para paineis EPS monoliticos, sem assumir desempenho estrutural sem fornecedor validado."
                   : "MVP preliminar para registrar dimensoes iniciais. Quantitativos, orcamento e 3D especificos entram nos proximos PRs."}
               </p>
             </CardHeader>
@@ -634,6 +668,61 @@ export function StartProjectForm() {
                           ["horizontalRebarEnabled", "Armadura horizontal/canaletas", selectedMethodInputs.horizontalRebarEnabled ?? false],
                           ["baseWaterproofingEnabled", "Impermeabilizacao de base", selectedMethodInputs.baseWaterproofingEnabled ?? true],
                           ["specializedLabor", "Mao de obra especializada", selectedMethodInputs.specializedLabor ?? true],
+                        ].map(([name, label, checked]) => (
+                          <label className="flex items-center gap-2 text-sm" key={String(name)}>
+                            <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                  {selectedMethod === "monolithic-eps" ? (
+                    <>
+                      <NumberInput id="epsCoreThickness" name="epsCoreThicknessM" label="Nucleo EPS (m)" min={0.03} defaultValue={selectedMethodInputs.epsCoreThicknessM ?? 0.08} />
+                      <NumberInput id="epsRenderThickness" name="renderThicknessPerFaceM" label="Revest. por face (m)" min={0.01} defaultValue={selectedMethodInputs.renderThicknessPerFaceM ?? 0.03} />
+                      <NumberInput id="epsFinalThickness" name="finalWallThicknessM" label="Espessura final (m)" min={0.08} defaultValue={selectedMethodInputs.finalWallThicknessM ?? 0.14} />
+                      <NumberInput id="epsPanelWidth" name="panelWidthM" label="Largura painel (m)" min={0.3} defaultValue={selectedMethodInputs.panelWidthM ?? 1.2} />
+                      <NumberInput id="epsPanelHeight" name="panelHeightM" label="Altura painel (m)" min={1} defaultValue={selectedMethodInputs.panelHeightM ?? 2.8} />
+                      <div className="space-y-2">
+                        <Label htmlFor="epsUseType">Uso</Label>
+                        <select
+                          id="epsUseType"
+                          name="useType"
+                          defaultValue={selectedMethodInputs.useType ?? "infill"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="infill">Vedacao</option>
+                          <option value="structural-preliminary">Estrutural preliminar</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="epsFoundationType">Fundacao</Label>
+                        <select
+                          id="epsFoundationType"
+                          name="foundationType"
+                          defaultValue={selectedMethodInputs.foundationType ?? "radier"}
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                        >
+                          <option value="radier">Radier</option>
+                          <option value="baldrame">Baldrame</option>
+                          <option value="placeholder">Placeholder</option>
+                        </select>
+                      </div>
+                      <NumberInput id="epsDoorCount" name="doorCount" label="Portas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.doorCount ?? 2} />
+                      <NumberInput id="epsDoorWidth" name="doorWidthM" label="Largura porta (m)" min={0.5} defaultValue={selectedMethodInputs.doorWidthM ?? 0.8} />
+                      <NumberInput id="epsDoorHeight" name="doorHeightM" label="Altura porta (m)" min={1.8} defaultValue={selectedMethodInputs.doorHeightM ?? 2.1} />
+                      <NumberInput id="epsWindowCount" name="windowCount" label="Janelas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.windowCount ?? 4} />
+                      <NumberInput id="epsWindowWidth" name="windowWidthM" label="Largura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowWidthM ?? 1.2} />
+                      <NumberInput id="epsWindowHeight" name="windowHeightM" label="Altura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowHeightM ?? 1} />
+                      <NumberInput id="epsWaste" name="wastePercent" label="Perdas (%)" min={0} step={1} defaultValue={selectedMethodInputs.wastePercent ?? 10} />
+                      <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
+                        {[
+                          ["starterBarsEnabled", "Arranques na fundacao", selectedMethodInputs.starterBarsEnabled ?? true],
+                          ["openingReinforcementEnabled", "Reforcos em aberturas", selectedMethodInputs.openingReinforcementEnabled ?? true],
+                          ["projectionEquipmentRequired", "Equipamento de projecao", selectedMethodInputs.projectionEquipmentRequired ?? true],
+                          ["specializedLaborRequired", "Mao de obra especializada", selectedMethodInputs.specializedLaborRequired ?? true],
+                          ["finalFinish", "Acabamento final", selectedMethodInputs.finalFinish ?? false],
                         ].map(([name, label, checked]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
                             <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />
