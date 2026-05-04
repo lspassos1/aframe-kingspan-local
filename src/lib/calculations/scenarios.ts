@@ -37,8 +37,10 @@ export function scenarioComparisonRow(project: Project, scenario: Scenario): Sce
     const materials = calculateScenarioMaterials(project, scenario);
     const width = numberMetric(geometry.widthM ?? geometry.baseWidth);
     const depth = numberMetric(geometry.depthM ?? geometry.effectiveHouseDepth);
-    const height = numberMetric(geometry.floorHeightM ?? geometry.ridgeHeight);
-    const builtArea = numberMetric(geometry.builtAreaM2 ?? geometry.netWallAreaM2 ?? geometry.netPanelAreaM2);
+    const floors = Math.max(1, numberMetric(geometry.floors) || 1);
+    const floorHeight = numberMetric(geometry.floorHeightM);
+    const height = numberMetric(geometry.totalHeightM ?? (floorHeight > 0 ? floorHeight * floors : geometry.ridgeHeight));
+    const groundArea = groundAreaForComparison(geometry, width, depth, floors);
     const unitCount = numberMetric(geometry.totalBlocks ?? geometry.panelCount);
 
     return {
@@ -47,8 +49,8 @@ export function scenarioComparisonRow(project: Project, scenario: Scenario): Sce
       width,
       depth,
       height,
-      groundTotalArea: builtArea,
-      groundUsefulArea: builtArea,
+      groundTotalArea: groundArea,
+      groundUsefulArea: groundArea,
       mezzanineTotalArea: 0,
       mezzanineUsefulArea: 0,
       totalPanels: unitCount || materials.length,
@@ -58,7 +60,7 @@ export function scenarioComparisonRow(project: Project, scenario: Scenario): Sce
       panelPackageCostBRL: budget.panelPackageCostBRL,
       steelCostBRL: budget.steelStructureCostBRL,
       totalCostBRL: budget.totalEstimatedCostBRL,
-      fitsTerrain: true,
+      fitsTerrain: fitsTerrainFootprint(scenario, width, depth),
       costPerUsefulM2: budget.costPerUsefulM2,
     };
   }
@@ -113,4 +115,23 @@ export function materialLinesForScenario(project: Project, scenario: Scenario) {
 
 function numberMetric(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function groundAreaForComparison(geometry: Record<string, unknown>, width: number, depth: number, floors: number) {
+  const footprintArea = width > 0 && depth > 0 ? width * depth : 0;
+  if (footprintArea > 0) return roundMetric(footprintArea);
+
+  const builtArea = numberMetric(geometry.builtAreaM2 ?? geometry.netWallAreaM2 ?? geometry.netPanelAreaM2);
+  return roundMetric(builtArea / Math.max(1, floors));
+}
+
+function fitsTerrainFootprint(scenario: Scenario, width: number, depth: number) {
+  const availableWidth = scenario.terrain.width - scenario.terrain.leftSetback - scenario.terrain.rightSetback;
+  const availableDepth = scenario.terrain.depth - scenario.terrain.frontSetback - scenario.terrain.rearSetback;
+
+  return width > 0 && depth > 0 && width <= availableWidth && depth <= availableDepth;
+}
+
+function roundMetric(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
