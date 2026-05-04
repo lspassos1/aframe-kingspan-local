@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAndConsumeAiDailyLimit, createAiRateLimitHeaders, createMemoryAiRateLimitStore, getClientIpFromHeaders } from "@/lib/ai/rate-limit";
+import { checkAndConsumeAiDailyLimit, createAiRateLimitHeaders, createMemoryAiRateLimitStore, createRedisAiRateLimitStore, getClientIpFromHeaders } from "@/lib/ai/rate-limit";
 
 const baseEnv = {
   NODE_ENV: "development",
@@ -93,6 +93,80 @@ describe("AI daily rate limit", () => {
       scope: "user",
       reason: "anonymous-not-allowed",
     });
+  });
+
+  it("does not consume global quota when a scoped user request is already blocked", async () => {
+    const store = createMemoryAiRateLimitStore(new Map());
+    const env = {
+      ...baseEnv,
+      AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "1",
+      AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP: "20",
+      AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT: "4",
+    };
+    const now = new Date("2026-05-04T12:00:00.000Z");
+
+    const firstUser = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: "user-a", ip: "203.0.113.20", now }, { env, store });
+    const blockedUser = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: "user-a", ip: "203.0.113.20", now }, { env, store });
+    const secondUser = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: "user-b", ip: "203.0.113.21", now }, { env, store });
+    const thirdUser = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: "user-c", ip: "203.0.113.22", now }, { env, store });
+    const fourthUser = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: "user-d", ip: "203.0.113.23", now }, { env, store });
+    const fifthUser = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: "user-e", ip: "203.0.113.24", now }, { env, store });
+
+    expect(firstUser.allowed).toBe(true);
+    expect(blockedUser).toMatchObject({ allowed: false, scope: "user" });
+    expect(secondUser.allowed).toBe(true);
+    expect(thirdUser.allowed).toBe(true);
+    expect(fourthUser.allowed).toBe(true);
+    expect(fifthUser).toMatchObject({
+      allowed: false,
+      scope: "global",
+      reason: "global-daily-limit-exceeded",
+    });
+  });
+
+  it("fails closed in production when the rate limit salt is not configured", async () => {
+    const decision = await checkAndConsumeAiDailyLimit(
+      {
+        feature: "plan-extract",
+        userId: "user-prod",
+        ip: "203.0.113.25",
+        now: new Date("2026-05-04T12:00:00.000Z"),
+      },
+      {
+        env: {
+          NODE_ENV: "production",
+          AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "3",
+          AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP: "5",
+          AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT: "50",
+        },
+        store: createMemoryAiRateLimitStore(new Map()),
+      }
+    );
+
+    expect(decision).toMatchObject({
+      allowed: false,
+      reason: "rate-limit-salt-required",
+    });
+  });
+
+  it("uses AbortSignal timeouts for Redis REST calls", async () => {
+    const signals: Array<AbortSignal | null | undefined> = [];
+    const fetcher: typeof fetch = async (_input, init) => {
+      signals.push(init?.signal);
+      return Response.json({ result: 0 });
+    };
+    const store = createRedisAiRateLimitStore(
+      {
+        UPSTASH_REDIS_REST_URL: "https://redis.example.com",
+        UPSTASH_REDIS_REST_TOKEN: "redis-token",
+        AI_RATE_LIMIT_REDIS_TIMEOUT_MS: "100",
+      },
+      fetcher
+    );
+
+    await store?.get("ai:plan-extract:global:2026-05-04:test");
+
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
   });
 
   it("extracts client IP and builds response headers", async () => {

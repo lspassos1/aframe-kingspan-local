@@ -31,6 +31,8 @@ export type AiPlanExtractProviderResult = {
   tokens?: number;
 };
 
+const defaultProviderOrder: AiPlanExtractProviderId[] = ["openai", "openrouter", "groq", "generic"];
+
 const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyEnv?: string; defaultModel: string; baseUrl?: string; supports: AiPlanExtractMimeType[] }> = {
   openai: {
     modelEnv: "AI_OPENAI_MODEL",
@@ -51,7 +53,7 @@ const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyE
     keyEnv: "GROQ_API_KEY",
     defaultModel: "llama-3.1-8b-instant",
     baseUrl: "https://api.groq.com/openai/v1/chat/completions",
-    supports: [],
+    supports: ["image/png", "image/jpeg", "image/webp"],
   },
   generic: {
     modelEnv: "LLM_MODEL",
@@ -63,8 +65,9 @@ const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyE
 
 export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.env) {
   const configuredOrder = env.AI_PLAN_EXTRACT_PROVIDER_ORDER?.split(",").map((provider) => provider.trim()).filter(Boolean) ?? [];
-  const order = configuredOrder.length > 0 ? configuredOrder : ["openai", "openrouter", "groq", "generic"];
-  return order.filter((provider): provider is AiPlanExtractProviderId => provider in providerDefaults);
+  const order = configuredOrder.length > 0 ? configuredOrder : defaultProviderOrder;
+  const supportedOrder = order.filter((provider): provider is AiPlanExtractProviderId => provider in providerDefaults);
+  return supportedOrder.length > 0 ? supportedOrder : defaultProviderOrder;
 }
 
 export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.env): AiPlanExtractProviderConfig[] {

@@ -24,6 +24,7 @@ export type AiRateLimitEnv = Record<string, string | undefined>;
 
 export type AiRateLimitStore = {
   kind: AiRateLimitStorageKind;
+  get(key: string): Promise<number>;
   increment(key: string, ttlSeconds: number): Promise<number>;
 };
 
@@ -48,6 +49,12 @@ function getBooleanEnv(env: AiRateLimitEnv, key: string, fallback = false) {
 export function createMemoryAiRateLimitStore(entries = sharedMemoryStore): AiRateLimitStore {
   return {
     kind: "memory",
+    async get(key) {
+      const now = Date.now();
+      const current = entries.get(key);
+      if (!current || current.expiresAt <= now) return 0;
+      return current.count;
+    },
     async increment(key, ttlSeconds) {
       const now = Date.now();
       const current = entries.get(key);
@@ -65,23 +72,42 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
   const url = env.UPSTASH_REDIS_REST_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
+  const timeoutMs = getNumberEnv(env, "AI_RATE_LIMIT_REDIS_TIMEOUT_MS", 2500);
+
+  async function fetchRedis(path: string) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetcher(path, {
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 
   return {
     kind: "redis",
+    async get(key) {
+      const endpoint = url.replace(/\/$/, "");
+      const response = await fetchRedis(`${endpoint}/get/${encodeURIComponent(key)}`);
+      if (!response.ok) throw new Error(`Redis GET failed with ${response.status}.`);
+      const payload = (await response.json()) as { result?: string | number | null };
+      const count = Number(payload.result ?? 0);
+      if (!Number.isFinite(count)) throw new Error("Redis GET returned an invalid count.");
+      return count;
+    },
     async increment(key, ttlSeconds) {
       const endpoint = url.replace(/\/$/, "");
-      const incrementResponse = await fetcher(`${endpoint}/incr/${encodeURIComponent(key)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const incrementResponse = await fetchRedis(`${endpoint}/incr/${encodeURIComponent(key)}`);
       if (!incrementResponse.ok) throw new Error(`Redis INCR failed with ${incrementResponse.status}.`);
       const incrementPayload = (await incrementResponse.json()) as { result?: number };
       const count = Number(incrementPayload.result);
       if (!Number.isFinite(count)) throw new Error("Redis INCR returned an invalid count.");
 
       if (count === 1) {
-        const expireResponse = await fetcher(`${endpoint}/expire/${encodeURIComponent(key)}/${ttlSeconds}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const expireResponse = await fetchRedis(`${endpoint}/expire/${encodeURIComponent(key)}/${ttlSeconds}`);
         if (!expireResponse.ok) throw new Error(`Redis EXPIRE failed with ${expireResponse.status}.`);
       }
 
@@ -152,6 +178,18 @@ export async function checkAndConsumeAiDailyLimit(
   const redisStore = options.store === undefined ? createRedisAiRateLimitStore(env, options.fetcher) : null;
   const store = options.store ?? redisStore ?? (env.NODE_ENV === "production" ? null : createMemoryAiRateLimitStore());
 
+  if (env.NODE_ENV === "production" && salt === "change-me-in-production") {
+    return buildHeadersDecision({
+      allowed: false,
+      scope: "global",
+      limit: limits.global,
+      remaining: 0,
+      resetAt,
+      storage: store?.kind ?? "memory",
+      reason: "rate-limit-salt-required",
+    });
+  }
+
   if (!input.userId && !allowAnonymous) {
     return buildHeadersDecision({
       allowed: false,
@@ -182,19 +220,21 @@ export async function checkAndConsumeAiDailyLimit(
     ...(input.ip ? [{ scope: "ip" as const, identifier: input.ip, limit: limits.ip }] : []),
   ];
   const consumed: Array<{ scope: AiRateLimitScope; limit: number; count: number; remaining: number }> = [];
-
-  for (const scope of scopes) {
-    const key = buildDailyKey({
+  const scopeKeys = scopes.map((scope) => ({
+    ...scope,
+    key: buildDailyKey({
       feature: input.feature,
       scope: scope.scope,
       identifier: scope.identifier,
       dateKey: getDateKey(now),
       salt,
-    });
+    }),
+  }));
 
-    let count: number;
+  for (const scope of scopeKeys) {
+    let currentCount: number;
     try {
-      count = await store.increment(key, ttlSeconds);
+      currentCount = await store.get(scope.key);
     } catch (error) {
       if (failOpen) {
         return buildHeadersDecision({
@@ -218,7 +258,7 @@ export async function checkAndConsumeAiDailyLimit(
       });
     }
 
-    if (count > scope.limit) {
+    if (currentCount >= scope.limit) {
       return buildHeadersDecision({
         allowed: false,
         scope: scope.scope,
@@ -229,7 +269,34 @@ export async function checkAndConsumeAiDailyLimit(
         reason: `${scope.scope}-daily-limit-exceeded`,
       });
     }
+  }
 
+  for (const scope of scopeKeys) {
+    let count: number;
+    try {
+      count = await store.increment(scope.key, ttlSeconds);
+    } catch (error) {
+      if (failOpen) {
+        return buildHeadersDecision({
+          allowed: true,
+          scope: scope.scope,
+          limit: scope.limit,
+          remaining: scope.limit,
+          resetAt,
+          storage: store.kind,
+          reason: `rate-limit-store-error-fail-open:${error instanceof Error ? error.message : "unknown"}`,
+        });
+      }
+      return buildHeadersDecision({
+        allowed: false,
+        scope: scope.scope,
+        limit: scope.limit,
+        remaining: 0,
+        resetAt,
+        storage: store.kind,
+        reason: "rate-limit-store-error",
+      });
+    }
     consumed.push({
       scope: scope.scope,
       limit: scope.limit,

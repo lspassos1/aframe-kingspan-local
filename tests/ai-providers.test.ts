@@ -49,6 +49,15 @@ describe("AI plan extraction providers", () => {
     expect(providers.every((provider) => provider.configured)).toBe(true);
   });
 
+  it("falls back to default provider order when env order has no supported provider names", () => {
+    const providers = getAiPlanExtractProviderConfigs({
+      AI_PLAN_EXTRACT_PROVIDER_ORDER: "unknown, also-unknown",
+      OPENAI_API_KEY: "openai-key",
+    });
+
+    expect(providers.map((provider) => provider.id)).toEqual(["openai", "openrouter", "groq", "generic"]);
+  });
+
   it("parses JSON wrapped in a code fence", () => {
     const result = parsePlanExtractResult(`\`\`\`json\n${validPlanExtractJson}\n\`\`\``);
 
@@ -57,11 +66,25 @@ describe("AI plan extraction providers", () => {
     expect(result.fieldConfidence.houseWidthM).toBe("medium");
   });
 
+  it("allows Groq image fallback when configured", () => {
+    const providers = getConfiguredAiPlanExtractProviders({
+      AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq",
+      GROQ_API_KEY: "groq-key",
+      AI_GROQ_MODEL: "llama-3.1-8b-instant",
+    });
+
+    expect(providers).toHaveLength(1);
+    expect(providers[0]).toMatchObject({
+      id: "groq",
+      supports: ["image/png", "image/jpeg", "image/webp"],
+    });
+  });
+
   it("throws an unavailable error when no configured provider supports the file", async () => {
     await expect(
       extractPlanWithProviderChain(
         {
-          mimeType: "image/png",
+          mimeType: "application/pdf",
           fileBase64: "abc",
         },
         { env: { AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq", GROQ_API_KEY: "groq-key", AI_GROQ_MODEL: "llama-3.1-8b-instant" } }
