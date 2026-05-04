@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultProject } from "@/data/defaultProject";
 import { validateBudgetAssistantDataForReviewedBudget } from "@/lib/budget-assistant";
 import type { BudgetAssistantProjectData, BudgetMatch, CostItem, CostSource } from "@/lib/budget-assistant";
 
@@ -87,5 +88,10 @@ describe("budget assistant reviewed-budget validation", () => {
 });
 
 function createBudgetAssistantData(data: Pick<BudgetAssistantProjectData, "costSources" | "costItems" | "matches">): BudgetAssistantProjectData {
-  return data as BudgetAssistantProjectData;
+  return {
+    ...defaultProject.budgetAssistant,
+    costSources: data.costSources,
+    costItems: data.costItems,
+    matches: data.matches,
+  };
 }
