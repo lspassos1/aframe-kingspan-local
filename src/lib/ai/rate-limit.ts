@@ -24,8 +24,8 @@ export type AiRateLimitEnv = Record<string, string | undefined>;
 
 export type AiRateLimitStore = {
   kind: AiRateLimitStorageKind;
-  get(key: string): Promise<number>;
   increment(key: string, ttlSeconds: number): Promise<number>;
+  decrement(key: string): Promise<void>;
 };
 
 type MemoryEntry = {
@@ -49,12 +49,6 @@ function getBooleanEnv(env: AiRateLimitEnv, key: string, fallback = false) {
 export function createMemoryAiRateLimitStore(entries = sharedMemoryStore): AiRateLimitStore {
   return {
     kind: "memory",
-    async get(key) {
-      const now = Date.now();
-      const current = entries.get(key);
-      if (!current || current.expiresAt <= now) return 0;
-      return current.count;
-    },
     async increment(key, ttlSeconds) {
       const now = Date.now();
       const current = entries.get(key);
@@ -64,6 +58,12 @@ export function createMemoryAiRateLimitStore(entries = sharedMemoryStore): AiRat
       }
       current.count += 1;
       return current.count;
+    },
+    async decrement(key) {
+      const now = Date.now();
+      const current = entries.get(key);
+      if (!current || current.expiresAt <= now) return;
+      current.count = Math.max(0, current.count - 1);
     },
   };
 }
@@ -89,15 +89,6 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
 
   return {
     kind: "redis",
-    async get(key) {
-      const endpoint = url.replace(/\/$/, "");
-      const response = await fetchRedis(`${endpoint}/get/${encodeURIComponent(key)}`);
-      if (!response.ok) throw new Error(`Redis GET failed with ${response.status}.`);
-      const payload = (await response.json()) as { result?: string | number | null };
-      const count = Number(payload.result ?? 0);
-      if (!Number.isFinite(count)) throw new Error("Redis GET returned an invalid count.");
-      return count;
-    },
     async increment(key, ttlSeconds) {
       const endpoint = url.replace(/\/$/, "");
       const incrementResponse = await fetchRedis(`${endpoint}/incr/${encodeURIComponent(key)}`);
@@ -112,6 +103,11 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
       }
 
       return count;
+    },
+    async decrement(key) {
+      const endpoint = url.replace(/\/$/, "");
+      const response = await fetchRedis(`${endpoint}/decr/${encodeURIComponent(key)}`);
+      if (!response.ok) throw new Error(`Redis DECR failed with ${response.status}.`);
     },
   };
 }
@@ -213,13 +209,14 @@ export async function checkAndConsumeAiDailyLimit(
       reason: "rate-limit-storage-unavailable",
     });
   }
+  const activeStore = store;
 
   const scopes: Array<{ scope: AiRateLimitScope; identifier: string; limit: number }> = [
-    { scope: "global", identifier: "global", limit: limits.global },
     ...(input.userId ? [{ scope: "user" as const, identifier: input.userId, limit: limits.user }] : []),
     ...(input.ip ? [{ scope: "ip" as const, identifier: input.ip, limit: limits.ip }] : []),
+    { scope: "global", identifier: "global", limit: limits.global },
   ];
-  const consumed: Array<{ scope: AiRateLimitScope; limit: number; count: number; remaining: number }> = [];
+  const consumed: Array<{ key: string; scope: AiRateLimitScope; limit: number; count: number; remaining: number }> = [];
   const scopeKeys = scopes.map((scope) => ({
     ...scope,
     key: buildDailyKey({
@@ -231,51 +228,16 @@ export async function checkAndConsumeAiDailyLimit(
     }),
   }));
 
-  for (const scope of scopeKeys) {
-    let currentCount: number;
-    try {
-      currentCount = await store.get(scope.key);
-    } catch (error) {
-      if (failOpen) {
-        return buildHeadersDecision({
-          allowed: true,
-          scope: scope.scope,
-          limit: scope.limit,
-          remaining: scope.limit,
-          resetAt,
-          storage: store.kind,
-          reason: `rate-limit-store-error-fail-open:${error instanceof Error ? error.message : "unknown"}`,
-        });
-      }
-      return buildHeadersDecision({
-        allowed: false,
-        scope: scope.scope,
-        limit: scope.limit,
-        remaining: 0,
-        resetAt,
-        storage: store.kind,
-        reason: "rate-limit-store-error",
-      });
-    }
-
-    if (currentCount >= scope.limit) {
-      return buildHeadersDecision({
-        allowed: false,
-        scope: scope.scope,
-        limit: scope.limit,
-        remaining: 0,
-        resetAt,
-        storage: store.kind,
-        reason: `${scope.scope}-daily-limit-exceeded`,
-      });
-    }
+  async function rollbackConsumedScopes() {
+    await Promise.allSettled(consumed.map((scope) => activeStore.decrement(scope.key)));
   }
 
   for (const scope of scopeKeys) {
     let count: number;
     try {
-      count = await store.increment(scope.key, ttlSeconds);
+      count = await activeStore.increment(scope.key, ttlSeconds);
     } catch (error) {
+      await rollbackConsumedScopes();
       if (failOpen) {
         return buildHeadersDecision({
           allowed: true,
@@ -283,7 +245,7 @@ export async function checkAndConsumeAiDailyLimit(
           limit: scope.limit,
           remaining: scope.limit,
           resetAt,
-          storage: store.kind,
+          storage: activeStore.kind,
           reason: `rate-limit-store-error-fail-open:${error instanceof Error ? error.message : "unknown"}`,
         });
       }
@@ -293,11 +255,24 @@ export async function checkAndConsumeAiDailyLimit(
         limit: scope.limit,
         remaining: 0,
         resetAt,
-        storage: store.kind,
+        storage: activeStore.kind,
         reason: "rate-limit-store-error",
       });
     }
+    if (count > scope.limit) {
+      await Promise.allSettled([activeStore.decrement(scope.key), rollbackConsumedScopes()]);
+      return buildHeadersDecision({
+        allowed: false,
+        scope: scope.scope,
+        limit: scope.limit,
+        remaining: 0,
+        resetAt,
+        storage: activeStore.kind,
+        reason: `${scope.scope}-daily-limit-exceeded`,
+      });
+    }
     consumed.push({
+      key: scope.key,
       scope: scope.scope,
       limit: scope.limit,
       count,
@@ -316,6 +291,6 @@ export async function checkAndConsumeAiDailyLimit(
     limit: tightestScope?.limit ?? limits.global,
     remaining: tightestScope?.remaining ?? limits.global,
     resetAt,
-    storage: store.kind,
+    storage: activeStore.kind,
   });
 }

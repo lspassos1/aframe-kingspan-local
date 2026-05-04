@@ -124,6 +124,33 @@ describe("AI daily rate limit", () => {
     });
   });
 
+  it("does not consume global quota when an anonymous IP request is already blocked", async () => {
+    const store = createMemoryAiRateLimitStore(new Map());
+    const env = {
+      ...baseEnv,
+      AI_ALLOW_ANONYMOUS_PLAN_EXTRACT: "true",
+      AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP: "1",
+      AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT: "3",
+    };
+    const now = new Date("2026-05-04T12:00:00.000Z");
+
+    const firstIp = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: null, ip: "203.0.113.30", now }, { env, store });
+    const blockedIp = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: null, ip: "203.0.113.30", now }, { env, store });
+    const secondIp = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: null, ip: "203.0.113.31", now }, { env, store });
+    const thirdIp = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: null, ip: "203.0.113.32", now }, { env, store });
+    const fourthIp = await checkAndConsumeAiDailyLimit({ feature: "plan-extract", userId: null, ip: "203.0.113.33", now }, { env, store });
+
+    expect(firstIp.allowed).toBe(true);
+    expect(blockedIp).toMatchObject({ allowed: false, scope: "ip" });
+    expect(secondIp.allowed).toBe(true);
+    expect(thirdIp.allowed).toBe(true);
+    expect(fourthIp).toMatchObject({
+      allowed: false,
+      scope: "global",
+      reason: "global-daily-limit-exceeded",
+    });
+  });
+
   it("fails closed in production when the rate limit salt is not configured", async () => {
     const decision = await checkAndConsumeAiDailyLimit(
       {
@@ -153,7 +180,7 @@ describe("AI daily rate limit", () => {
     const signals: Array<AbortSignal | null | undefined> = [];
     const fetcher: typeof fetch = async (_input, init) => {
       signals.push(init?.signal);
-      return Response.json({ result: 0 });
+      return Response.json({ result: 1 });
     };
     const store = createRedisAiRateLimitStore(
       {
@@ -164,9 +191,10 @@ describe("AI daily rate limit", () => {
       fetcher
     );
 
-    await store?.get("ai:plan-extract:global:2026-05-04:test");
+    await store?.increment("ai:plan-extract:global:2026-05-04:test", 60);
 
     expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]).toBeInstanceOf(AbortSignal);
   });
 
   it("extracts client IP and builds response headers", async () => {
