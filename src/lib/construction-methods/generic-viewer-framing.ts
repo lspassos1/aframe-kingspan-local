@@ -26,13 +26,12 @@ function primitiveFromExtents(id: string, extents: Construction3DExtents, color:
 
 export function getGenericViewerFramingLayers(
   activeLayers: Construction3DLayer[],
-  dimensionLayers: Construction3DLayer[],
   showDimensions: boolean
 ): Construction3DLayer[] {
   if (!showDimensions) return activeLayers;
 
-  const dimensions = getGenericConstructionDimensions(dimensionLayers);
-  const methodId = activeLayers[0]?.methodId ?? dimensionLayers[0]?.methodId;
+  const dimensions = getGenericConstructionDimensions(activeLayers);
+  const methodId = activeLayers[0]?.methodId;
 
   if (!dimensions || !methodId) return activeLayers;
 

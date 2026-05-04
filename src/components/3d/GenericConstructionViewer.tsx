@@ -195,20 +195,18 @@ function DimensionOverlay({ layers, mode }: { layers: Construction3DLayer[]; mod
 
 function GenericScene({
   layers,
-  dimensionLayers,
   dimensionMode,
   modelOpacity,
   showDimensions,
   view,
 }: {
   layers: Construction3DLayer[];
-  dimensionLayers: Construction3DLayer[];
   dimensionMode: DimensionMode;
   modelOpacity: number;
   showDimensions: boolean;
   view: ViewMode;
 }) {
-  const framingLayers = getGenericViewerFramingLayers(layers, dimensionLayers, showDimensions);
+  const framingLayers = getGenericViewerFramingLayers(layers, showDimensions);
 
   return (
     <>
@@ -222,7 +220,7 @@ function GenericScene({
           ))}
         </group>
       ))}
-      {showDimensions ? <DimensionOverlay layers={dimensionLayers} mode={dimensionMode} /> : null}
+      {showDimensions ? <DimensionOverlay layers={layers} mode={dimensionMode} /> : null}
       <gridHelper args={[40, 40, "#cbd5e1", "#e2e8f0"]} position={[0, 0.01, 0]} />
       <OrbitControls makeDefault enableDamping />
     </>
@@ -302,7 +300,6 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
         <Canvas shadows camera={{ position: [16, 12, 16], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
           <GenericScene
             layers={activeLayers}
-            dimensionLayers={layers}
             dimensionMode={dimensionMode}
             modelOpacity={modelOpacity}
             showDimensions={showDimensions}
