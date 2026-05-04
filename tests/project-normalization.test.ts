@@ -85,7 +85,18 @@ describe("project serialization and normalization", () => {
           },
         ],
         costItems: [],
-        matches: [],
+        matches: [
+          {
+            id: "manual-match-1",
+            quantityItemId: "q-1",
+            costItemId: "c-1",
+            confidence: "low",
+            reason: "Manual",
+            unitCompatible: true,
+            requiresReview: true,
+            approvedByUser: false,
+          },
+        ],
       },
     } as Project;
 
@@ -95,5 +106,6 @@ describe("project serialization and normalization", () => {
       supplier: "Fornecedor ABC",
       referenceDate: "2026-05-04",
     });
+    expect(normalizeProject(savedProject).budgetAssistant.matches[0].approvedByUser).toBe(true);
   });
 });

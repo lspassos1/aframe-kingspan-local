@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
-import { createBudgetAssistantViewModel, createManualCostItem, createManualCostSource } from "@/lib/budget-assistant";
+import { createBudgetAssistantViewModel, createManualCostItem, createManualCostSource, suggestBudgetMatches } from "@/lib/budget-assistant";
 
 describe("budget assistant foundation", () => {
   it("builds a preliminary view model from detected budget quantities", () => {
@@ -51,5 +51,62 @@ describe("budget assistant foundation", () => {
     expect(viewModel.costSources).toHaveLength(1);
     expect(viewModel.lowConfidenceCount).toBe(1);
     expect(viewModel.unpricedCount).toBe(baseViewModel.unpricedCount - 1);
+  });
+
+  it("suggests matches only from existing cost items and leaves them pending", () => {
+    const scenario = defaultProject.scenarios[0];
+    const viewModel = createBudgetAssistantViewModel(defaultProject, scenario);
+    const quantityItem = viewModel.pendingPriceItems[0];
+    const entry = createManualCostItem({
+      quantityItem,
+      sourceId: "source-1",
+      description: quantityItem.description,
+      category: quantityItem.category,
+      quantity: quantityItem.quantity,
+      unit: quantityItem.unit,
+      unitPrice: 90,
+      confidence: "medium",
+    });
+
+    const suggestions = suggestBudgetMatches({
+      quantityItems: [quantityItem],
+      costItems: [entry.costItem],
+    });
+
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0]).toMatchObject({
+      quantityItemId: quantityItem.id,
+      costItemId: entry.costItem.id,
+      unitCompatible: true,
+      approvedByUser: false,
+      requiresReview: true,
+    });
+  });
+
+  it("flags unit incompatibility and does not suggest already matched quantities", () => {
+    const scenario = defaultProject.scenarios[0];
+    const viewModel = createBudgetAssistantViewModel(defaultProject, scenario);
+    const quantityItem = viewModel.pendingPriceItems[0];
+    const entry = createManualCostItem({
+      quantityItem,
+      sourceId: "source-1",
+      description: quantityItem.description,
+      category: quantityItem.category,
+      quantity: quantityItem.quantity,
+      unit: quantityItem.unit === "m2" ? "m" : "m2",
+      unitPrice: 90,
+      confidence: "high",
+    });
+
+    const suggestions = suggestBudgetMatches({ quantityItems: [quantityItem], costItems: [entry.costItem] });
+    const blocked = suggestBudgetMatches({
+      quantityItems: [quantityItem],
+      costItems: [entry.costItem],
+      existingMatches: [{ ...suggestions[0], approvedByUser: true }],
+    });
+
+    expect(suggestions[0].unitCompatible).toBe(false);
+    expect(suggestions[0].requiresReview).toBe(true);
+    expect(blocked).toHaveLength(0);
   });
 });

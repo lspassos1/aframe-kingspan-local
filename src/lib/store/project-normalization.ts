@@ -88,7 +88,10 @@ function normalizeBudgetAssistantData(
       notes: source.notes ?? "",
     })) ?? defaults.costSources,
     costItems: data?.costItems ?? defaults.costItems,
-    matches: data?.matches ?? defaults.matches,
+    matches: data?.matches?.map((match) => ({
+      ...match,
+      approvedByUser: match.id.startsWith("manual-match-") ? true : match.approvedByUser,
+    })) ?? defaults.matches,
   };
 }
 

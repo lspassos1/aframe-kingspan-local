@@ -53,6 +53,12 @@ export interface ManualCostItemInput {
   notes?: string;
 }
 
+export interface BudgetMatchSuggestionInput {
+  quantityItems: BudgetAssistantQuantityItem[];
+  costItems: CostItem[];
+  existingMatches?: BudgetMatch[];
+}
+
 export function createBudgetAssistantViewModel(project: Project, scenario: Scenario, data?: BudgetAssistantData): BudgetAssistantViewModel {
   const definition = getConstructionMethodDefinition(scenario.constructionMethod);
   const budget = calculateScenarioBudget(project, scenario);
@@ -75,15 +81,16 @@ export function createBudgetAssistantViewModel(project: Project, scenario: Scena
   const costItems = (assistantData.costItems ?? []).filter(
     (item) => item.constructionMethod === scenario.constructionMethod && matchedCostItemIds.has(item.id)
   );
-  const pricedQuantityIds = new Set(matches.map((match) => match.quantityItemId));
+  const pricedQuantityIds = new Set(matches.filter((match) => match.approvedByUser).map((match) => match.quantityItemId));
   const pendingPriceItems = quantityItems.filter((item) => item.requiresPriceSource && !pricedQuantityIds.has(item.id));
   const lowConfidenceItems = costItems.filter((item) => item.confidence === "low" || item.confidence === "unverified");
+  const hasAiSuggestions = matches.some((match) => !match.approvedByUser);
 
   return {
     scenarioId: scenario.id,
     scenarioName: scenario.name,
     methodName: definition.name,
-    status: "preliminary",
+    status: hasAiSuggestions ? "ai_assisted" : "preliminary",
     quantityItems,
     costSources,
     costItems,
@@ -92,6 +99,52 @@ export function createBudgetAssistantViewModel(project: Project, scenario: Scena
     lowConfidenceItems,
     unpricedCount: pendingPriceItems.length,
     lowConfidenceCount: lowConfidenceItems.length,
+  };
+}
+
+export function suggestBudgetMatches(input: BudgetMatchSuggestionInput): BudgetMatch[] {
+  const existingMatches = input.existingMatches ?? [];
+  const matchedQuantityIds = new Set(existingMatches.map((match) => match.quantityItemId));
+  const suggestions: BudgetMatch[] = [];
+
+  for (const quantityItem of input.quantityItems) {
+    if (matchedQuantityIds.has(quantityItem.id)) continue;
+
+    const candidates = input.costItems
+      .filter((costItem) => costItem.constructionMethod === quantityItem.constructionMethod)
+      .map((costItem) => ({ costItem, score: scoreCostMatch(quantityItem, costItem) }))
+      .filter((candidate) => candidate.score.total >= 0.25)
+      .sort((a, b) => b.score.total - a.score.total);
+    const best = candidates[0];
+    if (!best) continue;
+
+    suggestions.push(createBudgetMatchSuggestion(quantityItem, best.costItem, best.score));
+  }
+
+  return suggestions;
+}
+
+export function createBudgetMatchSuggestion(
+  quantityItem: BudgetAssistantQuantityItem,
+  costItem: CostItem,
+  score = scoreCostMatch(quantityItem, costItem)
+): BudgetMatch {
+  const confidence = confidenceFromScore(score.total);
+  const reasons = [
+    score.unitCompatible ? "Unidade compativel." : `Unidade divergente: quantitativo em ${quantityItem.unit}, preco em ${costItem.unit}.`,
+    score.categoryCompatible ? "Categoria compativel." : "Categoria diferente; revisar antes de aprovar.",
+    score.textOverlap > 0 ? `Descricao com ${Math.round(score.textOverlap * 100)}% de semelhanca por termos.` : "Descricao exige revisao manual.",
+  ];
+
+  return {
+    id: `ai-match-${quantityItem.id}-${costItem.id}`,
+    quantityItemId: quantityItem.id,
+    costItemId: costItem.id,
+    confidence,
+    reason: reasons.join(" "),
+    unitCompatible: score.unitCompatible,
+    requiresReview: true,
+    approvedByUser: false,
   };
 }
 
@@ -135,7 +188,7 @@ export function createManualCostItem(input: ManualCostItemInput) {
     reason: "Preco manual vinculado ao quantitativo selecionado.",
     unitCompatible: input.unit === input.quantityItem.unit,
     requiresReview: true,
-    approvedByUser: false,
+    approvedByUser: true,
   };
 
   return { costItem, match };
@@ -174,4 +227,50 @@ function reliabilityForConfidence(confidence: BudgetConfidenceLevel): CostSource
 
 function roundCurrency(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function scoreCostMatch(quantityItem: BudgetAssistantQuantityItem, costItem: CostItem) {
+  const unitCompatible = quantityItem.unit === costItem.unit;
+  const categoryCompatible = quantityItem.category === costItem.category;
+  const textOverlap = tokenOverlap(quantityItem.description, costItem.description);
+  const confidenceWeight = costItem.confidence === "high" ? 1 : costItem.confidence === "medium" ? 0.7 : costItem.confidence === "low" ? 0.35 : 0;
+  const total =
+    (unitCompatible ? 0.35 : 0) +
+    (categoryCompatible ? 0.25 : 0) +
+    textOverlap * 0.3 +
+    confidenceWeight * 0.1;
+
+  return {
+    total,
+    unitCompatible,
+    categoryCompatible,
+    textOverlap,
+  };
+}
+
+function confidenceFromScore(score: number): BudgetConfidenceLevel {
+  if (score >= 0.75) return "high";
+  if (score >= 0.55) return "medium";
+  if (score >= 0.35) return "low";
+  return "unverified";
+}
+
+function tokenOverlap(left: string, right: string) {
+  const leftTokens = new Set(tokens(left));
+  const rightTokens = new Set(tokens(right));
+  if (leftTokens.size === 0 || rightTokens.size === 0) return 0;
+  let matches = 0;
+  leftTokens.forEach((token) => {
+    if (rightTokens.has(token)) matches += 1;
+  });
+  return matches / Math.max(leftTokens.size, rightTokens.size);
+}
+
+function tokens(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 2);
 }

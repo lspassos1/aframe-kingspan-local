@@ -14,6 +14,7 @@ import {
   createBudgetAssistantViewModel,
   createManualCostItem,
   createManualCostSource,
+  suggestBudgetMatches,
   type BudgetConfidenceLevel,
   type PriceSourceType,
 } from "@/lib/budget-assistant";
@@ -42,6 +43,9 @@ export default function BudgetAssistantPage() {
   const project = useProjectStore((state) => state.project);
   const addBudgetCostSource = useProjectStore((state) => state.addBudgetCostSource);
   const addBudgetCostItem = useProjectStore((state) => state.addBudgetCostItem);
+  const addBudgetMatchSuggestion = useProjectStore((state) => state.addBudgetMatchSuggestion);
+  const approveBudgetMatch = useProjectStore((state) => state.approveBudgetMatch);
+  const rejectBudgetMatch = useProjectStore((state) => state.rejectBudgetMatch);
   const scenario = useSelectedScenario();
   const baseViewModel = useMemo(() => createBudgetAssistantViewModel(project, scenario), [project, scenario]);
   const firstQuantity = baseViewModel.pendingPriceItems[0] ?? baseViewModel.quantityItems[0];
@@ -62,6 +66,9 @@ export default function BudgetAssistantPage() {
   const selectedQuantity = viewModel.quantityItems.find((item) => item.id === selectedQuantityId) ?? viewModel.pendingPriceItems[0] ?? viewModel.quantityItems[0];
   const sourceSelectValue = selectedSourceId || viewModel.costSources[0]?.id || "";
   const sourceById = new Map(viewModel.costSources.map((source) => [source.id, source]));
+  const availableCostItems = project.budgetAssistant.costItems.filter((item) => item.constructionMethod === scenario.constructionMethod);
+  const costItemById = new Map(availableCostItems.map((item) => [item.id, item]));
+  const suggestedMatches = viewModel.matches.filter((match) => !match.approvedByUser);
   const priceNumber = Number(unitPrice.replace(",", "."));
   const canAddSource = Boolean(sourceTitle.trim() && sourceType && sourceSupplier.trim() && sourceDate);
   const canAddManualPrice = Boolean(selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0);
@@ -112,6 +119,16 @@ export default function BudgetAssistantPage() {
     addBudgetCostItem(entry.costItem, entry.match);
     setUnitPrice("");
     setItemNotes("");
+  };
+
+  const handleSuggestMatches = () => {
+    const suggestions = suggestBudgetMatches({
+      quantityItems: viewModel.pendingPriceItems,
+      costItems: availableCostItems,
+      existingMatches: viewModel.matches,
+    });
+
+    suggestions.forEach(addBudgetMatchSuggestion);
   };
 
   return (
@@ -272,6 +289,58 @@ export default function BudgetAssistantPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Card className="rounded-md shadow-none">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BadgeDollarSign className="h-5 w-5" />
+            Matching assistido
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium">{suggestedMatches.length} sugestoes pendentes</p>
+              <p className="text-xs text-muted-foreground">Sugestoes usam apenas itens de preco ja cadastrados e sempre ficam pendentes de revisao humana.</p>
+            </div>
+            <Button type="button" onClick={handleSuggestMatches} disabled={availableCostItems.length === 0 || viewModel.pendingPriceItems.length === 0}>
+              Gerar sugestoes
+            </Button>
+          </div>
+          {suggestedMatches.length === 0 ? null : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {suggestedMatches.map((match) => {
+                const quantityItem = viewModel.quantityItems.find((item) => item.id === match.quantityItemId);
+                const costItem = costItemById.get(match.costItemId);
+                const source = costItem ? sourceById.get(costItem.sourceId) : undefined;
+                return (
+                  <div key={match.id} className="rounded-md border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{quantityItem?.description ?? "Quantitativo nao encontrado"}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{costItem?.description ?? "Item de preco nao encontrado"}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {source?.title ?? "Fonte removida"} | {match.unitCompatible ? "unidade compativel" : "unidade divergente"}
+                        </p>
+                      </div>
+                      <Badge variant={match.confidence === "high" || match.confidence === "medium" ? "outline" : "secondary"}>{match.confidence}</Badge>
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">{match.reason}</p>
+                    <div className="mt-3 flex gap-2">
+                      <Button type="button" size="sm" onClick={() => approveBudgetMatch(match.id)}>
+                        Aprovar
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => rejectBudgetMatch(match.id)}>
+                        Rejeitar
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-md shadow-none">
