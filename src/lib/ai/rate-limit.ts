@@ -174,7 +174,7 @@ export async function checkAndConsumeAiDailyLimit(
   const resetAtDate = getResetAt(now);
   const resetAt = resetAtDate.toISOString();
   const ttlSeconds = getTtlSeconds(now, resetAtDate);
-  const salt = env.AI_RATE_LIMIT_SALT || "change-me-in-production";
+  const salt = env.AI_RATE_LIMIT_SALT?.trim() || "change-me-in-production";
   const allowAnonymous = getBooleanEnv(env, "AI_ALLOW_ANONYMOUS_PLAN_EXTRACT", false);
   const failOpen = env.NODE_ENV !== "production" && getBooleanEnv(env, "AI_RATE_LIMIT_FAIL_OPEN", false);
   const limits = {
