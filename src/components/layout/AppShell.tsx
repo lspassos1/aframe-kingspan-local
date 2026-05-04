@@ -27,6 +27,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import type { ConstructionMethodId } from "@/lib/construction-methods";
+import { isAppNavigationItemVisible } from "@/lib/navigation/app-navigation";
 import { useProjectStore } from "@/lib/store/project-store";
 import { canUseAppShellBeforeOnboarding } from "@/lib/routes/shell";
 import { cn } from "@/lib/utils";
@@ -38,7 +40,7 @@ const navItems = [
   { href: "/model-3d", label: "Modelo 3D", icon: Box },
   { href: "/technical-project", label: "Projeto Tecnico", icon: FileText },
   { href: "/materials", label: "Materiais", icon: Package },
-  { href: "/structure", label: "Estrutura Metalica", icon: Building2 },
+  { href: "/structure", label: "Estrutura A-frame", icon: Building2 },
   { href: "/budget", label: "Orcamento", icon: Calculator },
   { href: "/budget-assistant", label: "Budget Assistant", icon: WalletCards },
   { href: "/quotation", label: "Cotacao", icon: ClipboardList },
@@ -50,11 +52,11 @@ const navItems = [
   { href: "/help", label: "Ajuda", icon: HelpCircle },
 ];
 
-function NavList({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({ constructionMethod, onNavigate }: { constructionMethod?: ConstructionMethodId; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <nav className="grid gap-1">
-      {navItems.map((item) => {
+      {navItems.filter((item) => isAppNavigationItemVisible(item.href, constructionMethod)).map((item) => {
         const Icon = item.icon;
         const active = pathname === item.href || (pathname === "/" && item.href === "/dashboard");
         return (
@@ -79,7 +81,10 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const onboardingCompleted = useProjectStore((state) => state.project.onboardingCompleted);
+  const project = useProjectStore((state) => state.project);
+  const onboardingCompleted = project.onboardingCompleted;
+  const selectedScenario = project.scenarios.find((scenario) => scenario.id === project.selectedScenarioId) ?? project.scenarios[0];
+  const constructionMethod = selectedScenario?.constructionMethod;
 
   useEffect(() => {
     if (!onboardingCompleted && !canUseAppShellBeforeOnboarding(pathname)) {
@@ -103,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UserButton />
         </div>
         <Separator className="my-5" />
-        <NavList />
+        <NavList constructionMethod={constructionMethod} />
       </aside>
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
@@ -123,7 +128,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <SheetTitle>Navegacao</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6">
-                  <NavList />
+                  <NavList constructionMethod={constructionMethod} />
                 </div>
               </SheetContent>
             </Sheet>

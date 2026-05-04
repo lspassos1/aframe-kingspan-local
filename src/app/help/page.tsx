@@ -3,15 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const sections = [
   {
     title: "Como usar",
-    body: "Comece em Configurar, ajuste endereco, lote, recuos, painel, angulo, profundidade e pavimento superior/mezanino percentual. Depois confira Dashboard, Modelo 3D, Materiais, Estrutura, Orcamento e Cenarios.",
+    body: "Comece em Configurar, ajuste metodo, endereco, lote e dados tecnicos. Depois confira Dashboard, Modelo 3D, Projeto Tecnico, Materiais, Orcamento e Cenarios. A tela Estrutura A-frame aparece somente para projetos A-frame.",
   },
   {
     title: "Precos",
     body: "O MVP nao busca precos automaticamente. Atualize valores manualmente, por CSV/XLSX exportado/importado externamente ou por pedidos de cotacao gerados na tela Cotacao.",
   },
   {
-    title: "Estrutura",
-    body: "A estrutura metalica e somente pre-dimensionamento para viabilidade. Vento, fundacoes, ligacoes, ancoragens, flambagem e ART/RRT exigem engenheiro habilitado.",
+    title: "Estrutura A-frame",
+    body: "A estrutura metalica e somente pre-dimensionamento para viabilidade do metodo A-frame. Vento, fundacoes, ligacoes, ancoragens, flambagem e ART/RRT exigem engenheiro habilitado.",
   },
   {
     title: "Salvar e carregar",
