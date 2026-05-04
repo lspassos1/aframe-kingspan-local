@@ -48,7 +48,14 @@ export async function POST(request: NextRequest) {
     return jsonResponse({ message: validation.message, maxBytes: validation.maxBytes }, { status: validation.status });
   }
 
-  const fileBytes = Buffer.from(await file.arrayBuffer());
+  let fileBytes: Buffer;
+  try {
+    fileBytes = Buffer.from(await file.arrayBuffer());
+  } catch {
+    const payload = getErrorMessage(new AiPlanExtractError("Nao foi possivel ler o arquivo enviado.", "ai-plan-file-read-failed", 400));
+    return jsonResponse(payload, { status: 400 });
+  }
+
   const cacheStore = createMemoryPlanExtractCacheStore();
   const cacheKey = createPlanExtractCacheKey({ fileBytes, mimeType: validation.mimeType });
   const cachedExtraction = await cacheStore.get(cacheKey.key).catch(() => null);

@@ -78,5 +78,6 @@ describe("AI plan extract cache", () => {
       model: "gpt-4o-mini",
     });
     expect(await store.get("invalid-key")).toBeNull();
+    expect(entries.has("invalid-key")).toBe(false);
   });
 });

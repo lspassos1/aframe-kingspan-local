@@ -74,7 +74,11 @@ export function createMemoryPlanExtractCacheStore(entries = sharedMemoryCache): 
       }
 
       const parsed = planExtractResultSchema.safeParse(entry.value.result);
-      return parsed.success ? entry.value : null;
+      if (!parsed.success) {
+        entries.delete(key);
+        return null;
+      }
+      return entry.value;
     },
     async set(key, value, ttlSeconds) {
       entries.set(key, {
