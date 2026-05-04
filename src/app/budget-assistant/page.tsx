@@ -80,7 +80,7 @@ export default function BudgetAssistantPage() {
   const selectedPriceSourceIds = new Set(viewModel.selectedPriceSourceIds);
   const sourceSelectValue = selectedSourceId && applicableSourceById.has(selectedSourceId) ? selectedSourceId : viewModel.applicableCostSources[0]?.source.id ?? "";
   const sourceById = new Map(viewModel.costSources.map((source) => [source.id, source]));
-  const availableCostItems = project.budgetAssistant.costItems.filter(
+  const availableCostItems = (project.budgetAssistant?.costItems ?? []).filter(
     (item) => item.constructionMethod === scenario.constructionMethod && selectedPriceSourceIds.has(item.sourceId)
   );
   const costItemById = new Map(availableCostItems.map((item) => [item.id, item]));
@@ -91,8 +91,12 @@ export default function BudgetAssistantPage() {
   const sourceStateIsValid = isBrazilState(sourceState);
   const sourceCityIsValid = isBrazilCityInState(sourceState, sourceCity);
   const priceNumber = Number(unitPrice.replace(",", "."));
-  const canAddSource = Boolean(sourceTitle.trim() && sourceType && sourceSupplier.trim() && sourceDate && sourceStateIsValid && sourceCityIsValid);
-  const canAddManualPrice = Boolean(selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0);
+  const canAddSource = Boolean(
+    scenarioHasValidRegion && sourceTitle.trim() && sourceType && sourceSupplier.trim() && sourceDate && sourceStateIsValid && sourceCityIsValid
+  );
+  const canAddManualPrice = Boolean(
+    scenarioHasValidRegion && selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0
+  );
 
   const handleSelectQuantity = (quantityId: string) => {
     setSelectedQuantityId(quantityId);
@@ -399,7 +403,11 @@ export default function BudgetAssistantPage() {
               <p className="text-sm font-medium">{suggestedMatches.length} sugestoes pendentes</p>
               <p className="text-xs text-muted-foreground">Sugestoes usam apenas itens de preco ja cadastrados e sempre ficam pendentes de revisao humana.</p>
             </div>
-            <Button type="button" onClick={handleSuggestMatches} disabled={availableCostItems.length === 0 || viewModel.pendingPriceItems.length === 0}>
+            <Button
+              type="button"
+              onClick={handleSuggestMatches}
+              disabled={!scenarioHasValidRegion || availableCostItems.length === 0 || viewModel.pendingPriceItems.length === 0}
+            >
               Gerar sugestoes
             </Button>
           </div>

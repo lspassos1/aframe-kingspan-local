@@ -156,6 +156,16 @@ describe("budget assistant foundation", () => {
     expect(selectApplicableRegionalCostSources(scenario, [manualSource, nationalSource, stateSource]).map((item) => item.source.id)).toEqual(["source-state"]);
     expect(selectApplicableRegionalCostSources(scenario, [manualSource, nationalSource]).map((item) => item.source.id)).toEqual(["source-national"]);
     expect(selectApplicableRegionalCostSources(scenario, [unrelatedSource, manualSource]).map((item) => item.source.id)).toEqual(["source-manual"]);
+    expect(
+      selectApplicableRegionalCostSources(scenario, [
+        createCostSource({
+          id: "source-manual-empty-region",
+          type: "manual",
+          city: "",
+          state: "",
+        }),
+      ])[0]
+    ).toMatchObject({ scope: "manual" });
   });
 
   it("filters matched cost items to the selected regional source scope", () => {

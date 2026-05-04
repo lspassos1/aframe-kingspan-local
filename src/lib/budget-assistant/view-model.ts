@@ -138,10 +138,10 @@ function classifyPriceSourceScope(scenario: Scenario, source: CostSource): Price
   const sourceState = normalizeRegionText(normalizeBrazilStateName(source.state) || source.state);
   const sourceCity = normalizeRegionText(source.city);
 
+  if (source.type === "manual") return "manual";
   if (!sourceState || sourceState === "brasil" || sourceState === "nacional" || sourceCity === "nacional") return "national";
   if (scenarioState && sourceState === scenarioState && scenarioCity && sourceCity === scenarioCity) return "city";
   if (scenarioState && sourceState === scenarioState) return "state";
-  if (source.type === "manual") return "manual";
   return null;
 }
 
