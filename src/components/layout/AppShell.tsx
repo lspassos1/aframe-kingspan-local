@@ -22,6 +22,7 @@ import {
   Ruler,
   Settings,
   ShieldCheck,
+  WalletCards,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -38,6 +39,7 @@ const navItems = [
   { href: "/materials", label: "Materiais", icon: Package },
   { href: "/structure", label: "Estrutura Metalica", icon: Building2 },
   { href: "/budget", label: "Orcamento", icon: Calculator },
+  { href: "/budget-assistant", label: "Budget Assistant", icon: WalletCards },
   { href: "/quotation", label: "Cotacao", icon: ClipboardList },
   { href: "/scenarios", label: "Cenarios", icon: BarChart3 },
   { href: "/export", label: "Exportar", icon: FileDown },
