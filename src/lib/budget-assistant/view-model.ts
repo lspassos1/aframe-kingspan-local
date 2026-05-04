@@ -1,6 +1,7 @@
 import type { MaterialCategory, MaterialUnit, Project, Scenario } from "@/types/project";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { calculateScenarioBudget } from "@/lib/construction-methods/scenario-calculations";
+import { normalizeBrazilStateName } from "@/lib/locations/brazil";
 import type {
   BudgetAssistantQuantityItem,
   BudgetAssistantViewModel,
@@ -8,6 +9,7 @@ import type {
   BudgetMatch,
   CostItem,
   CostSource,
+  PriceSourceRegionalScope,
   PriceSourceType,
 } from "./types";
 
@@ -59,6 +61,12 @@ export interface BudgetMatchSuggestionInput {
   existingMatches?: BudgetMatch[];
 }
 
+export interface RegionalCostSource {
+  source: CostSource;
+  scope: PriceSourceRegionalScope;
+  label: string;
+}
+
 export function createBudgetAssistantViewModel(project: Project, scenario: Scenario, data?: BudgetAssistantData): BudgetAssistantViewModel {
   const definition = getConstructionMethodDefinition(scenario.constructionMethod);
   const budget = calculateScenarioBudget(project, scenario);
@@ -75,12 +83,20 @@ export function createBudgetAssistantViewModel(project: Project, scenario: Scena
     notes: item.notes,
   }));
   const costSources = assistantData.costSources ?? [];
+  const applicableCostSources = selectApplicableRegionalCostSources(scenario, costSources);
+  const selectedPriceSourceIds = applicableCostSources.map((item) => item.source.id);
+  const regionalFallbackWarnings = createRegionalFallbackWarnings(applicableCostSources);
   const quantityIds = new Set(quantityItems.map((item) => item.id));
-  const matches = (assistantData.matches ?? []).filter((match) => quantityIds.has(match.quantityItemId));
+  const selectedPriceSourceIdSet = new Set(selectedPriceSourceIds);
+  const scenarioCostItems = (assistantData.costItems ?? []).filter((item) => item.constructionMethod === scenario.constructionMethod);
+  const scenarioCostItemById = new Map(scenarioCostItems.map((item) => [item.id, item]));
+  const matches = (assistantData.matches ?? []).filter((match) => {
+    if (!quantityIds.has(match.quantityItemId)) return false;
+    const costItem = scenarioCostItemById.get(match.costItemId);
+    return Boolean(costItem && selectedPriceSourceIdSet.has(costItem.sourceId));
+  });
   const matchedCostItemIds = new Set(matches.map((match) => match.costItemId));
-  const costItems = (assistantData.costItems ?? []).filter(
-    (item) => item.constructionMethod === scenario.constructionMethod && matchedCostItemIds.has(item.id)
-  );
+  const costItems = scenarioCostItems.filter((item) => matchedCostItemIds.has(item.id));
   const pricedQuantityIds = new Set(matches.filter((match) => match.approvedByUser).map((match) => match.quantityItemId));
   const pendingPriceItems = quantityItems.filter((item) => item.requiresPriceSource && !pricedQuantityIds.has(item.id));
   const lowConfidenceItems = costItems.filter((item) => item.confidence === "low" || item.confidence === "unverified");
@@ -93,6 +109,9 @@ export function createBudgetAssistantViewModel(project: Project, scenario: Scena
     status: hasAiSuggestions ? "ai_assisted" : "preliminary",
     quantityItems,
     costSources,
+    applicableCostSources,
+    selectedPriceSourceIds,
+    regionalFallbackWarnings,
     costItems,
     matches,
     pendingPriceItems,
@@ -100,6 +119,54 @@ export function createBudgetAssistantViewModel(project: Project, scenario: Scena
     unpricedCount: pendingPriceItems.length,
     lowConfidenceCount: lowConfidenceItems.length,
   };
+}
+
+export function selectApplicableRegionalCostSources(scenario: Scenario, costSources: CostSource[]): RegionalCostSource[] {
+  const classifiedSources = costSources.flatMap((source) => {
+    const scope = classifyPriceSourceScope(scenario, source);
+    return scope ? [{ source, scope, label: createPriceSourceScopeLabel(source, scope) }] : [];
+  });
+  const priority: PriceSourceRegionalScope[] = ["city", "state", "national", "manual"];
+  const selectedScope = priority.find((scope) => classifiedSources.some((item) => item.scope === scope));
+
+  return selectedScope ? classifiedSources.filter((item) => item.scope === selectedScope) : [];
+}
+
+function classifyPriceSourceScope(scenario: Scenario, source: CostSource): PriceSourceRegionalScope | null {
+  const scenarioState = normalizeRegionText(normalizeBrazilStateName(scenario.location.state) || scenario.location.state);
+  const scenarioCity = normalizeRegionText(scenario.location.city);
+  const sourceState = normalizeRegionText(normalizeBrazilStateName(source.state) || source.state);
+  const sourceCity = normalizeRegionText(source.city);
+
+  if (!sourceState || sourceState === "brasil" || sourceState === "nacional" || sourceCity === "nacional") return "national";
+  if (scenarioState && sourceState === scenarioState && scenarioCity && sourceCity === scenarioCity) return "city";
+  if (scenarioState && sourceState === scenarioState) return "state";
+  if (source.type === "manual") return "manual";
+  return null;
+}
+
+function createPriceSourceScopeLabel(source: CostSource, scope: PriceSourceRegionalScope) {
+  const sourceState = normalizeBrazilStateName(source.state) || source.state.trim();
+  if (scope === "city") return `Cidade: ${source.city}/${sourceState}`;
+  if (scope === "state") return `UF: ${sourceState}`;
+  if (scope === "national") return "Base nacional";
+  return "Fallback manual revisavel";
+}
+
+function createRegionalFallbackWarnings(sources: RegionalCostSource[]) {
+  const selectedScope = sources[0]?.scope;
+  if (!selectedScope || selectedScope === "city") return [];
+  if (selectedScope === "state") return ["Sem fonte municipal compativel; usando fonte estadual como fallback."];
+  if (selectedScope === "national") return ["Sem fonte municipal/estadual compativel; usando fonte nacional como fallback."];
+  return ["Sem fonte regional compativel; usando fonte manual revisavel como fallback."];
+}
+
+function normalizeRegionText(value: string | undefined | null) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 export function suggestBudgetMatches(input: BudgetMatchSuggestionInput): BudgetMatch[] {

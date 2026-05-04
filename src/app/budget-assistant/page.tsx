@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { BadgeDollarSign, CircleAlert, FileCheck2, Link2, Plus, WalletCards } from "lucide-react";
+import { BadgeDollarSign, CircleAlert, FileCheck2, Link2, MapPin, Plus, WalletCards } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,7 +59,7 @@ export default function BudgetAssistantPage() {
   const scenarioState = normalizeBrazilStateName(scenario.location.state) || scenario.location.state;
   const scenarioLocationKey = `${scenario.id}:${scenario.location.city}:${scenarioState}`;
   const [selectedQuantityId, setSelectedQuantityId] = useState(firstQuantity?.id ?? "");
-  const [selectedSourceId, setSelectedSourceId] = useState(baseViewModel.costSources[0]?.id ?? "");
+  const [selectedSourceId, setSelectedSourceId] = useState(baseViewModel.applicableCostSources[0]?.source.id ?? "");
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourceType, setSourceType] = useState<PriceSourceType>("manual");
   const [sourceSupplier, setSourceSupplier] = useState("");
@@ -76,11 +76,16 @@ export default function BudgetAssistantPage() {
   const [itemNotes, setItemNotes] = useState("");
   const viewModel = useMemo(() => createBudgetAssistantViewModel(project, scenario), [project, scenario]);
   const selectedQuantity = viewModel.quantityItems.find((item) => item.id === selectedQuantityId) ?? viewModel.pendingPriceItems[0] ?? viewModel.quantityItems[0];
-  const sourceSelectValue = selectedSourceId || viewModel.costSources[0]?.id || "";
+  const applicableSourceById = new Map(viewModel.applicableCostSources.map((item) => [item.source.id, item]));
+  const selectedPriceSourceIds = new Set(viewModel.selectedPriceSourceIds);
+  const sourceSelectValue = selectedSourceId && applicableSourceById.has(selectedSourceId) ? selectedSourceId : viewModel.applicableCostSources[0]?.source.id ?? "";
   const sourceById = new Map(viewModel.costSources.map((source) => [source.id, source]));
-  const availableCostItems = project.budgetAssistant.costItems.filter((item) => item.constructionMethod === scenario.constructionMethod);
+  const availableCostItems = project.budgetAssistant.costItems.filter(
+    (item) => item.constructionMethod === scenario.constructionMethod && selectedPriceSourceIds.has(item.sourceId)
+  );
   const costItemById = new Map(availableCostItems.map((item) => [item.id, item]));
   const suggestedMatches = viewModel.matches.filter((match) => !match.approvedByUser);
+  const scenarioHasValidRegion = Boolean(scenario.location.city.trim() && scenarioState.trim());
   const sourceCity = sourceLocation.locationKey === scenarioLocationKey ? sourceLocation.city : scenario.location.city;
   const sourceState = sourceLocation.locationKey === scenarioLocationKey ? normalizeBrazilStateName(sourceLocation.state) || sourceLocation.state : scenarioState;
   const sourceStateIsValid = isBrazilState(sourceState);
@@ -186,6 +191,58 @@ export default function BudgetAssistantPage() {
         <Metric icon={<Link2 className="h-4 w-4" />} label="Fontes" value={viewModel.costSources.length} />
       </section>
 
+      <Card className="rounded-md shadow-none">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Filtro regional de precos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium">
+                {scenario.location.city || "Cidade nao informada"}
+                {scenarioState ? `/${scenarioState}` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">Prioridade: cidade, UF, base nacional e fallback manual revisavel.</p>
+            </div>
+            <Badge variant={viewModel.applicableCostSources.length > 0 ? "outline" : "secondary"}>{viewModel.applicableCostSources.length} fontes aplicaveis</Badge>
+          </div>
+          {!scenarioHasValidRegion ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              Informe cidade e estado no cenario para aplicar filtro regional de precos.
+            </p>
+          ) : null}
+          {viewModel.regionalFallbackWarnings.map((warning) => (
+            <p key={warning} className="rounded-md border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-900">
+              {warning}
+            </p>
+          ))}
+          {viewModel.applicableCostSources.length === 0 ? (
+            <p className="rounded-md border p-3 text-sm text-muted-foreground">
+              Nenhuma fonte compativel com a regiao do cenario. Cadastre uma fonte local, estadual, nacional ou manual revisavel antes de vincular precos.
+            </p>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {viewModel.applicableCostSources.map(({ source, label, scope }) => (
+                <div key={source.id} className="rounded-md border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{source.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {source.supplier} | {formatDate(source.referenceDate)}
+                      </p>
+                    </div>
+                    <Badge variant={scope === "manual" ? "secondary" : "outline"}>{label}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <section className="grid gap-4 xl:grid-cols-2">
         <Card className="rounded-md shadow-none">
           <CardHeader>
@@ -278,13 +335,16 @@ export default function BudgetAssistantPage() {
                     <SelectValue placeholder="Cadastrar fonte primeiro" />
                   </SelectTrigger>
                   <SelectContent>
-                    {viewModel.costSources.map((source) => (
+                    {viewModel.applicableCostSources.map(({ source, label }) => (
                       <SelectItem key={source.id} value={source.id}>
-                        {source.title}
+                        {source.title} - {label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {viewModel.costSources.length > 0 && viewModel.applicableCostSources.length === 0 ? (
+                  <p className="text-xs text-destructive">As fontes cadastradas nao correspondem a regiao do cenario.</p>
+                ) : null}
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="item-description">Descricao do item</Label>
@@ -433,19 +493,25 @@ export default function BudgetAssistantPage() {
               {viewModel.costSources.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma fonte cadastrada para este projeto.</p>
               ) : (
-                viewModel.costSources.map((source) => (
-                  <div key={source.id} className="rounded-md border p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{source.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {source.supplier} | {source.city}, {source.state} | {formatDate(source.referenceDate)}
-                        </p>
+                viewModel.costSources.map((source) => {
+                  const regionalSource = applicableSourceById.get(source.id);
+                  return (
+                    <div key={source.id} className="rounded-md border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{source.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {source.supplier} | {source.city}, {source.state} | {formatDate(source.referenceDate)}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <Badge variant="outline">{source.reliability}</Badge>
+                          <Badge variant={regionalSource ? "outline" : "secondary"}>{regionalSource?.label ?? "fora da regiao"}</Badge>
+                        </div>
                       </div>
-                      <Badge variant="outline">{source.reliability}</Badge>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </CardContent>
           </Card>
