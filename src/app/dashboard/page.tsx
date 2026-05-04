@@ -14,6 +14,9 @@ import { estimateSteelStructure } from "@/lib/calculations/structure";
 import { calculateConventionalMasonryBudget } from "@/lib/construction-methods/conventional-masonry/budget";
 import { calculateConventionalMasonryGeometry } from "@/lib/construction-methods/conventional-masonry/geometry";
 import { calculateConventionalMasonryMaterialList } from "@/lib/construction-methods/conventional-masonry/materials";
+import { calculateEcoBlockBudget } from "@/lib/construction-methods/eco-block/budget";
+import { calculateEcoBlockGeometry } from "@/lib/construction-methods/eco-block/geometry";
+import { calculateEcoBlockMaterialList } from "@/lib/construction-methods/eco-block/materials";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 
 export default function DashboardPage() {
@@ -31,11 +34,16 @@ export default function DashboardPage() {
   const budget = calculateBudget(project, scenario);
   const structural = estimateSteelStructure(project, scenario);
   const isConventionalMasonry = scenario.constructionMethod === "conventional-masonry";
+  const isEcoBlock = scenario.constructionMethod === "eco-block";
   const conventionalGeometry = isConventionalMasonry ? calculateConventionalMasonryGeometry({ project, scenario }) : null;
   const conventionalBudget = isConventionalMasonry ? calculateConventionalMasonryBudget({ project, scenario }) : null;
   const conventionalMaterials = isConventionalMasonry ? calculateConventionalMasonryMaterialList({ project, scenario }) : [];
-  const warnings = (conventionalBudget?.warnings ?? budget.warnings).filter((warning) => warning.level !== "info");
+  const ecoGeometry = isEcoBlock ? calculateEcoBlockGeometry({ project, scenario }) : null;
+  const ecoBudget = isEcoBlock ? calculateEcoBlockBudget({ project, scenario }) : null;
+  const ecoMaterials = isEcoBlock ? calculateEcoBlockMaterialList({ project, scenario }) : [];
+  const warnings = (ecoBudget?.warnings ?? conventionalBudget?.warnings ?? budget.warnings).filter((warning) => warning.level !== "info");
   const pendingConventionalPrices = conventionalBudget?.items.filter((item) => item.requiresConfirmation).length ?? 0;
+  const pendingEcoPrices = ecoBudget?.items.filter((item) => item.requiresConfirmation).length ?? 0;
   const savedSummaries = savedProjects.map(getSavedProjectSummary);
   const activeProjectSaved = savedProjects.some((item) => item.id === project.id);
 
@@ -76,8 +84,8 @@ export default function DashboardPage() {
               Fechar detalhes
             </Button>
           ) : null}
-          <Badge variant={isConventionalMasonry ? "outline" : geometry.fitsTerrain ? "default" : "destructive"} className="h-9 px-3">
-            {isConventionalMasonry ? "Alvenaria preliminar" : geometry.fitsTerrain ? "Cabe no lote com os recuos" : "Revisar implantacao"}
+          <Badge variant={isConventionalMasonry || isEcoBlock ? "outline" : geometry.fitsTerrain ? "default" : "destructive"} className="h-9 px-3">
+            {isEcoBlock ? "Bloco ecologico preliminar" : isConventionalMasonry ? "Alvenaria preliminar" : geometry.fitsTerrain ? "Cabe no lote com os recuos" : "Revisar implantacao"}
           </Badge>
         </div>
       </div>
@@ -140,7 +148,58 @@ export default function DashboardPage() {
       </section>
 
       {!detailsOpen ? null : (
-        isConventionalMasonry && conventionalGeometry && conventionalBudget ? (
+        isEcoBlock && ecoGeometry && ecoBudget ? (
+          <>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Lote" value={`${scenario.terrain.width} x ${scenario.terrain.depth} m`} detail="Dimensoes e endereco editaveis" icon={<Ruler className="h-5 w-5" />} />
+        <MetricCard label="Area construida" value={`${formatCompactNumber(ecoGeometry.builtAreaM2)} m2`} detail={`Pe-direito ${ecoGeometry.floorHeightM} m | perimetro ${ecoGeometry.perimeterM} m`} icon={<Home className="h-5 w-5" />} />
+        <MetricCard label="Blocos" value={`${formatCompactNumber(ecoGeometry.totalBlocks)} un`} detail={`${ecoGeometry.specialBlocks} especiais/canaletas`} icon={<Package className="h-5 w-5" />} />
+        <MetricCard label="Custo preliminar" value={formatCurrency(ecoBudget.totalEstimatedCostBRL)} detail={`${pendingEcoPrices} itens dependem de preco/fonte`} icon={<Wallet className="h-5 w-5" />} />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Quantitativos de bloco ecologico</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard label="Parede bruta" value={`${formatCompactNumber(ecoGeometry.grossWallAreaM2)} m2`} />
+            <MetricCard label="Aberturas" value={`${formatCompactNumber(ecoGeometry.openingsAreaM2)} m2`} />
+            <MetricCard label="Parede liquida" value={`${formatCompactNumber(ecoGeometry.netWallAreaM2)} m2`} />
+            <MetricCard label="Argamassa/cola" value={`${formatCompactNumber(ecoGeometry.adhesiveMortarKg)} kg`} />
+            <MetricCard label="Graute" value={`${formatCompactNumber(ecoGeometry.groutM3)} m3`} />
+            <MetricCard label="Aco preliminar" value={`${formatCompactNumber(ecoGeometry.verticalSteelKg + ecoGeometry.horizontalSteelKg)} kg`} />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div>
+              <p className="font-medium">Metodo selecionado</p>
+              <p className="text-muted-foreground">Bloco ecologico / solo-cimento com quantitativos preliminares.</p>
+            </div>
+            <div>
+              <p className="font-medium">Materiais gerados</p>
+              <p className="text-muted-foreground">{ecoMaterials.length} linhas iniciais, todas marcadas para confirmacao de preco e fonte.</p>
+            </div>
+            <div>
+              <p className="font-medium">Alertas</p>
+              <div className="mt-2 space-y-2">
+                {warnings.slice(0, 6).map((warning) => (
+                  <div key={warning.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                    {warning.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+          </>
+        ) : isConventionalMasonry && conventionalGeometry && conventionalBudget ? (
           <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard

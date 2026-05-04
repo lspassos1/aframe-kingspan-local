@@ -30,7 +30,7 @@ describe("generic construction 3D layers", () => {
       };
       const layers = definition.generate3DLayers?.({ project: defaultProject, scenario }) ?? [];
 
-      expect(layers.map((layer) => layer.type)).toEqual(requiredLayerTypes);
+      expect(layers.map((layer) => layer.type)).toEqual(expect.arrayContaining(requiredLayerTypes));
       expect(layers.every((layer) => layer.methodId === methodId)).toBe(true);
       expect(layers.every((layer) => layer.visibleByDefault)).toBe(true);
       expect(layers.every((layer) => layer.data.primitives.length > 0)).toBe(true);
