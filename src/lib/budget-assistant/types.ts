@@ -11,6 +11,7 @@ export interface CostSource {
   id: string;
   type: PriceSourceType;
   title: string;
+  supplier: string;
   state: string;
   city: string;
   referenceDate: string;
@@ -95,4 +96,10 @@ export interface BudgetAssistantViewModel {
   lowConfidenceItems: CostItem[];
   unpricedCount: number;
   lowConfidenceCount: number;
+}
+
+export interface BudgetAssistantProjectData {
+  costSources: CostSource[];
+  costItems: CostItem[];
+  matches: BudgetMatch[];
 }

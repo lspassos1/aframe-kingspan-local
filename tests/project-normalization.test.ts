@@ -19,6 +19,7 @@ describe("project serialization and normalization", () => {
     expect(parsed.budgetAssumptions.panelInstallationLaborBRLM2).toBe(defaultProject.budgetAssumptions.panelInstallationLaborBRLM2);
     expect(parsed.budgetAssumptions.engineerPlaceholderBRL).toBe(defaultProject.budgetAssumptions.engineerPlaceholderBRL);
     expect(parsed.foundationAssumptions).toMatchObject(defaultProject.foundationAssumptions);
+    expect(parsed.budgetAssistant).toMatchObject(defaultProject.budgetAssistant);
   });
 
   it("normalizes legacy A-frame mezzanine fields while preserving current defaults", () => {
@@ -52,6 +53,7 @@ describe("project serialization and normalization", () => {
     expect(normalizedScenario.aFrame.upperFloorAreaPercent).toBe(50);
     expect(normalized.panelProducts).toHaveLength(defaultProject.panelProducts.length);
     expect(normalized.accessories).toHaveLength(defaultProject.accessories.length);
+    expect(normalized.budgetAssistant).toMatchObject(defaultProject.budgetAssistant);
   });
 
   it("keeps every default scenario method-aware while preserving legacy aFrame inputs", () => {
@@ -59,5 +61,39 @@ describe("project serialization and normalization", () => {
       expect(scenario.constructionMethod).toBe("aframe");
       expect(scenario.methodInputs.aframe).toMatchObject(scenario.aFrame);
     }
+  });
+
+  it("normalizes manual budget assistant data from saved projects", () => {
+    const legacyProject = {
+      ...defaultProject,
+      budgetAssistant: undefined,
+    } as unknown as Project;
+    const savedProject = {
+      ...defaultProject,
+      budgetAssistant: {
+        costSources: [
+          {
+            id: "source-1",
+            type: "manual",
+            title: "Cotacao local",
+            supplier: "Fornecedor ABC",
+            state: "BA",
+            city: "Cruz das Almas",
+            referenceDate: "2026-05-04",
+            reliability: "low",
+            notes: "",
+          },
+        ],
+        costItems: [],
+        matches: [],
+      },
+    } as Project;
+
+    expect(normalizeProject(legacyProject).budgetAssistant).toMatchObject(defaultProject.budgetAssistant);
+    expect(normalizeProject(savedProject).budgetAssistant.costSources[0]).toMatchObject({
+      title: "Cotacao local",
+      supplier: "Fornecedor ABC",
+      referenceDate: "2026-05-04",
+    });
   });
 });

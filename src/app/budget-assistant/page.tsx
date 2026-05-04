@@ -9,13 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createBudgetAssistantViewModel,
-  createManualCostEntry,
+  createManualCostItem,
+  createManualCostSource,
   type BudgetConfidenceLevel,
-  type BudgetMatch,
-  type CostItem,
-  type CostSource,
+  type PriceSourceType,
 } from "@/lib/budget-assistant";
 import { formatCompactNumber, formatCurrency, formatDate } from "@/lib/format";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
@@ -27,46 +27,91 @@ const confidenceOptions: Array<{ value: BudgetConfidenceLevel; label: string }> 
   { value: "high", label: "Alta" },
 ];
 
+const sourceTypeOptions: Array<{ value: PriceSourceType; label: string }> = [
+  { value: "manual", label: "Manual" },
+  { value: "supplier_quote", label: "Cotacao fornecedor" },
+  { value: "sinapi", label: "SINAPI" },
+  { value: "tcpo", label: "TCPO" },
+  { value: "historical", label: "Historico" },
+  { value: "web_reference", label: "Referencia web" },
+];
+
+const today = () => new Date().toISOString().slice(0, 10);
+
 export default function BudgetAssistantPage() {
   const project = useProjectStore((state) => state.project);
+  const addBudgetCostSource = useProjectStore((state) => state.addBudgetCostSource);
+  const addBudgetCostItem = useProjectStore((state) => state.addBudgetCostItem);
   const scenario = useSelectedScenario();
-  const [costSources, setCostSources] = useState<CostSource[]>([]);
-  const [costItems, setCostItems] = useState<CostItem[]>([]);
-  const [matches, setMatches] = useState<BudgetMatch[]>([]);
   const baseViewModel = useMemo(() => createBudgetAssistantViewModel(project, scenario), [project, scenario]);
-  const [selectedQuantityId, setSelectedQuantityId] = useState(baseViewModel.pendingPriceItems[0]?.id ?? baseViewModel.quantityItems[0]?.id ?? "");
+  const firstQuantity = baseViewModel.pendingPriceItems[0] ?? baseViewModel.quantityItems[0];
+  const [selectedQuantityId, setSelectedQuantityId] = useState(firstQuantity?.id ?? "");
+  const [selectedSourceId, setSelectedSourceId] = useState(baseViewModel.costSources[0]?.id ?? "");
   const [sourceTitle, setSourceTitle] = useState("");
-  const [referenceDate, setReferenceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [sourceType, setSourceType] = useState<PriceSourceType>("manual");
+  const [sourceSupplier, setSourceSupplier] = useState("");
+  const [sourceCity, setSourceCity] = useState(scenario.location.city);
+  const [sourceState, setSourceState] = useState(scenario.location.state);
+  const [sourceDate, setSourceDate] = useState(today);
+  const [sourceNotes, setSourceNotes] = useState("");
+  const [itemDescription, setItemDescription] = useState(firstQuantity?.description ?? "");
   const [unitPrice, setUnitPrice] = useState("");
   const [confidence, setConfidence] = useState<BudgetConfidenceLevel>("unverified");
-  const viewModel = useMemo(
-    () => createBudgetAssistantViewModel(project, scenario, { costSources, costItems, matches }),
-    [costItems, costSources, matches, project, scenario]
-  );
+  const [itemNotes, setItemNotes] = useState("");
+  const viewModel = useMemo(() => createBudgetAssistantViewModel(project, scenario), [project, scenario]);
   const selectedQuantity = viewModel.quantityItems.find((item) => item.id === selectedQuantityId) ?? viewModel.pendingPriceItems[0] ?? viewModel.quantityItems[0];
+  const sourceSelectValue = selectedSourceId || viewModel.costSources[0]?.id || "";
   const sourceById = new Map(viewModel.costSources.map((source) => [source.id, source]));
   const priceNumber = Number(unitPrice.replace(",", "."));
-  const canAddManualPrice = Boolean(selectedQuantity && sourceTitle.trim() && referenceDate && Number.isFinite(priceNumber) && priceNumber > 0);
+  const canAddSource = Boolean(sourceTitle.trim() && sourceType && sourceSupplier.trim() && sourceDate);
+  const canAddManualPrice = Boolean(selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0);
+
+  const handleSelectQuantity = (quantityId: string) => {
+    setSelectedQuantityId(quantityId);
+    const quantity = viewModel.quantityItems.find((item) => item.id === quantityId);
+    if (quantity) setItemDescription(quantity.description);
+  };
+
+  const handleAddSource = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canAddSource) return;
+
+    const source = createManualCostSource({
+      title: sourceTitle,
+      type: sourceType,
+      supplier: sourceSupplier,
+      city: sourceCity,
+      state: sourceState,
+      referenceDate: sourceDate,
+      notes: sourceNotes,
+    });
+
+    addBudgetCostSource(source);
+    setSelectedSourceId(source.id);
+    setSourceTitle("");
+    setSourceSupplier("");
+    setSourceNotes("");
+  };
 
   const handleAddManualPrice = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedQuantity || !canAddManualPrice) return;
 
-    const entry = createManualCostEntry({
+    const entry = createManualCostItem({
       quantityItem: selectedQuantity,
-      sourceTitle,
-      referenceDate,
+      sourceId: sourceSelectValue,
+      description: itemDescription,
+      category: selectedQuantity.category,
+      quantity: selectedQuantity.quantity,
+      unit: selectedQuantity.unit,
       unitPrice: priceNumber,
       confidence,
-      city: scenario.location.city,
-      state: scenario.location.state,
+      notes: itemNotes,
     });
 
-    setCostSources((current) => [...current, entry.source]);
-    setCostItems((current) => [...current, entry.costItem]);
-    setMatches((current) => [...current, entry.match]);
-    setSourceTitle("");
+    addBudgetCostItem(entry.costItem, entry.match);
     setUnitPrice("");
+    setItemNotes("");
   };
 
   return (
@@ -85,85 +130,124 @@ export default function BudgetAssistantPage() {
       </div>
 
       <section className="grid gap-4 md:grid-cols-4">
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <FileCheck2 className="h-4 w-4" />
-              Quantitativos
-            </div>
-            <p className="mt-2 text-2xl font-semibold">{viewModel.quantityItems.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CircleAlert className="h-4 w-4" />
-              Sem preco
-            </div>
-            <p className="mt-2 text-2xl font-semibold">{viewModel.unpricedCount}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <BadgeDollarSign className="h-4 w-4" />
-              Baixa confianca
-            </div>
-            <p className="mt-2 text-2xl font-semibold">{viewModel.lowConfidenceCount}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Link2 className="h-4 w-4" />
-              Fontes
-            </div>
-            <p className="mt-2 text-2xl font-semibold">{viewModel.costSources.length}</p>
-          </CardContent>
-        </Card>
+        <Metric icon={<FileCheck2 className="h-4 w-4" />} label="Quantitativos" value={viewModel.quantityItems.length} />
+        <Metric icon={<CircleAlert className="h-4 w-4" />} label="Sem preco" value={viewModel.unpricedCount} />
+        <Metric icon={<BadgeDollarSign className="h-4 w-4" />} label="Baixa confianca" value={viewModel.lowConfidenceCount} />
+        <Metric icon={<Link2 className="h-4 w-4" />} label="Fontes" value={viewModel.costSources.length} />
       </section>
 
-      <Card className="rounded-md shadow-none">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
-            Adicionar preco manual
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAddManualPrice} className="grid gap-4 lg:grid-cols-[minmax(260px,1.4fr)_minmax(180px,0.8fr)_minmax(150px,0.6fr)_minmax(150px,0.6fr)_auto]">
-            <div className="space-y-2">
-              <Label htmlFor="quantity-item">Quantitativo</Label>
-              <Select value={selectedQuantity?.id ?? ""} onValueChange={setSelectedQuantityId}>
-                <SelectTrigger id="quantity-item" className="h-10 w-full">
-                  <SelectValue placeholder="Selecionar item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {viewModel.quantityItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.description}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="source-title">Fonte</Label>
-              <Input id="source-title" value={sourceTitle} onChange={(event) => setSourceTitle(event.target.value)} placeholder="Fornecedor ou tabela" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reference-date">Data</Label>
-              <Input id="reference-date" type="date" value={referenceDate} onChange={(event) => setReferenceDate(event.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="unit-price">Preco unit.</Label>
-              <Input id="unit-price" inputMode="decimal" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} placeholder="0,00" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confidence">Confianca</Label>
-              <div className="flex gap-2">
+      <section className="grid gap-4 xl:grid-cols-2">
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Cadastrar fonte de preco
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAddSource} className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="source-title">Nome da fonte</Label>
+                <Input id="source-title" value={sourceTitle} onChange={(event) => setSourceTitle(event.target.value)} placeholder="Tabela, fornecedor ou cotacao" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="source-type">Tipo</Label>
+                <Select value={sourceType} onValueChange={(value) => setSourceType(value as PriceSourceType)}>
+                  <SelectTrigger id="source-type" className="h-10 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sourceTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="source-supplier">Fornecedor</Label>
+                <Input id="source-supplier" value={sourceSupplier} onChange={(event) => setSourceSupplier(event.target.value)} placeholder="Empresa ou responsavel" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="source-date">Data de referencia</Label>
+                <Input id="source-date" type="date" value={sourceDate} onChange={(event) => setSourceDate(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="source-city">Cidade</Label>
+                <Input id="source-city" value={sourceCity} onChange={(event) => setSourceCity(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="source-state">Estado</Label>
+                <Input id="source-state" value={sourceState} onChange={(event) => setSourceState(event.target.value)} />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="source-notes">Observacoes</Label>
+                <Textarea id="source-notes" value={sourceNotes} onChange={(event) => setSourceNotes(event.target.value)} />
+              </div>
+              <div className="md:col-span-2">
+                <Button type="submit" disabled={!canAddSource}>
+                  Adicionar fonte
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Vincular preco manual
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAddManualPrice} className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="quantity-item">Quantitativo</Label>
+                <Select value={selectedQuantity?.id ?? ""} onValueChange={handleSelectQuantity}>
+                  <SelectTrigger id="quantity-item" className="h-10 w-full">
+                    <SelectValue placeholder="Selecionar item" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {viewModel.quantityItems.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="source-id">Fonte</Label>
+                <Select value={sourceSelectValue} onValueChange={setSelectedSourceId}>
+                  <SelectTrigger id="source-id" className="h-10 w-full">
+                    <SelectValue placeholder="Cadastrar fonte primeiro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {viewModel.costSources.map((source) => (
+                      <SelectItem key={source.id} value={source.id}>
+                        {source.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="item-description">Descricao do item</Label>
+                <Input id="item-description" value={itemDescription} onChange={(event) => setItemDescription(event.target.value)} />
+              </div>
+              <ReadOnlyField label="Categoria" value={selectedQuantity?.category ?? "-"} />
+              <ReadOnlyField label="Unidade" value={selectedQuantity?.unit ?? "-"} />
+              <ReadOnlyField label="Quantidade" value={selectedQuantity ? formatCompactNumber(selectedQuantity.quantity) : "-"} />
+              <div className="space-y-2">
+                <Label htmlFor="unit-price">Preco unitario</Label>
+                <Input id="unit-price" inputMode="decimal" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} placeholder="0,00" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confidence">Confianca</Label>
                 <Select value={confidence} onValueChange={(value) => setConfidence(value as BudgetConfidenceLevel)}>
-                  <SelectTrigger id="confidence" className="h-10 w-36">
+                  <SelectTrigger id="confidence" className="h-10 w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -174,14 +258,20 @@ export default function BudgetAssistantPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button type="submit" disabled={!canAddManualPrice} className="h-10">
-                  Adicionar
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="item-notes">Notas do item</Label>
+                <Textarea id="item-notes" value={itemNotes} onChange={(event) => setItemNotes(event.target.value)} />
+              </div>
+              <div className="md:col-span-2">
+                <Button type="submit" disabled={!canAddManualPrice}>
+                  Vincular preco
                 </Button>
               </div>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            </form>
+          </CardContent>
+        </Card>
+      </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-md shadow-none">
@@ -236,7 +326,7 @@ export default function BudgetAssistantPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {viewModel.costSources.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma fonte cadastrada para este cenario.</p>
+                <p className="text-sm text-muted-foreground">Nenhuma fonte cadastrada para este projeto.</p>
               ) : (
                 viewModel.costSources.map((source) => (
                   <div key={source.id} className="rounded-md border p-3">
@@ -244,7 +334,7 @@ export default function BudgetAssistantPage() {
                       <div>
                         <p className="font-medium">{source.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {source.city}, {source.state} | {formatDate(source.referenceDate)}
+                          {source.supplier} | {source.city}, {source.state} | {formatDate(source.referenceDate)}
                         </p>
                       </div>
                       <Badge variant="outline">{source.reliability}</Badge>
@@ -289,6 +379,29 @@ export default function BudgetAssistantPage() {
           </Card>
         </div>
       </section>
+    </div>
+  );
+}
+
+function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <Card className="rounded-md shadow-none">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          {icon}
+          {label}
+        </div>
+        <p className="mt-2 text-2xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex h-10 items-center rounded-md border px-3 text-sm text-muted-foreground">{value}</div>
     </div>
   );
 }

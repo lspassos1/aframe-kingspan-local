@@ -17,6 +17,7 @@ import type {
 } from "@/types/project";
 import { duplicateScenario } from "@/lib/calculations/scenarios";
 import { getConstructionMethodDefinition, type ConstructionMethodId, type ConstructionMethodInputs } from "@/lib/construction-methods";
+import type { BudgetMatch, CostItem, CostSource } from "@/lib/budget-assistant";
 import { cloneProject, normalizeProject, upsertSavedProject } from "@/lib/store/project-normalization";
 
 export type SavedProjectSummary = {
@@ -75,6 +76,8 @@ interface ProjectStore {
   updateMaterialAssumptions: (updates: Partial<Project["materialAssumptions"]>) => void;
   updateBudgetAssumptions: (updates: Partial<Project["budgetAssumptions"]>) => void;
   updateFoundationAssumptions: (updates: Partial<FoundationAssumptions>) => void;
+  addBudgetCostSource: (source: CostSource) => void;
+  addBudgetCostItem: (costItem: CostItem, match: BudgetMatch) => void;
   setOnboardingCompleted: (completed: boolean) => void;
   duplicateSelectedScenario: () => void;
   deleteScenario: (scenarioId: string) => void;
@@ -331,6 +334,27 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           project: { ...state.project, foundationAssumptions: { ...state.project.foundationAssumptions, ...updates } },
         })),
+      addBudgetCostSource: (source) =>
+        set((state) => ({
+          project: {
+            ...state.project,
+            budgetAssistant: {
+              ...state.project.budgetAssistant,
+              costSources: [...state.project.budgetAssistant.costSources, source],
+            },
+          },
+        })),
+      addBudgetCostItem: (costItem, match) =>
+        set((state) => ({
+          project: {
+            ...state.project,
+            budgetAssistant: {
+              ...state.project.budgetAssistant,
+              costItems: [...state.project.budgetAssistant.costItems, costItem],
+              matches: [...state.project.budgetAssistant.matches, match],
+            },
+          },
+        })),
       setOnboardingCompleted: (completed) =>
         set((state) => {
           const project = { ...state.project, onboardingCompleted: completed };
@@ -369,7 +393,7 @@ export const useProjectStore = create<ProjectStore>()(
     }),
     {
       name: "aframe-project-store",
-      version: 6,
+      version: 7,
       partialize: (state) => ({ project: state.project, savedProjects: state.savedProjects }),
       migrate: (persisted) => {
         const persistedState = persisted as { project?: Project; savedProjects?: Project[] } | undefined;

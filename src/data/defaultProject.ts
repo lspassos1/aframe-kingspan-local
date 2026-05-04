@@ -199,4 +199,9 @@ export const defaultProject: Project = {
     soilPrepUnitPriceBRLM2: 18,
     wastePercent: 7,
   },
+  budgetAssistant: {
+    costSources: [],
+    costItems: [],
+    matches: [],
+  },
 };
