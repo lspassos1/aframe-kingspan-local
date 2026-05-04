@@ -1,28 +1,77 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Calculator, FileText, Package, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MandatoryWarning } from "@/components/shared/MandatoryWarning";
 import { estimateSteelStructure } from "@/lib/calculations/structure";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { formatCurrency } from "@/lib/format";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
+
+const methodAwareLinks = [
+  { href: "/technical-project", label: "Projeto tecnico", icon: FileText },
+  { href: "/materials", label: "Materiais", icon: Package },
+  { href: "/budget", label: "Orcamento", icon: Calculator },
+];
 
 export default function StructurePage() {
   const project = useProjectStore((state) => state.project);
   const updateStructuralInputs = useProjectStore((state) => state.updateStructuralInputs);
   const updateSteelProfile = useProjectStore((state) => state.updateSteelProfile);
   const scenario = useSelectedScenario();
+
+  if (scenario.constructionMethod !== "aframe") {
+    const methodDefinition = getConstructionMethodDefinition(scenario.constructionMethod);
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <p className="text-sm text-muted-foreground">Modulo especifico do A-frame</p>
+          <h1 className="text-3xl font-semibold tracking-normal">Estrutura metalica nao se aplica a {methodDefinition.name}</h1>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            Esta tela calcula porticos, tercas e perfis preliminares apenas para o metodo A-frame com paineis. Para {methodDefinition.name}, use as telas
+            abaixo, que usam os quantitativos e alertas do metodo ativo.
+          </p>
+        </div>
+
+        <Card className="rounded-md shadow-none">
+          <CardHeader>
+            <CardTitle>Continuar com o metodo ativo</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            {methodAwareLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Button asChild className="justify-between" key={item.href} variant="outline">
+                  <Link href={item.href}>
+                    <span className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const estimate = estimateSteelStructure(project, scenario);
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">Estrutura Metalica</p>
-        <h1 className="text-3xl font-semibold tracking-normal">Pre-dimensionamento estrutural</h1>
+        <p className="text-sm text-muted-foreground">Estrutura A-frame</p>
+        <h1 className="text-3xl font-semibold tracking-normal">Pre-dimensionamento estrutural A-frame</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           O modulo compara perfis candidatos e escolhe a opcao preliminar mais leve que passa em checks simplificados.
         </p>
