@@ -94,6 +94,8 @@ function DimensionOverlay({ layers }: { layers: Construction3DLayer[] }) {
   const heightX = footprint.minX - 0.72;
   const terrainFrontZ = terrain ? terrain.minZ - 0.5 : frontZ - 0.6;
   const terrainDepthX = terrain ? terrain.minX - 0.5 : heightX - 0.6;
+  const terrainWidthM = dimensions.terrainWidthM;
+  const terrainDepthM = dimensions.terrainDepthM;
 
   return (
     <group>
@@ -124,14 +126,14 @@ function DimensionOverlay({ layers }: { layers: Construction3DLayer[] }) {
         labelPosition={[heightX - 0.42, Math.max(0.7, vertical.maxY / 2), frontZ]}
         color="#7c2d12"
       />
-      {terrain && dimensions.terrainWidthM && dimensions.terrainDepthM ? (
+      {terrain && terrainWidthM != null && terrainDepthM != null ? (
         <>
           <DimensionLine
             points={[
               [terrain.minX, 0.1, terrainFrontZ],
               [terrain.maxX, 0.1, terrainFrontZ],
             ]}
-            label={`Largura lote ${br.format(dimensions.terrainWidthM)} m`}
+            label={`Largura lote ${br.format(terrainWidthM)} m`}
             labelPosition={[(terrain.minX + terrain.maxX) / 2, 0.38, terrainFrontZ]}
             color="#0f766e"
           />
@@ -140,7 +142,7 @@ function DimensionOverlay({ layers }: { layers: Construction3DLayer[] }) {
               [terrainDepthX, 0.1, terrain.minZ],
               [terrainDepthX, 0.1, terrain.maxZ],
             ]}
-            label={`Prof. lote ${br.format(dimensions.terrainDepthM)} m`}
+            label={`Prof. lote ${br.format(terrainDepthM)} m`}
             labelPosition={[terrainDepthX - 0.42, 0.38, (terrain.minZ + terrain.maxZ) / 2]}
             color="#0f766e"
           />
