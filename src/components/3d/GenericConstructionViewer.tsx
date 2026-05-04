@@ -150,7 +150,15 @@ function DimensionOverlay({ layers }: { layers: Construction3DLayer[] }) {
   );
 }
 
-function GenericScene({ layers, showDimensions }: { layers: Construction3DLayer[]; showDimensions: boolean }) {
+function GenericScene({
+  layers,
+  dimensionLayers,
+  showDimensions,
+}: {
+  layers: Construction3DLayer[];
+  dimensionLayers: Construction3DLayer[];
+  showDimensions: boolean;
+}) {
   return (
     <>
       <CameraView layers={layers} />
@@ -163,7 +171,7 @@ function GenericScene({ layers, showDimensions }: { layers: Construction3DLayer[
           ))}
         </group>
       ))}
-      {showDimensions ? <DimensionOverlay layers={layers} /> : null}
+      {showDimensions ? <DimensionOverlay layers={dimensionLayers} /> : null}
       <gridHelper args={[40, 40, "#cbd5e1", "#e2e8f0"]} position={[0, 0.01, 0]} />
       <OrbitControls makeDefault enableDamping />
     </>
@@ -192,7 +200,7 @@ export function GenericConstructionViewer({ layers, title }: { layers: Construct
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-h-[640px] overflow-hidden rounded-md border bg-slate-50">
         <Canvas shadows camera={{ position: [16, 12, 16], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
-          <GenericScene layers={activeLayers} showDimensions={showDimensions} />
+          <GenericScene layers={activeLayers} dimensionLayers={layers} showDimensions={showDimensions} />
         </Canvas>
       </div>
       <aside className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto">

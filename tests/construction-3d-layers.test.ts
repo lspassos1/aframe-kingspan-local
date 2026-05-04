@@ -62,28 +62,31 @@ describe("generic construction 3D layers", () => {
   });
 
   it("derives visible dimensions for non-A-frame methods", () => {
-    const definition = getConstructionMethodDefinition("conventional-masonry");
     const baseScenario = defaultProject.scenarios[0];
-    const scenario = {
-      ...baseScenario,
-      constructionMethod: "conventional-masonry" as const,
-      methodInputs: {
-        ...baseScenario.methodInputs,
-        "conventional-masonry": {
-          ...definition.getDefaultInputs(),
-          widthM: 9,
-          depthM: 11,
-          floorHeightM: 3,
-        },
-      },
-    };
-    const layers = definition.generate3DLayers?.({ project: defaultProject, scenario }) ?? [];
-    const dimensions = getGenericConstructionDimensions(layers);
 
-    expect(dimensions?.widthM).toBe(9);
-    expect(dimensions?.depthM).toBe(11);
-    expect(dimensions?.heightM).toBeGreaterThan(3);
-    expect(dimensions?.terrainWidthM).toBeGreaterThanOrEqual(9);
-    expect(dimensions?.terrainDepthM).toBeGreaterThanOrEqual(11);
+    for (const methodId of genericMethodIds) {
+      const definition = getConstructionMethodDefinition(methodId);
+      const scenario = {
+        ...baseScenario,
+        constructionMethod: methodId,
+        methodInputs: {
+          ...baseScenario.methodInputs,
+          [methodId]: {
+            ...definition.getDefaultInputs(),
+            widthM: 9,
+            depthM: 11,
+            floorHeightM: 3,
+          },
+        },
+      };
+      const layers = definition.generate3DLayers?.({ project: defaultProject, scenario }) ?? [];
+      const dimensions = getGenericConstructionDimensions(layers);
+
+      expect(dimensions?.widthM).toBe(9);
+      expect(dimensions?.depthM).toBe(11);
+      expect(dimensions?.heightM).toBeGreaterThan(3);
+      expect(dimensions?.terrainWidthM).toBeGreaterThanOrEqual(9);
+      expect(dimensions?.terrainDepthM).toBeGreaterThanOrEqual(11);
+    }
   });
 });
