@@ -1,4 +1,5 @@
 import type { ConstructionMethodId, ConstructionMethodInputs } from "@/lib/construction-methods";
+import type { BudgetAssistantProjectData } from "@/lib/budget-assistant/types";
 
 export type CurrencyCode = "BRL";
 
@@ -482,4 +483,5 @@ export interface Project {
     contingencyPercent: number;
   };
   foundationAssumptions: FoundationAssumptions;
+  budgetAssistant: BudgetAssistantProjectData;
 }

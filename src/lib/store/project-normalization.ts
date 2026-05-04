@@ -1,5 +1,6 @@
 import { defaultProject } from "@/data/defaultProject";
 import { constructionMethodRegistry, getConstructionMethodDefinition, type ConstructionMethodId } from "@/lib/construction-methods";
+import type { BudgetAssistantProjectData } from "@/lib/budget-assistant/types";
 import type { AFrameInputs, Project, Scenario, ScenarioMethodInputs } from "@/types/project";
 
 export const cloneProject = (project: Project): Project => JSON.parse(JSON.stringify(project)) as Project;
@@ -72,6 +73,22 @@ export function normalizeProject(project: Project): Project {
     materialAssumptions: { ...defaults.materialAssumptions, ...project.materialAssumptions },
     budgetAssumptions: { ...defaults.budgetAssumptions, ...project.budgetAssumptions },
     foundationAssumptions: { ...defaults.foundationAssumptions, ...project.foundationAssumptions },
+    budgetAssistant: normalizeBudgetAssistantData(project.budgetAssistant, defaults.budgetAssistant),
+  };
+}
+
+function normalizeBudgetAssistantData(
+  data: Partial<BudgetAssistantProjectData> | undefined,
+  defaults: BudgetAssistantProjectData
+): BudgetAssistantProjectData {
+  return {
+    costSources: data?.costSources?.map((source) => ({
+      ...source,
+      supplier: source.supplier ?? "",
+      notes: source.notes ?? "",
+    })) ?? defaults.costSources,
+    costItems: data?.costItems ?? defaults.costItems,
+    matches: data?.matches ?? defaults.matches,
   };
 }
 

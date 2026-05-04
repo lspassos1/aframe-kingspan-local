@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
-import { createBudgetAssistantViewModel, createManualCostEntry } from "@/lib/budget-assistant";
+import { createBudgetAssistantViewModel, createManualCostItem, createManualCostSource } from "@/lib/budget-assistant";
 
 describe("budget assistant foundation", () => {
   it("builds a preliminary view model from detected budget quantities", () => {
@@ -18,23 +18,33 @@ describe("budget assistant foundation", () => {
     const scenario = defaultProject.scenarios[0];
     const baseViewModel = createBudgetAssistantViewModel(defaultProject, scenario);
     const quantityItem = baseViewModel.pendingPriceItems[0];
-    const entry = createManualCostEntry({
-      quantityItem,
-      sourceTitle: "Cotacao local",
+    const source = createManualCostSource({
+      title: "Cotacao local",
+      type: "supplier_quote",
+      supplier: "Fornecedor ABC",
       referenceDate: "2026-05-04",
-      unitPrice: 125,
-      confidence: "low",
       city: "Lisboa",
       state: "LX",
     });
+    const entry = createManualCostItem({
+      quantityItem,
+      sourceId: source.id,
+      description: quantityItem.description,
+      category: quantityItem.category,
+      quantity: quantityItem.quantity,
+      unit: quantityItem.unit,
+      unitPrice: 125,
+      confidence: "low",
+    });
     const viewModel = createBudgetAssistantViewModel(defaultProject, scenario, {
-      costSources: [entry.source],
+      costSources: [source],
       costItems: [entry.costItem],
       matches: [entry.match],
     });
 
-    expect(entry.source.type).toBe("manual");
-    expect(entry.source.referenceDate).toBe("2026-05-04");
+    expect(source.type).toBe("supplier_quote");
+    expect(source.supplier).toBe("Fornecedor ABC");
+    expect(source.referenceDate).toBe("2026-05-04");
     expect(entry.costItem.unit).toBe(quantityItem.unit);
     expect(entry.costItem.confidence).toBe("low");
     expect(entry.costItem.requiresReview).toBe(true);

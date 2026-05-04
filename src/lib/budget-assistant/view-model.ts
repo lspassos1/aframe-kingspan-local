@@ -1,4 +1,4 @@
-import type { Project, Scenario } from "@/types/project";
+import type { MaterialCategory, MaterialUnit, Project, Scenario } from "@/types/project";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { calculateScenarioBudget } from "@/lib/construction-methods/scenario-calculations";
 import type {
@@ -8,6 +8,7 @@ import type {
   BudgetMatch,
   CostItem,
   CostSource,
+  PriceSourceType,
 } from "./types";
 
 export interface BudgetAssistantData {
@@ -19,6 +20,8 @@ export interface BudgetAssistantData {
 export interface ManualCostEntryInput {
   quantityItem: BudgetAssistantQuantityItem;
   sourceTitle: string;
+  sourceType?: PriceSourceType;
+  supplier?: string;
   referenceDate: string;
   unitPrice: number;
   confidence: BudgetConfidenceLevel;
@@ -27,9 +30,33 @@ export interface ManualCostEntryInput {
   notes?: string;
 }
 
-export function createBudgetAssistantViewModel(project: Project, scenario: Scenario, data: BudgetAssistantData = {}): BudgetAssistantViewModel {
+export interface ManualCostSourceInput {
+  title: string;
+  type: PriceSourceType;
+  supplier: string;
+  city: string;
+  state: string;
+  referenceDate: string;
+  notes?: string;
+  reliability?: CostSource["reliability"];
+}
+
+export interface ManualCostItemInput {
+  quantityItem: BudgetAssistantQuantityItem;
+  sourceId: string;
+  description: string;
+  category: MaterialCategory;
+  quantity: number;
+  unit: MaterialUnit;
+  unitPrice: number;
+  confidence: BudgetConfidenceLevel;
+  notes?: string;
+}
+
+export function createBudgetAssistantViewModel(project: Project, scenario: Scenario, data?: BudgetAssistantData): BudgetAssistantViewModel {
   const definition = getConstructionMethodDefinition(scenario.constructionMethod);
   const budget = calculateScenarioBudget(project, scenario);
+  const assistantData = data ?? project.budgetAssistant ?? {};
   const quantityItems = budget.items.map<BudgetAssistantQuantityItem>((item) => ({
     id: item.id,
     constructionMethod: scenario.constructionMethod,
@@ -41,9 +68,13 @@ export function createBudgetAssistantViewModel(project: Project, scenario: Scena
     requiresPriceSource: item.requiresConfirmation || item.unitPriceBRL === undefined,
     notes: item.notes,
   }));
-  const costSources = data.costSources ?? [];
-  const costItems = data.costItems ?? [];
-  const matches = data.matches ?? [];
+  const costSources = assistantData.costSources ?? [];
+  const quantityIds = new Set(quantityItems.map((item) => item.id));
+  const matches = (assistantData.matches ?? []).filter((match) => quantityIds.has(match.quantityItemId));
+  const matchedCostItemIds = new Set(matches.map((match) => match.costItemId));
+  const costItems = (assistantData.costItems ?? []).filter(
+    (item) => item.constructionMethod === scenario.constructionMethod && matchedCostItemIds.has(item.id)
+  );
   const pricedQuantityIds = new Set(matches.map((match) => match.quantityItemId));
   const pendingPriceItems = quantityItems.filter((item) => item.requiresPriceSource && !pricedQuantityIds.has(item.id));
   const lowConfidenceItems = costItems.filter((item) => item.confidence === "low" || item.confidence === "unverified");
@@ -64,29 +95,33 @@ export function createBudgetAssistantViewModel(project: Project, scenario: Scena
   };
 }
 
-export function createManualCostEntry(input: ManualCostEntryInput) {
-  const suffix = `${input.quantityItem.id}-${Date.now()}`;
-  const source: CostSource = {
-    id: `manual-source-${suffix}`,
-    type: "manual",
-    title: input.sourceTitle.trim(),
+export function createManualCostSource(input: ManualCostSourceInput): CostSource {
+  return {
+    id: `manual-source-${Date.now()}`,
+    type: input.type,
+    title: input.title.trim(),
+    supplier: input.supplier.trim(),
     state: input.state.trim(),
     city: input.city.trim(),
     referenceDate: input.referenceDate,
-    reliability: reliabilityForConfidence(input.confidence),
+    reliability: input.reliability ?? "low",
     notes: input.notes?.trim() ?? "",
   };
-  const total = roundCurrency(input.quantityItem.quantity * input.unitPrice);
+}
+
+export function createManualCostItem(input: ManualCostItemInput) {
+  const suffix = `${input.quantityItem.id}-${Date.now()}`;
+  const total = roundCurrency(input.quantity * input.unitPrice);
   const costItem: CostItem = {
     id: `manual-cost-${suffix}`,
     constructionMethod: input.quantityItem.constructionMethod,
-    category: input.quantityItem.category,
-    description: input.quantityItem.description,
-    quantity: input.quantityItem.quantity,
-    unit: input.quantityItem.unit,
+    category: input.category,
+    description: input.description.trim(),
+    quantity: input.quantity,
+    unit: input.unit,
     unitPrice: input.unitPrice,
     total,
-    sourceId: source.id,
+    sourceId: input.sourceId,
     sourceCode: "MANUAL",
     confidence: input.confidence,
     requiresReview: true,
@@ -98,12 +133,38 @@ export function createManualCostEntry(input: ManualCostEntryInput) {
     costItemId: costItem.id,
     confidence: input.confidence,
     reason: "Preco manual vinculado ao quantitativo selecionado.",
-    unitCompatible: true,
+    unitCompatible: input.unit === input.quantityItem.unit,
     requiresReview: true,
     approvedByUser: false,
   };
 
-  return { source, costItem, match };
+  return { costItem, match };
+}
+
+export function createManualCostEntry(input: ManualCostEntryInput) {
+  const source = createManualCostSource({
+    title: input.sourceTitle.trim(),
+    type: input.sourceType ?? "manual",
+    supplier: input.supplier ?? input.sourceTitle,
+    state: input.state,
+    city: input.city,
+    referenceDate: input.referenceDate,
+    reliability: reliabilityForConfidence(input.confidence),
+    notes: input.notes,
+  });
+  const entry = createManualCostItem({
+    quantityItem: input.quantityItem,
+    sourceId: source.id,
+    description: input.quantityItem.description,
+    category: input.quantityItem.category,
+    quantity: input.quantityItem.quantity,
+    unit: input.quantityItem.unit,
+    unitPrice: input.unitPrice,
+    confidence: input.confidence,
+    notes: input.notes,
+  });
+
+  return { source, ...entry };
 }
 
 function reliabilityForConfidence(confidence: BudgetConfidenceLevel): CostSource["reliability"] {
