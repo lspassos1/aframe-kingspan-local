@@ -5,6 +5,7 @@ import { BadgeDollarSign, CircleAlert, FileCheck2, Link2, MapPin, Plus, WalletCa
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PriceBaseImportCard } from "@/components/budget-assistant/PriceBaseImportCard";
 import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ interface SourceLocationFormState {
 export default function BudgetAssistantPage() {
   const project = useProjectStore((state) => state.project);
   const addBudgetCostSource = useProjectStore((state) => state.addBudgetCostSource);
+  const addBudgetImportedPriceBase = useProjectStore((state) => state.addBudgetImportedPriceBase);
   const addBudgetCostItem = useProjectStore((state) => state.addBudgetCostItem);
   const addBudgetMatchSuggestion = useProjectStore((state) => state.addBudgetMatchSuggestion);
   const approveBudgetMatch = useProjectStore((state) => state.approveBudgetMatch);
@@ -246,6 +248,16 @@ export default function BudgetAssistantPage() {
           )}
         </CardContent>
       </Card>
+
+      <PriceBaseImportCard
+        scenarioId={scenario.id}
+        scenarioCity={scenario.location.city}
+        scenarioState={scenarioState}
+        defaultConstructionMethod={scenario.constructionMethod}
+        importedSourceCount={project.budgetAssistant.priceSources.length}
+        importedCompositionCount={project.budgetAssistant.serviceCompositions.length}
+        onImport={addBudgetImportedPriceBase}
+      />
 
       <section className="grid gap-4 xl:grid-cols-2">
         <Card className="rounded-md shadow-none">

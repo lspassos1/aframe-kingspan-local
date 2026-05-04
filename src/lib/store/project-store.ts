@@ -17,7 +17,7 @@ import type {
 } from "@/types/project";
 import { duplicateScenario } from "@/lib/calculations/scenarios";
 import { getConstructionMethodDefinition, type ConstructionMethodId, type ConstructionMethodInputs } from "@/lib/construction-methods";
-import type { BudgetMatch, CostItem, CostSource } from "@/lib/budget-assistant";
+import type { BudgetMatch, CostItem, CostSource, PriceSource, ServiceComposition } from "@/lib/budget-assistant";
 import { cloneProject, normalizeProject, upsertSavedProject } from "@/lib/store/project-normalization";
 
 export type SavedProjectSummary = {
@@ -77,6 +77,7 @@ interface ProjectStore {
   updateBudgetAssumptions: (updates: Partial<Project["budgetAssumptions"]>) => void;
   updateFoundationAssumptions: (updates: Partial<FoundationAssumptions>) => void;
   addBudgetCostSource: (source: CostSource) => void;
+  addBudgetImportedPriceBase: (source: PriceSource, serviceCompositions: ServiceComposition[]) => void;
   addBudgetCostItem: (costItem: CostItem, match: BudgetMatch) => void;
   addBudgetMatchSuggestion: (match: BudgetMatch) => void;
   approveBudgetMatch: (matchId: string) => void;
@@ -347,6 +348,28 @@ export const useProjectStore = create<ProjectStore>()(
             },
           },
         })),
+      addBudgetImportedPriceBase: (source, serviceCompositions) =>
+        set((state) => {
+          const assistant = state.project.budgetAssistant;
+          const costSourceExists = assistant.costSources.some((item) => item.id === source.id);
+          const priceSourceExists = assistant.priceSources.some((item) => item.id === source.id);
+          const importedCompositionIds = new Set(serviceCompositions.map((composition) => composition.id));
+
+          return {
+            project: {
+              ...state.project,
+              budgetAssistant: {
+                ...assistant,
+                costSources: costSourceExists ? assistant.costSources : [...assistant.costSources, source],
+                priceSources: priceSourceExists ? assistant.priceSources : [...assistant.priceSources, source],
+                serviceCompositions: [
+                  ...assistant.serviceCompositions.filter((composition) => !importedCompositionIds.has(composition.id)),
+                  ...serviceCompositions,
+                ],
+              },
+            },
+          };
+        }),
       addBudgetCostItem: (costItem, match) =>
         set((state) => ({
           project: {
