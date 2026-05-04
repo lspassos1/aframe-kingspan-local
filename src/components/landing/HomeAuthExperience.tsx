@@ -254,7 +254,7 @@ export function HomeAuthExperience() {
             <div className="rounded-md border border-neutral-950/12 bg-white p-1.5 shadow-sm">
               <SignIn
                 routing="hash"
-                signUpUrl="/"
+                signUpUrl="/sign-up"
                 forceRedirectUrl="/start"
                 appearance={{
                   elements: {
