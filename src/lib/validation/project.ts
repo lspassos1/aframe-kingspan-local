@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { addBrazilCityIssue, brazilCitySchema, brazilStateSchema } from "@/lib/validation/brazil-location";
 
 export const terrainSchema = z.object({
   width: z.coerce.number().min(3, "Informe uma largura valida"),
@@ -10,14 +11,16 @@ export const terrainSchema = z.object({
   rightSetback: z.coerce.number().min(0),
 });
 
-export const locationSchema = z.object({
-  address: z.string().max(200),
-  city: z.string().min(1, "Cidade obrigatoria"),
-  state: z.string().min(1, "Estado obrigatorio"),
-  country: z.string().min(1, "Pais obrigatorio"),
-  postalCode: z.string().max(20),
-  notes: z.string().max(1000),
-});
+export const locationSchema = z
+  .object({
+    address: z.string().max(200),
+    city: brazilCitySchema,
+    state: brazilStateSchema,
+    country: z.string().min(1, "Pais obrigatorio"),
+    postalCode: z.string().max(20),
+    notes: z.string().max(1000),
+  })
+  .superRefine(addBrazilCityIssue);
 
 export const aFrameSchema = z.object({
   panelLength: z.coerce.number().min(2).max(20),

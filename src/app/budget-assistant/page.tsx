@@ -5,6 +5,7 @@ import { BadgeDollarSign, CircleAlert, FileCheck2, Link2, Plus, WalletCards } fr
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/budget-assistant";
 import { formatLocalDateInputValue } from "@/lib/date";
 import { formatCompactNumber, formatCurrency, formatDate } from "@/lib/format";
+import { isBrazilCityInState, isBrazilState, normalizeBrazilStateName } from "@/lib/locations/brazil";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 
 const confidenceOptions: Array<{ value: BudgetConfidenceLevel; label: string }> = [
@@ -54,7 +56,8 @@ export default function BudgetAssistantPage() {
   const scenario = useSelectedScenario();
   const baseViewModel = useMemo(() => createBudgetAssistantViewModel(project, scenario), [project, scenario]);
   const firstQuantity = baseViewModel.pendingPriceItems[0] ?? baseViewModel.quantityItems[0];
-  const scenarioLocationKey = `${scenario.id}:${scenario.location.city}:${scenario.location.state}`;
+  const scenarioState = normalizeBrazilStateName(scenario.location.state) || scenario.location.state;
+  const scenarioLocationKey = `${scenario.id}:${scenario.location.city}:${scenarioState}`;
   const [selectedQuantityId, setSelectedQuantityId] = useState(firstQuantity?.id ?? "");
   const [selectedSourceId, setSelectedSourceId] = useState(baseViewModel.costSources[0]?.id ?? "");
   const [sourceTitle, setSourceTitle] = useState("");
@@ -63,7 +66,7 @@ export default function BudgetAssistantPage() {
   const [sourceLocation, setSourceLocation] = useState<SourceLocationFormState>(() => ({
     locationKey: scenarioLocationKey,
     city: scenario.location.city,
-    state: scenario.location.state,
+    state: scenarioState,
   }));
   const [sourceDate, setSourceDate] = useState(formatLocalDateInputValue);
   const [sourceNotes, setSourceNotes] = useState("");
@@ -79,9 +82,11 @@ export default function BudgetAssistantPage() {
   const costItemById = new Map(availableCostItems.map((item) => [item.id, item]));
   const suggestedMatches = viewModel.matches.filter((match) => !match.approvedByUser);
   const sourceCity = sourceLocation.locationKey === scenarioLocationKey ? sourceLocation.city : scenario.location.city;
-  const sourceState = sourceLocation.locationKey === scenarioLocationKey ? sourceLocation.state : scenario.location.state;
+  const sourceState = sourceLocation.locationKey === scenarioLocationKey ? normalizeBrazilStateName(sourceLocation.state) || sourceLocation.state : scenarioState;
+  const sourceStateIsValid = isBrazilState(sourceState);
+  const sourceCityIsValid = isBrazilCityInState(sourceState, sourceCity);
   const priceNumber = Number(unitPrice.replace(",", "."));
-  const canAddSource = Boolean(sourceTitle.trim() && sourceType && sourceSupplier.trim() && sourceDate);
+  const canAddSource = Boolean(sourceTitle.trim() && sourceType && sourceSupplier.trim() && sourceDate && sourceStateIsValid && sourceCityIsValid);
   const canAddManualPrice = Boolean(selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0);
 
   const handleSelectQuantity = (quantityId: string) => {
@@ -91,11 +96,20 @@ export default function BudgetAssistantPage() {
   };
 
   const handleSourceCityChange = (city: string) => {
-    setSourceLocation({ locationKey: scenarioLocationKey, city, state: sourceState });
+    setSourceLocation((current) => ({
+      locationKey: scenarioLocationKey,
+      city,
+      state: current.locationKey === scenarioLocationKey ? current.state : sourceState,
+    }));
   };
 
   const handleSourceStateChange = (state: string) => {
-    setSourceLocation({ locationKey: scenarioLocationKey, city: sourceCity, state });
+    const normalizedState = normalizeBrazilStateName(state) || state;
+    setSourceLocation({
+      locationKey: scenarioLocationKey,
+      city: isBrazilCityInState(normalizedState, sourceCity) ? sourceCity : "",
+      state: normalizedState,
+    });
   };
 
   const handleAddSource = (event: FormEvent<HTMLFormElement>) => {
@@ -209,14 +223,17 @@ export default function BudgetAssistantPage() {
                 <Label htmlFor="source-date">Data de referencia</Label>
                 <Input id="source-date" type="date" value={sourceDate} onChange={(event) => setSourceDate(event.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="source-city">Cidade</Label>
-                <Input id="source-city" value={sourceCity} onChange={(event) => handleSourceCityChange(event.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="source-state">Estado</Label>
-                <Input id="source-state" value={sourceState} onChange={(event) => handleSourceStateChange(event.target.value)} />
-              </div>
+              <BrazilLocationSelectFields
+                className="md:col-span-2"
+                stateId="source-state"
+                cityId="source-city"
+                stateValue={sourceState}
+                cityValue={sourceCity}
+                onStateChange={handleSourceStateChange}
+                onCityChange={handleSourceCityChange}
+                stateError={sourceStateIsValid ? undefined : "Estado obrigatorio"}
+                cityError={sourceCityIsValid ? undefined : "Cidade obrigatoria"}
+              />
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="source-notes">Observacoes</Label>
                 <Textarea id="source-notes" value={sourceNotes} onChange={(event) => setSourceNotes(event.target.value)} />

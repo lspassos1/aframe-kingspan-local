@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +22,17 @@ import {
   getPanelLengthOptions,
   getPanelThicknessOptions,
 } from "@/lib/panels";
+import { normalizeBrazilStateName } from "@/lib/locations/brazil";
+
+function getScenarioFormDefaults(scenario: ScenarioFormValues): ScenarioFormValues {
+  return {
+    ...scenario,
+    location: {
+      ...scenario.location,
+      state: normalizeBrazilStateName(scenario.location.state) || scenario.location.state,
+    },
+  };
+}
 
 function NumberField({
   label,
@@ -51,11 +63,12 @@ export default function EditPage() {
 
   const form = useForm<ScenarioFormValues>({
     resolver: zodResolver(scenarioSchema) as Resolver<ScenarioFormValues>,
-    defaultValues: scenario,
+    mode: "onChange",
+    defaultValues: getScenarioFormDefaults(scenario),
   });
 
   useEffect(() => {
-    form.reset(scenario);
+    form.reset(getScenarioFormDefaults(scenario));
   }, [form, scenario]);
 
   const watched = useWatch({ control: form.control }) as ScenarioFormValues;
@@ -82,7 +95,10 @@ export default function EditPage() {
 
   const onSubmit = (values: ScenarioFormValues) => {
     updateScenarioName(scenario.id, values.name);
-    updateScenarioLocation(scenario.id, values.location);
+    updateScenarioLocation(scenario.id, {
+      ...values.location,
+      state: normalizeBrazilStateName(values.location.state) || values.location.state,
+    });
     updateScenarioTerrain(scenario.id, values.terrain);
     updateScenarioAFrame(scenario.id, values.aFrame);
     updateScenarioPanel(scenario.id, values.panelProductId, values.externalColor, values.internalFinish);
@@ -123,14 +139,29 @@ export default function EditPage() {
             <Label>Endereco</Label>
             <Input {...form.register("location.address")} placeholder="Rua, numero, bairro" />
           </div>
-          <div className="space-y-2">
-            <Label>Cidade</Label>
-            <Input {...form.register("location.city")} />
-          </div>
-          <div className="space-y-2">
-            <Label>Estado</Label>
-            <Input {...form.register("location.state")} />
-          </div>
+          <Controller
+            control={form.control}
+            name="location.state"
+            render={({ field: stateField, fieldState: stateFieldState }) => (
+              <Controller
+                control={form.control}
+                name="location.city"
+                render={({ field: cityField, fieldState: cityFieldState }) => (
+                  <BrazilLocationSelectFields
+                    className="md:col-span-2 xl:col-span-2"
+                    stateId="editState"
+                    cityId="editCity"
+                    stateValue={stateField.value}
+                    cityValue={cityField.value}
+                    onStateChange={stateField.onChange}
+                    onCityChange={cityField.onChange}
+                    stateError={stateFieldState.error?.message}
+                    cityError={cityFieldState.error?.message}
+                  />
+                )}
+              />
+            )}
+          />
           <div className="space-y-2">
             <Label>CEP</Label>
             <Input {...form.register("location.postalCode")} />

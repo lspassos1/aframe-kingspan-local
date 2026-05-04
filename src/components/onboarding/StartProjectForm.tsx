@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type FormEvent, type InputHTMLAttributes } from "react";
+import { useEffect, useMemo, type InputHTMLAttributes } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { ConstructionMethodSelector } from "@/components/onboarding/ConstructionMethodSelector";
 import { getConstructionMethodDefinition, getScenarioMethodInputs, type ConstructionMethodId } from "@/lib/construction-methods";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
@@ -18,7 +19,8 @@ import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { coerceAFrameToPanel, getPanelExternalOptions, getPanelInternalOptions, getPanelLengthOptions } from "@/lib/panels";
-import { startProjectSchema, type StartProjectFormValues } from "@/lib/validation/onboarding";
+import { normalizeBrazilStateName } from "@/lib/locations/brazil";
+import { methodProjectSchema, startProjectSchema, type MethodProjectFormValues, type StartProjectFormValues } from "@/lib/validation/onboarding";
 
 function fieldClass(hasError?: boolean) {
   return cn(hasError && "border-destructive bg-destructive/5 ring-2 ring-destructive/20");
@@ -90,6 +92,70 @@ type MinimalMethodInputs = {
   wastePercent?: number;
 };
 
+function buildMethodProjectFormDefaults({
+  constructionMethod,
+  inputs,
+  isFreshProject,
+  projectName,
+  city,
+  state,
+}: {
+  constructionMethod: ConstructionMethodId;
+  inputs: MinimalMethodInputs;
+  isFreshProject: boolean;
+  projectName: string;
+  city: string;
+  state: string;
+}): MethodProjectFormValues {
+  return {
+    constructionMethod,
+    projectName: isFreshProject ? "" : projectName,
+    city: isFreshProject ? "" : city,
+    state: isFreshProject ? "" : normalizeBrazilStateName(state) || state,
+    widthM: isFreshProject ? undefined : inputs.widthM ?? 8,
+    depthM: isFreshProject ? undefined : inputs.depthM ?? 12,
+    floorHeightM: isFreshProject ? undefined : inputs.floorHeightM ?? 2.8,
+    floors: inputs.floors ?? 1,
+    internalWallLengthM: inputs.internalWallLengthM ?? 20,
+    blockType: inputs.blockType ?? "ceramic",
+    blockLengthM: inputs.blockLengthM ?? 0.25,
+    blockHeightM: inputs.blockHeightM ?? 0.125,
+    blockWidthM: inputs.blockWidthM ?? 0.125,
+    blocksPerM2: inputs.blocksPerM2 ?? 64,
+    useType: inputs.useType ?? "infill",
+    finishType: inputs.finishType ?? "exposed",
+    epsCoreThicknessM: inputs.epsCoreThicknessM ?? 0.08,
+    renderThicknessPerFaceM: inputs.renderThicknessPerFaceM ?? 0.03,
+    finalWallThicknessM: inputs.finalWallThicknessM ?? 0.14,
+    panelWidthM: inputs.panelWidthM ?? 1.2,
+    panelHeightM: inputs.panelHeightM ?? 2.8,
+    wallThicknessM: inputs.wallThicknessM ?? 0.14,
+    doorCount: inputs.doorCount ?? 2,
+    doorWidthM: inputs.doorWidthM ?? 0.8,
+    doorHeightM: inputs.doorHeightM ?? 2.1,
+    windowCount: inputs.windowCount ?? 4,
+    windowWidthM: inputs.windowWidthM ?? 1.2,
+    windowHeightM: inputs.windowHeightM ?? 1,
+    foundationType: inputs.foundationType ?? (constructionMethod === "monolithic-eps" ? "radier" : "placeholder"),
+    roofType: inputs.roofType ?? "simple-roof",
+    internalPlaster: inputs.internalPlaster ?? true,
+    externalPlaster: inputs.externalPlaster ?? true,
+    subfloor: inputs.subfloor ?? true,
+    basicFinish: inputs.basicFinish ?? false,
+    groutingEnabled: inputs.groutingEnabled ?? false,
+    verticalRebarEnabled: inputs.verticalRebarEnabled ?? false,
+    horizontalRebarEnabled: inputs.horizontalRebarEnabled ?? false,
+    baseWaterproofingEnabled: inputs.baseWaterproofingEnabled ?? true,
+    specializedLabor: inputs.specializedLabor ?? true,
+    starterBarsEnabled: inputs.starterBarsEnabled ?? true,
+    openingReinforcementEnabled: inputs.openingReinforcementEnabled ?? true,
+    projectionEquipmentRequired: inputs.projectionEquipmentRequired ?? true,
+    specializedLaborRequired: inputs.specializedLaborRequired ?? true,
+    finalFinish: inputs.finalFinish ?? false,
+    wastePercent: inputs.wastePercent ?? 10,
+  };
+}
+
 export function StartProjectForm() {
   const router = useRouter();
   const project = useProjectStore((state) => state.project);
@@ -106,7 +172,7 @@ export function StartProjectForm() {
   const requiresFreshInput = !project.onboardingCompleted;
   const selectedMethod = scenario.constructionMethod;
   const selectedMethodDefinition = getConstructionMethodDefinition(selectedMethod);
-  const selectedMethodInputs = getScenarioMethodInputs<MinimalMethodInputs>(scenario);
+  const selectedMethodInputs = useMemo(() => getScenarioMethodInputs<MinimalMethodInputs>(scenario), [scenario]);
 
   const form = useForm<StartProjectFormValues>({
     resolver: zodResolver(startProjectSchema) as Resolver<StartProjectFormValues>,
@@ -124,6 +190,19 @@ export function StartProjectForm() {
       baseAngleDeg: requiresFreshInput ? (undefined as unknown as number) : scenario.aFrame.baseAngleDeg,
       houseDepth: requiresFreshInput ? (undefined as unknown as number) : scenario.aFrame.houseDepth,
     },
+  });
+
+  const methodForm = useForm<MethodProjectFormValues>({
+    resolver: zodResolver(methodProjectSchema) as Resolver<MethodProjectFormValues>,
+    mode: "onChange",
+    defaultValues: buildMethodProjectFormDefaults({
+      constructionMethod: selectedMethod,
+      inputs: selectedMethodInputs,
+      isFreshProject: requiresFreshInput,
+      projectName: project.name,
+      city: scenario.location.city,
+      state: scenario.location.state,
+    }),
   });
 
   const watched = useWatch({ control: form.control });
@@ -156,6 +235,22 @@ export function StartProjectForm() {
     }
   }, [form, requiresFreshInput]);
 
+  useEffect(() => {
+    methodForm.reset(
+      buildMethodProjectFormDefaults({
+        constructionMethod: selectedMethod,
+        inputs: selectedMethodInputs,
+        isFreshProject: requiresFreshInput,
+        projectName: project.name,
+        city: scenario.location.city,
+        state: scenario.location.state,
+      })
+    );
+    if (requiresFreshInput && selectedMethod !== "aframe") {
+      void methodForm.trigger();
+    }
+  }, [methodForm, project.name, requiresFreshInput, scenario.location.city, scenario.location.state, selectedMethod, selectedMethodInputs]);
+
   const applyValues = (values: StartProjectFormValues) => {
     const panel = project.panelProducts.find((item) => item.id === values.panelProductId) ?? project.panelProducts[0];
     const external = getPanelExternalOptions(panel)[0];
@@ -178,7 +273,7 @@ export function StartProjectForm() {
       ...scenario.location,
       address: values.address ?? "",
       city: values.city,
-      state: values.state,
+      state: normalizeBrazilStateName(values.state) || values.state,
       country: values.country,
     });
     updateScenarioTerrain(scenario.id, {
@@ -196,15 +291,11 @@ export function StartProjectForm() {
     updateScenarioConstructionMethod(scenario.id, methodId);
   };
 
-  const applyMethodPlaceholder = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const projectName = String(formData.get("projectName") ?? "").trim() || `${selectedMethodDefinition.name} - estudo`;
-    const city = String(formData.get("city") ?? "").trim();
-    const state = String(formData.get("state") ?? "").trim();
-    const widthM = Number(formData.get("widthM") ?? selectedMethodInputs.widthM ?? 8);
-    const depthM = Number(formData.get("depthM") ?? selectedMethodInputs.depthM ?? 12);
-    const floorHeightM = Number(formData.get("floorHeightM") ?? selectedMethodInputs.floorHeightM ?? 2.8);
+  const applyMethodPlaceholder = (values: MethodProjectFormValues) => {
+    const projectName = values.projectName.trim() || `${selectedMethodDefinition.name} - estudo`;
+    const widthM = Number(values.widthM ?? selectedMethodInputs.widthM ?? 8);
+    const depthM = Number(values.depthM ?? selectedMethodInputs.depthM ?? 12);
+    const floorHeightM = Number(values.floorHeightM ?? selectedMethodInputs.floorHeightM ?? 2.8);
     const methodInputs: MinimalMethodInputs = {
       ...selectedMethodInputs,
       widthM,
@@ -213,75 +304,75 @@ export function StartProjectForm() {
     };
 
     if (selectedMethod === "conventional-masonry") {
-      methodInputs.floors = Number(formData.get("floors") ?? selectedMethodInputs.floors ?? 1);
-      methodInputs.internalWallLengthM = Number(formData.get("internalWallLengthM") ?? selectedMethodInputs.internalWallLengthM ?? 20);
-      methodInputs.blockType = String(formData.get("blockType") ?? selectedMethodInputs.blockType ?? "ceramic") as MinimalMethodInputs["blockType"];
-      methodInputs.wallThicknessM = Number(formData.get("wallThicknessM") ?? selectedMethodInputs.wallThicknessM ?? 0.14);
-      methodInputs.doorCount = Number(formData.get("doorCount") ?? selectedMethodInputs.doorCount ?? 2);
-      methodInputs.doorWidthM = Number(formData.get("doorWidthM") ?? selectedMethodInputs.doorWidthM ?? 0.8);
-      methodInputs.doorHeightM = Number(formData.get("doorHeightM") ?? selectedMethodInputs.doorHeightM ?? 2.1);
-      methodInputs.windowCount = Number(formData.get("windowCount") ?? selectedMethodInputs.windowCount ?? 4);
-      methodInputs.windowWidthM = Number(formData.get("windowWidthM") ?? selectedMethodInputs.windowWidthM ?? 1.2);
-      methodInputs.windowHeightM = Number(formData.get("windowHeightM") ?? selectedMethodInputs.windowHeightM ?? 1);
-      methodInputs.foundationType = String(formData.get("foundationType") ?? selectedMethodInputs.foundationType ?? "placeholder") as MinimalMethodInputs["foundationType"];
-      methodInputs.roofType = String(formData.get("roofType") ?? selectedMethodInputs.roofType ?? "simple-roof") as MinimalMethodInputs["roofType"];
-      methodInputs.internalPlaster = formData.get("internalPlaster") === "on";
-      methodInputs.externalPlaster = formData.get("externalPlaster") === "on";
-      methodInputs.subfloor = formData.get("subfloor") === "on";
-      methodInputs.basicFinish = formData.get("basicFinish") === "on";
-      methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
+      methodInputs.floors = Number(values.floors ?? selectedMethodInputs.floors ?? 1);
+      methodInputs.internalWallLengthM = Number(values.internalWallLengthM ?? selectedMethodInputs.internalWallLengthM ?? 20);
+      methodInputs.blockType = values.blockType ?? selectedMethodInputs.blockType ?? "ceramic";
+      methodInputs.wallThicknessM = Number(values.wallThicknessM ?? selectedMethodInputs.wallThicknessM ?? 0.14);
+      methodInputs.doorCount = Number(values.doorCount ?? selectedMethodInputs.doorCount ?? 2);
+      methodInputs.doorWidthM = Number(values.doorWidthM ?? selectedMethodInputs.doorWidthM ?? 0.8);
+      methodInputs.doorHeightM = Number(values.doorHeightM ?? selectedMethodInputs.doorHeightM ?? 2.1);
+      methodInputs.windowCount = Number(values.windowCount ?? selectedMethodInputs.windowCount ?? 4);
+      methodInputs.windowWidthM = Number(values.windowWidthM ?? selectedMethodInputs.windowWidthM ?? 1.2);
+      methodInputs.windowHeightM = Number(values.windowHeightM ?? selectedMethodInputs.windowHeightM ?? 1);
+      methodInputs.foundationType = values.foundationType ?? selectedMethodInputs.foundationType ?? "placeholder";
+      methodInputs.roofType = values.roofType ?? selectedMethodInputs.roofType ?? "simple-roof";
+      methodInputs.internalPlaster = Boolean(values.internalPlaster);
+      methodInputs.externalPlaster = Boolean(values.externalPlaster);
+      methodInputs.subfloor = Boolean(values.subfloor);
+      methodInputs.basicFinish = Boolean(values.basicFinish);
+      methodInputs.wastePercent = Number(values.wastePercent ?? selectedMethodInputs.wastePercent ?? 10);
     }
 
     if (selectedMethod === "eco-block") {
-      methodInputs.blockLengthM = Number(formData.get("blockLengthM") ?? selectedMethodInputs.blockLengthM ?? 0.25);
-      methodInputs.blockHeightM = Number(formData.get("blockHeightM") ?? selectedMethodInputs.blockHeightM ?? 0.125);
-      methodInputs.blockWidthM = Number(formData.get("blockWidthM") ?? selectedMethodInputs.blockWidthM ?? 0.125);
-      methodInputs.blocksPerM2 = Number(formData.get("blocksPerM2") ?? selectedMethodInputs.blocksPerM2 ?? 64);
-      methodInputs.useType = String(formData.get("useType") ?? selectedMethodInputs.useType ?? "infill") as MinimalMethodInputs["useType"];
-      methodInputs.finishType = String(formData.get("finishType") ?? selectedMethodInputs.finishType ?? "exposed") as MinimalMethodInputs["finishType"];
-      methodInputs.doorCount = Number(formData.get("doorCount") ?? selectedMethodInputs.doorCount ?? 2);
-      methodInputs.doorWidthM = Number(formData.get("doorWidthM") ?? selectedMethodInputs.doorWidthM ?? 0.8);
-      methodInputs.doorHeightM = Number(formData.get("doorHeightM") ?? selectedMethodInputs.doorHeightM ?? 2.1);
-      methodInputs.windowCount = Number(formData.get("windowCount") ?? selectedMethodInputs.windowCount ?? 4);
-      methodInputs.windowWidthM = Number(formData.get("windowWidthM") ?? selectedMethodInputs.windowWidthM ?? 1.2);
-      methodInputs.windowHeightM = Number(formData.get("windowHeightM") ?? selectedMethodInputs.windowHeightM ?? 1);
-      methodInputs.foundationType = String(formData.get("foundationType") ?? selectedMethodInputs.foundationType ?? "placeholder") as MinimalMethodInputs["foundationType"];
-      methodInputs.groutingEnabled = formData.get("groutingEnabled") === "on";
-      methodInputs.verticalRebarEnabled = formData.get("verticalRebarEnabled") === "on";
-      methodInputs.horizontalRebarEnabled = formData.get("horizontalRebarEnabled") === "on";
-      methodInputs.baseWaterproofingEnabled = formData.get("baseWaterproofingEnabled") === "on";
-      methodInputs.specializedLabor = formData.get("specializedLabor") === "on";
-      methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
+      methodInputs.blockLengthM = Number(values.blockLengthM ?? selectedMethodInputs.blockLengthM ?? 0.25);
+      methodInputs.blockHeightM = Number(values.blockHeightM ?? selectedMethodInputs.blockHeightM ?? 0.125);
+      methodInputs.blockWidthM = Number(values.blockWidthM ?? selectedMethodInputs.blockWidthM ?? 0.125);
+      methodInputs.blocksPerM2 = Number(values.blocksPerM2 ?? selectedMethodInputs.blocksPerM2 ?? 64);
+      methodInputs.useType = values.useType ?? selectedMethodInputs.useType ?? "infill";
+      methodInputs.finishType = values.finishType ?? selectedMethodInputs.finishType ?? "exposed";
+      methodInputs.doorCount = Number(values.doorCount ?? selectedMethodInputs.doorCount ?? 2);
+      methodInputs.doorWidthM = Number(values.doorWidthM ?? selectedMethodInputs.doorWidthM ?? 0.8);
+      methodInputs.doorHeightM = Number(values.doorHeightM ?? selectedMethodInputs.doorHeightM ?? 2.1);
+      methodInputs.windowCount = Number(values.windowCount ?? selectedMethodInputs.windowCount ?? 4);
+      methodInputs.windowWidthM = Number(values.windowWidthM ?? selectedMethodInputs.windowWidthM ?? 1.2);
+      methodInputs.windowHeightM = Number(values.windowHeightM ?? selectedMethodInputs.windowHeightM ?? 1);
+      methodInputs.foundationType = values.foundationType ?? selectedMethodInputs.foundationType ?? "placeholder";
+      methodInputs.groutingEnabled = Boolean(values.groutingEnabled);
+      methodInputs.verticalRebarEnabled = Boolean(values.verticalRebarEnabled);
+      methodInputs.horizontalRebarEnabled = Boolean(values.horizontalRebarEnabled);
+      methodInputs.baseWaterproofingEnabled = Boolean(values.baseWaterproofingEnabled);
+      methodInputs.specializedLabor = Boolean(values.specializedLabor);
+      methodInputs.wastePercent = Number(values.wastePercent ?? selectedMethodInputs.wastePercent ?? 10);
     }
 
     if (selectedMethod === "monolithic-eps") {
-      methodInputs.epsCoreThicknessM = Number(formData.get("epsCoreThicknessM") ?? selectedMethodInputs.epsCoreThicknessM ?? 0.08);
-      methodInputs.renderThicknessPerFaceM = Number(formData.get("renderThicknessPerFaceM") ?? selectedMethodInputs.renderThicknessPerFaceM ?? 0.03);
-      methodInputs.finalWallThicknessM = Number(formData.get("finalWallThicknessM") ?? selectedMethodInputs.finalWallThicknessM ?? 0.14);
-      methodInputs.panelWidthM = Number(formData.get("panelWidthM") ?? selectedMethodInputs.panelWidthM ?? 1.2);
-      methodInputs.panelHeightM = Number(formData.get("panelHeightM") ?? selectedMethodInputs.panelHeightM ?? 2.8);
-      methodInputs.useType = String(formData.get("useType") ?? selectedMethodInputs.useType ?? "infill") as MinimalMethodInputs["useType"];
-      methodInputs.foundationType = String(formData.get("foundationType") ?? selectedMethodInputs.foundationType ?? "radier") as MinimalMethodInputs["foundationType"];
-      methodInputs.doorCount = Number(formData.get("doorCount") ?? selectedMethodInputs.doorCount ?? 2);
-      methodInputs.doorWidthM = Number(formData.get("doorWidthM") ?? selectedMethodInputs.doorWidthM ?? 0.8);
-      methodInputs.doorHeightM = Number(formData.get("doorHeightM") ?? selectedMethodInputs.doorHeightM ?? 2.1);
-      methodInputs.windowCount = Number(formData.get("windowCount") ?? selectedMethodInputs.windowCount ?? 4);
-      methodInputs.windowWidthM = Number(formData.get("windowWidthM") ?? selectedMethodInputs.windowWidthM ?? 1.2);
-      methodInputs.windowHeightM = Number(formData.get("windowHeightM") ?? selectedMethodInputs.windowHeightM ?? 1);
-      methodInputs.starterBarsEnabled = formData.get("starterBarsEnabled") === "on";
-      methodInputs.openingReinforcementEnabled = formData.get("openingReinforcementEnabled") === "on";
-      methodInputs.projectionEquipmentRequired = formData.get("projectionEquipmentRequired") === "on";
-      methodInputs.specializedLaborRequired = formData.get("specializedLaborRequired") === "on";
-      methodInputs.finalFinish = formData.get("finalFinish") === "on";
-      methodInputs.wastePercent = Number(formData.get("wastePercent") ?? selectedMethodInputs.wastePercent ?? 10);
+      methodInputs.epsCoreThicknessM = Number(values.epsCoreThicknessM ?? selectedMethodInputs.epsCoreThicknessM ?? 0.08);
+      methodInputs.renderThicknessPerFaceM = Number(values.renderThicknessPerFaceM ?? selectedMethodInputs.renderThicknessPerFaceM ?? 0.03);
+      methodInputs.finalWallThicknessM = Number(values.finalWallThicknessM ?? selectedMethodInputs.finalWallThicknessM ?? 0.14);
+      methodInputs.panelWidthM = Number(values.panelWidthM ?? selectedMethodInputs.panelWidthM ?? 1.2);
+      methodInputs.panelHeightM = Number(values.panelHeightM ?? selectedMethodInputs.panelHeightM ?? 2.8);
+      methodInputs.useType = values.useType ?? selectedMethodInputs.useType ?? "infill";
+      methodInputs.foundationType = values.foundationType ?? selectedMethodInputs.foundationType ?? "radier";
+      methodInputs.doorCount = Number(values.doorCount ?? selectedMethodInputs.doorCount ?? 2);
+      methodInputs.doorWidthM = Number(values.doorWidthM ?? selectedMethodInputs.doorWidthM ?? 0.8);
+      methodInputs.doorHeightM = Number(values.doorHeightM ?? selectedMethodInputs.doorHeightM ?? 2.1);
+      methodInputs.windowCount = Number(values.windowCount ?? selectedMethodInputs.windowCount ?? 4);
+      methodInputs.windowWidthM = Number(values.windowWidthM ?? selectedMethodInputs.windowWidthM ?? 1.2);
+      methodInputs.windowHeightM = Number(values.windowHeightM ?? selectedMethodInputs.windowHeightM ?? 1);
+      methodInputs.starterBarsEnabled = Boolean(values.starterBarsEnabled);
+      methodInputs.openingReinforcementEnabled = Boolean(values.openingReinforcementEnabled);
+      methodInputs.projectionEquipmentRequired = Boolean(values.projectionEquipmentRequired);
+      methodInputs.specializedLaborRequired = Boolean(values.specializedLaborRequired);
+      methodInputs.finalFinish = Boolean(values.finalFinish);
+      methodInputs.wastePercent = Number(values.wastePercent ?? selectedMethodInputs.wastePercent ?? 10);
     }
 
     updateProjectName(projectName);
     updateScenarioName(scenario.id, "Cenario inicial");
     updateScenarioLocation(scenario.id, {
       ...scenario.location,
-      city: city || scenario.location.city || "Cidade a definir",
-      state: state || scenario.location.state || "Estado a definir",
+      city: values.city,
+      state: normalizeBrazilStateName(values.state) || values.state,
     });
     updateScenarioMethodInputs(scenario.id, selectedMethod, methodInputs);
     setOnboardingCompleted(true);
@@ -339,20 +430,29 @@ export function StartProjectForm() {
                 <Label htmlFor="address">Endereco ou referencia do lote</Label>
                 <Input id="address" placeholder="Opcional nesta etapa" {...form.register("address")} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="city" className={cn(form.formState.errors.city && "text-destructive")}>
-                  Cidade
-                </Label>
-                <Input id="city" aria-invalid={Boolean(form.formState.errors.city)} className={fieldClass(Boolean(form.formState.errors.city))} {...form.register("city")} />
-                <FieldError message={form.formState.errors.city?.message} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state" className={cn(form.formState.errors.state && "text-destructive")}>
-                  Estado
-                </Label>
-                <Input id="state" aria-invalid={Boolean(form.formState.errors.state)} className={fieldClass(Boolean(form.formState.errors.state))} {...form.register("state")} />
-                <FieldError message={form.formState.errors.state?.message} />
-              </div>
+              <Controller
+                control={form.control}
+                name="state"
+                render={({ field: stateField, fieldState: stateFieldState }) => (
+                  <Controller
+                    control={form.control}
+                    name="city"
+                    render={({ field: cityField, fieldState: cityFieldState }) => (
+                      <BrazilLocationSelectFields
+                        className="md:col-span-2"
+                        stateId="state"
+                        cityId="city"
+                        stateValue={stateField.value}
+                        cityValue={cityField.value}
+                        onStateChange={stateField.onChange}
+                        onCityChange={cityField.onChange}
+                        stateError={stateFieldState.error?.message}
+                        cityError={cityFieldState.error?.message}
+                      />
+                    )}
+                  />
+                )}
+              />
               <div className="space-y-2">
                 <Label htmlFor="country" className={cn(form.formState.errors.country && "text-destructive")}>
                   Pais
@@ -495,61 +595,65 @@ export function StartProjectForm() {
               </p>
             </CardHeader>
             <CardContent>
-              <form onSubmit={applyMethodPlaceholder} className="space-y-6">
+              <form onSubmit={methodForm.handleSubmit(applyMethodPlaceholder)} className="space-y-6">
+                <input type="hidden" {...methodForm.register("constructionMethod")} />
                 <section className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="methodProjectName">Nome do projeto</Label>
-                    <Input id="methodProjectName" name="projectName" defaultValue={requiresFreshInput ? "" : project.name} required />
+                    <Label htmlFor="methodProjectName" className={cn(methodForm.formState.errors.projectName && "text-destructive")}>
+                      Nome do projeto
+                    </Label>
+                    <Input
+                      id="methodProjectName"
+                      aria-invalid={Boolean(methodForm.formState.errors.projectName)}
+                      className={fieldClass(Boolean(methodForm.formState.errors.projectName))}
+                      {...methodForm.register("projectName")}
+                    />
+                    <FieldError message={methodForm.formState.errors.projectName?.message} />
                   </div>
                   <NumberInput
                     id="methodWidthM"
-                    name="widthM"
                     label="Largura da casa (m)"
                     min={2}
-                    defaultValue={selectedMethodInputs.widthM ?? 8}
-                    required
+                    error={methodForm.formState.errors.widthM?.message}
+                    {...methodForm.register("widthM")}
                   />
                   <NumberInput
                     id="methodDepthM"
-                    name="depthM"
                     label="Profundidade da casa (m)"
                     min={2}
-                    defaultValue={selectedMethodInputs.depthM ?? 12}
-                    required
+                    error={methodForm.formState.errors.depthM?.message}
+                    {...methodForm.register("depthM")}
                   />
                   <NumberInput
                     id="methodFloorHeightM"
-                    name="floorHeightM"
                     label="Pe-direito (m)"
                     min={2}
-                    defaultValue={selectedMethodInputs.floorHeightM ?? 2.8}
-                    required
+                    error={methodForm.formState.errors.floorHeightM?.message}
+                    {...methodForm.register("floorHeightM")}
                   />
                   {selectedMethod === "conventional-masonry" ? (
                     <>
                       <NumberInput
                         id="methodFloors"
-                        name="floors"
                         label="Pavimentos"
                         min={1}
                         step={1}
-                        defaultValue={selectedMethodInputs.floors ?? 1}
-                        required
+                        error={methodForm.formState.errors.floors?.message}
+                        {...methodForm.register("floors")}
                       />
                       <NumberInput
                         id="methodInternalWalls"
-                        name="internalWallLengthM"
                         label="Paredes internas estimadas (m)"
                         min={0}
-                        defaultValue={selectedMethodInputs.internalWallLengthM ?? 20}
+                        error={methodForm.formState.errors.internalWallLengthM?.message}
+                        {...methodForm.register("internalWallLengthM")}
                       />
                       <div className="space-y-2">
                         <Label htmlFor="methodBlockType">Tipo de bloco</Label>
                         <select
                           id="methodBlockType"
-                          name="blockType"
-                          defaultValue={selectedMethodInputs.blockType ?? "ceramic"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("blockType")}
                         >
                           <option value="ceramic">Ceramico</option>
                           <option value="concrete">Concreto</option>
@@ -557,25 +661,24 @@ export function StartProjectForm() {
                       </div>
                       <NumberInput
                         id="methodWallThickness"
-                        name="wallThicknessM"
                         label="Espessura parede (m)"
                         min={0.09}
                         step={0.01}
-                        defaultValue={selectedMethodInputs.wallThicknessM ?? 0.14}
+                        error={methodForm.formState.errors.wallThicknessM?.message}
+                        {...methodForm.register("wallThicknessM")}
                       />
-                      <NumberInput id="methodDoorCount" name="doorCount" label="Portas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.doorCount ?? 2} />
-                      <NumberInput id="methodDoorWidth" name="doorWidthM" label="Largura porta (m)" min={0.5} defaultValue={selectedMethodInputs.doorWidthM ?? 0.8} />
-                      <NumberInput id="methodDoorHeight" name="doorHeightM" label="Altura porta (m)" min={1.8} defaultValue={selectedMethodInputs.doorHeightM ?? 2.1} />
-                      <NumberInput id="methodWindowCount" name="windowCount" label="Janelas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.windowCount ?? 4} />
-                      <NumberInput id="methodWindowWidth" name="windowWidthM" label="Largura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowWidthM ?? 1.2} />
-                      <NumberInput id="methodWindowHeight" name="windowHeightM" label="Altura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowHeightM ?? 1} />
+                      <NumberInput id="methodDoorCount" label="Portas (qtd.)" min={0} step={1} error={methodForm.formState.errors.doorCount?.message} {...methodForm.register("doorCount")} />
+                      <NumberInput id="methodDoorWidth" label="Largura porta (m)" min={0.5} error={methodForm.formState.errors.doorWidthM?.message} {...methodForm.register("doorWidthM")} />
+                      <NumberInput id="methodDoorHeight" label="Altura porta (m)" min={1.8} error={methodForm.formState.errors.doorHeightM?.message} {...methodForm.register("doorHeightM")} />
+                      <NumberInput id="methodWindowCount" label="Janelas (qtd.)" min={0} step={1} error={methodForm.formState.errors.windowCount?.message} {...methodForm.register("windowCount")} />
+                      <NumberInput id="methodWindowWidth" label="Largura janela (m)" min={0.4} error={methodForm.formState.errors.windowWidthM?.message} {...methodForm.register("windowWidthM")} />
+                      <NumberInput id="methodWindowHeight" label="Altura janela (m)" min={0.4} error={methodForm.formState.errors.windowHeightM?.message} {...methodForm.register("windowHeightM")} />
                       <div className="space-y-2">
                         <Label htmlFor="methodFoundationType">Fundacao</Label>
                         <select
                           id="methodFoundationType"
-                          name="foundationType"
-                          defaultValue={selectedMethodInputs.foundationType ?? "placeholder"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("foundationType")}
                         >
                           <option value="placeholder">Placeholder</option>
                           <option value="radier">Radier</option>
@@ -586,25 +689,24 @@ export function StartProjectForm() {
                         <Label htmlFor="methodRoofType">Cobertura</Label>
                         <select
                           id="methodRoofType"
-                          name="roofType"
-                          defaultValue={selectedMethodInputs.roofType ?? "simple-roof"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("roofType")}
                         >
                           <option value="simple-roof">Telhado simples</option>
                           <option value="slab">Laje</option>
                           <option value="placeholder">Placeholder</option>
                         </select>
                       </div>
-                      <NumberInput id="methodWaste" name="wastePercent" label="Perdas (%)" min={0} step={1} defaultValue={selectedMethodInputs.wastePercent ?? 10} />
+                      <NumberInput id="methodWaste" label="Perdas (%)" min={0} step={1} error={methodForm.formState.errors.wastePercent?.message} {...methodForm.register("wastePercent")} />
                       <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
                         {[
-                          ["internalPlaster", "Reboco interno", selectedMethodInputs.internalPlaster ?? true],
-                          ["externalPlaster", "Reboco externo", selectedMethodInputs.externalPlaster ?? true],
-                          ["subfloor", "Contrapiso", selectedMethodInputs.subfloor ?? true],
-                          ["basicFinish", "Acabamento basico", selectedMethodInputs.basicFinish ?? false],
-                        ].map(([name, label, checked]) => (
+                          ["internalPlaster", "Reboco interno"],
+                          ["externalPlaster", "Reboco externo"],
+                          ["subfloor", "Contrapiso"],
+                          ["basicFinish", "Acabamento basico"],
+                        ].map(([name, label]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
-                            <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />
+                            <input type="checkbox" className="h-4 w-4 accent-primary" {...methodForm.register(name as keyof MethodProjectFormValues)} />
                             {label}
                           </label>
                         ))}
@@ -613,17 +715,16 @@ export function StartProjectForm() {
                   ) : null}
                   {selectedMethod === "eco-block" ? (
                     <>
-                      <NumberInput id="ecoBlockLength" name="blockLengthM" label="Comprimento bloco (m)" min={0.1} defaultValue={selectedMethodInputs.blockLengthM ?? 0.25} />
-                      <NumberInput id="ecoBlockHeight" name="blockHeightM" label="Altura bloco (m)" min={0.05} defaultValue={selectedMethodInputs.blockHeightM ?? 0.125} />
-                      <NumberInput id="ecoBlockWidth" name="blockWidthM" label="Largura bloco (m)" min={0.08} defaultValue={selectedMethodInputs.blockWidthM ?? 0.125} />
-                      <NumberInput id="ecoBlocksM2" name="blocksPerM2" label="Blocos por m2" min={1} defaultValue={selectedMethodInputs.blocksPerM2 ?? 64} />
+                      <NumberInput id="ecoBlockLength" label="Comprimento bloco (m)" min={0.1} error={methodForm.formState.errors.blockLengthM?.message} {...methodForm.register("blockLengthM")} />
+                      <NumberInput id="ecoBlockHeight" label="Altura bloco (m)" min={0.05} error={methodForm.formState.errors.blockHeightM?.message} {...methodForm.register("blockHeightM")} />
+                      <NumberInput id="ecoBlockWidth" label="Largura bloco (m)" min={0.08} error={methodForm.formState.errors.blockWidthM?.message} {...methodForm.register("blockWidthM")} />
+                      <NumberInput id="ecoBlocksM2" label="Blocos por m2" min={1} error={methodForm.formState.errors.blocksPerM2?.message} {...methodForm.register("blocksPerM2")} />
                       <div className="space-y-2">
                         <Label htmlFor="ecoUseType">Uso</Label>
                         <select
                           id="ecoUseType"
-                          name="useType"
-                          defaultValue={selectedMethodInputs.useType ?? "infill"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("useType")}
                         >
                           <option value="infill">Vedacao</option>
                           <option value="structural-preliminary">Estrutural preliminar</option>
@@ -633,44 +734,42 @@ export function StartProjectForm() {
                         <Label htmlFor="ecoFinishType">Acabamento</Label>
                         <select
                           id="ecoFinishType"
-                          name="finishType"
-                          defaultValue={selectedMethodInputs.finishType ?? "exposed"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("finishType")}
                         >
                           <option value="exposed">Aparente</option>
                           <option value="plastered">Rebocado</option>
                         </select>
                       </div>
-                      <NumberInput id="ecoDoorCount" name="doorCount" label="Portas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.doorCount ?? 2} />
-                      <NumberInput id="ecoDoorWidth" name="doorWidthM" label="Largura porta (m)" min={0.5} defaultValue={selectedMethodInputs.doorWidthM ?? 0.8} />
-                      <NumberInput id="ecoDoorHeight" name="doorHeightM" label="Altura porta (m)" min={1.8} defaultValue={selectedMethodInputs.doorHeightM ?? 2.1} />
-                      <NumberInput id="ecoWindowCount" name="windowCount" label="Janelas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.windowCount ?? 4} />
-                      <NumberInput id="ecoWindowWidth" name="windowWidthM" label="Largura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowWidthM ?? 1.2} />
-                      <NumberInput id="ecoWindowHeight" name="windowHeightM" label="Altura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowHeightM ?? 1} />
+                      <NumberInput id="ecoDoorCount" label="Portas (qtd.)" min={0} step={1} error={methodForm.formState.errors.doorCount?.message} {...methodForm.register("doorCount")} />
+                      <NumberInput id="ecoDoorWidth" label="Largura porta (m)" min={0.5} error={methodForm.formState.errors.doorWidthM?.message} {...methodForm.register("doorWidthM")} />
+                      <NumberInput id="ecoDoorHeight" label="Altura porta (m)" min={1.8} error={methodForm.formState.errors.doorHeightM?.message} {...methodForm.register("doorHeightM")} />
+                      <NumberInput id="ecoWindowCount" label="Janelas (qtd.)" min={0} step={1} error={methodForm.formState.errors.windowCount?.message} {...methodForm.register("windowCount")} />
+                      <NumberInput id="ecoWindowWidth" label="Largura janela (m)" min={0.4} error={methodForm.formState.errors.windowWidthM?.message} {...methodForm.register("windowWidthM")} />
+                      <NumberInput id="ecoWindowHeight" label="Altura janela (m)" min={0.4} error={methodForm.formState.errors.windowHeightM?.message} {...methodForm.register("windowHeightM")} />
                       <div className="space-y-2">
                         <Label htmlFor="ecoFoundationType">Fundacao</Label>
                         <select
                           id="ecoFoundationType"
-                          name="foundationType"
-                          defaultValue={selectedMethodInputs.foundationType ?? "placeholder"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("foundationType")}
                         >
                           <option value="placeholder">Placeholder</option>
                           <option value="radier">Radier</option>
                           <option value="baldrame">Baldrame</option>
                         </select>
                       </div>
-                      <NumberInput id="ecoWaste" name="wastePercent" label="Perdas (%)" min={0} step={1} defaultValue={selectedMethodInputs.wastePercent ?? 10} />
+                      <NumberInput id="ecoWaste" label="Perdas (%)" min={0} step={1} error={methodForm.formState.errors.wastePercent?.message} {...methodForm.register("wastePercent")} />
                       <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
                         {[
-                          ["groutingEnabled", "Grauteamento", selectedMethodInputs.groutingEnabled ?? false],
-                          ["verticalRebarEnabled", "Armadura vertical", selectedMethodInputs.verticalRebarEnabled ?? false],
-                          ["horizontalRebarEnabled", "Armadura horizontal/canaletas", selectedMethodInputs.horizontalRebarEnabled ?? false],
-                          ["baseWaterproofingEnabled", "Impermeabilizacao de base", selectedMethodInputs.baseWaterproofingEnabled ?? true],
-                          ["specializedLabor", "Mao de obra especializada", selectedMethodInputs.specializedLabor ?? true],
-                        ].map(([name, label, checked]) => (
+                          ["groutingEnabled", "Grauteamento"],
+                          ["verticalRebarEnabled", "Armadura vertical"],
+                          ["horizontalRebarEnabled", "Armadura horizontal/canaletas"],
+                          ["baseWaterproofingEnabled", "Impermeabilizacao de base"],
+                          ["specializedLabor", "Mao de obra especializada"],
+                        ].map(([name, label]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
-                            <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />
+                            <input type="checkbox" className="h-4 w-4 accent-primary" {...methodForm.register(name as keyof MethodProjectFormValues)} />
                             {label}
                           </label>
                         ))}
@@ -679,18 +778,17 @@ export function StartProjectForm() {
                   ) : null}
                   {selectedMethod === "monolithic-eps" ? (
                     <>
-                      <NumberInput id="epsCoreThickness" name="epsCoreThicknessM" label="Nucleo EPS (m)" min={0.03} defaultValue={selectedMethodInputs.epsCoreThicknessM ?? 0.08} />
-                      <NumberInput id="epsRenderThickness" name="renderThicknessPerFaceM" label="Revest. por face (m)" min={0.01} defaultValue={selectedMethodInputs.renderThicknessPerFaceM ?? 0.03} />
-                      <NumberInput id="epsFinalThickness" name="finalWallThicknessM" label="Espessura final (m)" min={0.08} defaultValue={selectedMethodInputs.finalWallThicknessM ?? 0.14} />
-                      <NumberInput id="epsPanelWidth" name="panelWidthM" label="Largura painel (m)" min={0.3} defaultValue={selectedMethodInputs.panelWidthM ?? 1.2} />
-                      <NumberInput id="epsPanelHeight" name="panelHeightM" label="Altura painel (m)" min={1} defaultValue={selectedMethodInputs.panelHeightM ?? 2.8} />
+                      <NumberInput id="epsCoreThickness" label="Nucleo EPS (m)" min={0.03} error={methodForm.formState.errors.epsCoreThicknessM?.message} {...methodForm.register("epsCoreThicknessM")} />
+                      <NumberInput id="epsRenderThickness" label="Revest. por face (m)" min={0.01} error={methodForm.formState.errors.renderThicknessPerFaceM?.message} {...methodForm.register("renderThicknessPerFaceM")} />
+                      <NumberInput id="epsFinalThickness" label="Espessura final (m)" min={0.08} error={methodForm.formState.errors.finalWallThicknessM?.message} {...methodForm.register("finalWallThicknessM")} />
+                      <NumberInput id="epsPanelWidth" label="Largura painel (m)" min={0.3} error={methodForm.formState.errors.panelWidthM?.message} {...methodForm.register("panelWidthM")} />
+                      <NumberInput id="epsPanelHeight" label="Altura painel (m)" min={1} error={methodForm.formState.errors.panelHeightM?.message} {...methodForm.register("panelHeightM")} />
                       <div className="space-y-2">
                         <Label htmlFor="epsUseType">Uso</Label>
                         <select
                           id="epsUseType"
-                          name="useType"
-                          defaultValue={selectedMethodInputs.useType ?? "infill"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("useType")}
                         >
                           <option value="infill">Vedacao</option>
                           <option value="structural-preliminary">Estrutural preliminar</option>
@@ -700,50 +798,64 @@ export function StartProjectForm() {
                         <Label htmlFor="epsFoundationType">Fundacao</Label>
                         <select
                           id="epsFoundationType"
-                          name="foundationType"
-                          defaultValue={selectedMethodInputs.foundationType ?? "radier"}
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          {...methodForm.register("foundationType")}
                         >
                           <option value="radier">Radier</option>
                           <option value="baldrame">Baldrame</option>
                           <option value="placeholder">Placeholder</option>
                         </select>
                       </div>
-                      <NumberInput id="epsDoorCount" name="doorCount" label="Portas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.doorCount ?? 2} />
-                      <NumberInput id="epsDoorWidth" name="doorWidthM" label="Largura porta (m)" min={0.5} defaultValue={selectedMethodInputs.doorWidthM ?? 0.8} />
-                      <NumberInput id="epsDoorHeight" name="doorHeightM" label="Altura porta (m)" min={1.8} defaultValue={selectedMethodInputs.doorHeightM ?? 2.1} />
-                      <NumberInput id="epsWindowCount" name="windowCount" label="Janelas (qtd.)" min={0} step={1} defaultValue={selectedMethodInputs.windowCount ?? 4} />
-                      <NumberInput id="epsWindowWidth" name="windowWidthM" label="Largura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowWidthM ?? 1.2} />
-                      <NumberInput id="epsWindowHeight" name="windowHeightM" label="Altura janela (m)" min={0.4} defaultValue={selectedMethodInputs.windowHeightM ?? 1} />
-                      <NumberInput id="epsWaste" name="wastePercent" label="Perdas (%)" min={0} step={1} defaultValue={selectedMethodInputs.wastePercent ?? 10} />
+                      <NumberInput id="epsDoorCount" label="Portas (qtd.)" min={0} step={1} error={methodForm.formState.errors.doorCount?.message} {...methodForm.register("doorCount")} />
+                      <NumberInput id="epsDoorWidth" label="Largura porta (m)" min={0.5} error={methodForm.formState.errors.doorWidthM?.message} {...methodForm.register("doorWidthM")} />
+                      <NumberInput id="epsDoorHeight" label="Altura porta (m)" min={1.8} error={methodForm.formState.errors.doorHeightM?.message} {...methodForm.register("doorHeightM")} />
+                      <NumberInput id="epsWindowCount" label="Janelas (qtd.)" min={0} step={1} error={methodForm.formState.errors.windowCount?.message} {...methodForm.register("windowCount")} />
+                      <NumberInput id="epsWindowWidth" label="Largura janela (m)" min={0.4} error={methodForm.formState.errors.windowWidthM?.message} {...methodForm.register("windowWidthM")} />
+                      <NumberInput id="epsWindowHeight" label="Altura janela (m)" min={0.4} error={methodForm.formState.errors.windowHeightM?.message} {...methodForm.register("windowHeightM")} />
+                      <NumberInput id="epsWaste" label="Perdas (%)" min={0} step={1} error={methodForm.formState.errors.wastePercent?.message} {...methodForm.register("wastePercent")} />
                       <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-2 md:grid-cols-2">
                         {[
-                          ["starterBarsEnabled", "Arranques na fundacao", selectedMethodInputs.starterBarsEnabled ?? true],
-                          ["openingReinforcementEnabled", "Reforcos em aberturas", selectedMethodInputs.openingReinforcementEnabled ?? true],
-                          ["projectionEquipmentRequired", "Equipamento de projecao", selectedMethodInputs.projectionEquipmentRequired ?? true],
-                          ["specializedLaborRequired", "Mao de obra especializada", selectedMethodInputs.specializedLaborRequired ?? true],
-                          ["finalFinish", "Acabamento final", selectedMethodInputs.finalFinish ?? false],
-                        ].map(([name, label, checked]) => (
+                          ["starterBarsEnabled", "Arranques na fundacao"],
+                          ["openingReinforcementEnabled", "Reforcos em aberturas"],
+                          ["projectionEquipmentRequired", "Equipamento de projecao"],
+                          ["specializedLaborRequired", "Mao de obra especializada"],
+                          ["finalFinish", "Acabamento final"],
+                        ].map(([name, label]) => (
                           <label className="flex items-center gap-2 text-sm" key={String(name)}>
-                            <input type="checkbox" name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4 accent-primary" />
+                            <input type="checkbox" className="h-4 w-4 accent-primary" {...methodForm.register(name as keyof MethodProjectFormValues)} />
                             {label}
                           </label>
                         ))}
                       </div>
                     </>
                   ) : null}
-                  <div className="space-y-2">
-                    <Label htmlFor="methodCity">Cidade</Label>
-                    <Input id="methodCity" name="city" defaultValue={requiresFreshInput ? "" : scenario.location.city} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="methodState">Estado</Label>
-                    <Input id="methodState" name="state" defaultValue={requiresFreshInput ? "" : scenario.location.state} required />
-                  </div>
+                  <Controller
+                    control={methodForm.control}
+                    name="state"
+                    render={({ field: stateField, fieldState: stateFieldState }) => (
+                      <Controller
+                        control={methodForm.control}
+                        name="city"
+                        render={({ field: cityField, fieldState: cityFieldState }) => (
+                          <BrazilLocationSelectFields
+                            className="md:col-span-2"
+                            stateId="methodState"
+                            cityId="methodCity"
+                            stateValue={stateField.value}
+                            cityValue={cityField.value}
+                            onStateChange={stateField.onChange}
+                            onCityChange={cityField.onChange}
+                            stateError={stateFieldState.error?.message}
+                            cityError={cityFieldState.error?.message}
+                          />
+                        )}
+                      />
+                    )}
+                  />
                 </section>
 
                 <div className="flex justify-end border-t pt-5">
-                  <Button type="submit">
+                  <Button type="submit" disabled={!methodForm.formState.isValid}>
                     Continuar para dashboard
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
