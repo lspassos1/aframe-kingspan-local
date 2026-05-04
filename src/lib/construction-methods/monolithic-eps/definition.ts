@@ -4,9 +4,14 @@ import {
   positiveNumberIssue,
   validationResult,
   type ConstructionMethodDefinition,
-  type ConstructionMethodInputs,
 } from "@/lib/construction-methods/types";
+import { calculateMonolithicEpsBudget, calculateMonolithicEpsBudgetItems } from "./budget";
+import { calculateMonolithicEpsGeometry } from "./geometry";
+import { defaultMonolithicEpsInputs, normalizeMonolithicEpsInputs } from "./inputs";
+import { calculateMonolithicEpsMaterialList } from "./materials";
 import { generateMonolithicEps3DLayers } from "./three-layers";
+import type { MonolithicEpsInputs } from "./types";
+import { calculateMonolithicEpsWarnings } from "./warnings";
 
 export const monolithicEpsDefinition = {
   id: "monolithic-eps",
@@ -25,30 +30,24 @@ export const monolithicEpsDefinition = {
   complexity: "high",
   speed: "fast",
   industrializationLevel: "high",
-  getDefaultInputs: () => ({
-    widthM: 8,
-    depthM: 12,
-    floorHeightM: 2.8,
-    epsCoreThicknessM: 0.08,
-    renderThicknessPerFaceM: 0.03,
-    panelWidthM: 1.2,
-    panelHeightM: 2.8,
-    useType: "infill",
-    foundationType: "radier",
-    starterBarsEnabled: true,
-    openingReinforcementEnabled: true,
-    specializedLaborRequired: true,
-    wastePercent: 10,
-  }),
+  getDefaultInputs: () => ({ ...defaultMonolithicEpsInputs }),
   validateInputs: (inputs: unknown) => {
     if (!isRecord(inputs)) return validationResult([{ path: "", message: "Inputs devem ser um objeto." }]);
     const issues = compactValidationIssues([
       positiveNumberIssue(inputs, "widthM", "Largura deve ser maior que zero."),
       positiveNumberIssue(inputs, "depthM", "Profundidade deve ser maior que zero."),
+      positiveNumberIssue(inputs, "floorHeightM", "Pe-direito deve ser maior que zero."),
+      positiveNumberIssue(inputs, "epsCoreThicknessM", "Espessura do EPS deve ser maior que zero."),
+      positiveNumberIssue(inputs, "renderThicknessPerFaceM", "Espessura de revestimento por face deve ser maior que zero."),
       positiveNumberIssue(inputs, "panelWidthM", "Largura padrao dos paineis deve ser maior que zero."),
       positiveNumberIssue(inputs, "panelHeightM", "Altura padrao dos paineis deve ser maior que zero."),
     ]);
     return validationResult(issues);
   },
+  calculateGeometry: calculateMonolithicEpsGeometry,
+  calculateMaterialList: calculateMonolithicEpsMaterialList,
+  calculateBudgetItems: calculateMonolithicEpsBudgetItems,
+  calculateBudget: calculateMonolithicEpsBudget,
+  calculateWarnings: ({ scenario }) => calculateMonolithicEpsWarnings(normalizeMonolithicEpsInputs(scenario.methodInputs?.["monolithic-eps"])),
   generate3DLayers: generateMonolithicEps3DLayers,
-} satisfies ConstructionMethodDefinition<ConstructionMethodInputs>;
+} satisfies ConstructionMethodDefinition<MonolithicEpsInputs>;
