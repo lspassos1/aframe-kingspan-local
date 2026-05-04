@@ -203,5 +203,9 @@ export const defaultProject: Project = {
     costSources: [],
     costItems: [],
     matches: [],
+    priceSources: [],
+    serviceCompositions: [],
+    budgetQuantities: [],
+    budgetServiceLines: [],
   },
 };

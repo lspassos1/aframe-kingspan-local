@@ -82,16 +82,28 @@ function normalizeBudgetAssistantData(
   defaults: BudgetAssistantProjectData
 ): BudgetAssistantProjectData {
   return {
-    costSources: data?.costSources?.map((source) => ({
-      ...source,
-      supplier: source.supplier ?? "",
-      notes: source.notes ?? "",
-    })) ?? defaults.costSources,
+    costSources: data?.costSources?.map(normalizePriceLikeSource) ?? defaults.costSources,
     costItems: data?.costItems ?? defaults.costItems,
     matches: data?.matches?.map((match) => ({
       ...match,
       approvedByUser: match.id.startsWith("manual-match-") ? true : match.approvedByUser,
     })) ?? defaults.matches,
+    priceSources: data?.priceSources?.map(normalizePriceLikeSource) ?? defaults.priceSources,
+    serviceCompositions: data?.serviceCompositions ?? defaults.serviceCompositions,
+    budgetQuantities: data?.budgetQuantities ?? defaults.budgetQuantities,
+    budgetServiceLines: data?.budgetServiceLines ?? defaults.budgetServiceLines,
+  };
+}
+
+function normalizePriceLikeSource<T extends BudgetAssistantProjectData["costSources"][number]>(source: T): T {
+  return {
+    ...source,
+    supplier: source.supplier ?? "",
+    state: source.state ?? "",
+    city: source.city ?? "",
+    referenceDate: source.referenceDate ?? "",
+    reliability: source.reliability ?? "low",
+    notes: source.notes ?? "",
   };
 }
 
