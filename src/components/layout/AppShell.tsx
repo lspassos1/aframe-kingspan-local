@@ -38,13 +38,13 @@ const navItems = [
   { href: "/start", label: "Novo projeto", icon: PlusCircle },
   { href: "/edit", label: "Configurar", icon: PenLine },
   { href: "/model-3d", label: "Modelo 3D", icon: Box },
-  { href: "/technical-project", label: "Projeto Tecnico", icon: FileText },
+  { href: "/technical-project", label: "Projeto técnico", icon: FileText },
   { href: "/materials", label: "Materiais", icon: Package },
   { href: "/structure", label: "Estrutura A-frame", icon: Building2 },
-  { href: "/budget", label: "Orcamento", icon: Calculator },
+  { href: "/budget", label: "Orçamento", icon: Calculator },
   { href: "/budget-assistant", label: "Budget Assistant", icon: WalletCards },
-  { href: "/quotation", label: "Cotacao", icon: ClipboardList },
-  { href: "/scenarios", label: "Cenarios", icon: BarChart3 },
+  { href: "/quotation", label: "Cotação", icon: ClipboardList },
+  { href: "/scenarios", label: "Cenários", icon: BarChart3 },
   { href: "/export", label: "Exportar", icon: FileDown },
   { href: "/feedback", label: "Melhorias", icon: MessageSquare },
   { href: "/admin/feedback", label: "Admin melhorias", icon: ShieldCheck },
@@ -55,7 +55,7 @@ const navItems = [
 function NavList({ constructionMethod, onNavigate }: { constructionMethod?: ConstructionMethodId; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
-    <nav className="grid gap-1">
+    <nav className="grid gap-1.5">
       {navItems.filter((item) => isAppNavigationItemVisible(item.href, constructionMethod)).map((item) => {
         const Icon = item.icon;
         const active = pathname === item.href || (pathname === "/" && item.href === "/dashboard");
@@ -65,8 +65,8 @@ function NavList({ constructionMethod, onNavigate }: { constructionMethod?: Cons
             key={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-              active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-all hover:bg-accent hover:text-accent-foreground",
+              active && "bg-primary text-primary-foreground shadow-sm shadow-primary/15 hover:bg-primary hover:text-primary-foreground"
             )}
           >
             <Icon className="h-4 w-4" />
@@ -94,15 +94,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r bg-sidebar/95 px-4 py-5 shadow-sm lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r bg-sidebar/92 px-4 py-5 shadow-sm backdrop-blur-xl lg:block">
         <div className="flex items-center justify-between gap-3 px-2">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shadow-primary/15">
               <Ruler className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold">A-frame Estudo</p>
-              <p className="text-xs text-muted-foreground">pre-projeto seguro</p>
+              <p className="text-sm font-semibold">Construção Estudo</p>
+              <p className="text-xs text-muted-foreground">pré-orçamento modular</p>
             </div>
           </Link>
           <UserButton />
@@ -110,10 +110,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Separator className="my-5" />
         <NavList constructionMethod={constructionMethod} />
       </aside>
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur lg:hidden">
-        <div className="flex h-14 items-center justify-between px-4">
+      <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur-xl lg:hidden">
+        <div className="flex h-16 items-center justify-between px-4">
           <Link href="/dashboard" className="font-semibold">
-            A-frame Estudo
+            Construção Estudo
           </Link>
           <div className="flex items-center gap-2">
             <UserButton />
@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="lg:pl-72">
-        <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-screen max-w-[1540px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {children}
         </div>
       </main>
