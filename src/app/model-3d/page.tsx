@@ -24,7 +24,7 @@ export default function Model3DPage() {
             : "Modelo volumetrico simplificado por camadas para leitura preliminar do metodo construtivo selecionado."}
         </p>
       </div>
-      {isAFrame ? <AFrameViewer project={project} scenario={scenario} /> : <GenericConstructionViewer title={methodDefinition.name} layers={layers} />}
+      {isAFrame ? <AFrameViewer project={project} scenario={scenario} /> : <GenericConstructionViewer scenario={scenario} title={methodDefinition.name} layers={layers} />}
     </div>
   );
 }

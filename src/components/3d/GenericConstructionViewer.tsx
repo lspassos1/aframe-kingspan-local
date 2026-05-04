@@ -3,12 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text } from "@react-three/drei";
-import { Download, Layers3 } from "lucide-react";
+import { Camera, Download, Eye, RotateCcw, Settings2 } from "lucide-react";
 import type { Construction3DLayer, Construction3DPrimitive, Construction3DVector3 } from "@/lib/construction-methods";
+import type { Scenario } from "@/types/project";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { getGeneric3DNumberControls } from "@/lib/construction-methods/generic-3d-controls";
+import { getScenarioMethodInputs } from "@/lib/construction-methods";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
+import { useProjectStore } from "@/lib/store/project-store";
+
+type ViewMode = "iso" | "top" | "front" | "rear" | "side" | "section";
+type DimensionMode = "basic" | "detailed";
 
 function maxDimensionFromLayers(layers: Construction3DLayer[]) {
   return Math.max(
@@ -23,21 +33,32 @@ function maxDimensionFromLayers(layers: Construction3DLayer[]) {
   );
 }
 
-function CameraView({ layers }: { layers: Construction3DLayer[] }) {
+function CameraView({ layers, view }: { layers: Construction3DLayer[]; view: ViewMode }) {
   const { camera } = useThree();
   const distance = maxDimensionFromLayers(layers) * 1.15;
+  const dimensions = getGenericConstructionDimensions(layers);
+  const targetY = dimensions ? dimensions.heightM / 2 : distance * 0.16;
 
   useEffect(() => {
-    camera.position.set(distance, distance * 0.75, -distance);
-    camera.lookAt(0, distance * 0.16, 0);
+    const positions: Record<ViewMode, [number, number, number]> = {
+      iso: [distance, distance * 0.75, -distance],
+      top: [0, distance * 1.35, 0.01],
+      front: [0, Math.max(2.2, targetY), -distance],
+      rear: [0, Math.max(2.2, targetY), distance],
+      side: [distance, Math.max(2.2, targetY), 0],
+      section: [distance * 0.85, Math.max(2.2, targetY), -distance * 0.35],
+    };
+    camera.position.set(...positions[view]);
+    camera.lookAt(0, targetY, 0);
     camera.updateProjectionMatrix();
-  }, [camera, distance]);
+  }, [camera, distance, targetY, view]);
 
   return null;
 }
 
-function PrimitiveMesh({ primitive }: { primitive: Construction3DPrimitive }) {
-  const opacity = primitive.opacity ?? 1;
+function PrimitiveMesh({ layer, modelOpacity, primitive }: { layer: Construction3DLayer; modelOpacity: number; primitive: Construction3DPrimitive }) {
+  const primitiveOpacity = primitive.opacity ?? 1;
+  const opacity = layer.type === "terrain" || layer.type === "openings" ? primitiveOpacity : Math.min(primitiveOpacity, modelOpacity);
 
   return (
     <group>
@@ -83,7 +104,7 @@ function DimensionLine({
   );
 }
 
-function DimensionOverlay({ layers }: { layers: Construction3DLayer[] }) {
+function DimensionOverlay({ layers, mode }: { layers: Construction3DLayer[]; mode: DimensionMode }) {
   const dimensions = getGenericConstructionDimensions(layers);
   if (!dimensions) return null;
 
@@ -99,34 +120,53 @@ function DimensionOverlay({ layers }: { layers: Construction3DLayer[] }) {
 
   return (
     <group>
-      <DimensionLine
-        points={[
-          [footprint.minX, dimensionY, frontZ],
-          [footprint.maxX, dimensionY, frontZ],
-        ]}
-        label={`Largura casa ${br.format(dimensions.widthM)} m`}
-        labelPosition={[(footprint.minX + footprint.maxX) / 2, 0.48, frontZ]}
-        color="#111827"
-      />
-      <DimensionLine
-        points={[
-          [rightX, dimensionY, footprint.minZ],
-          [rightX, dimensionY, footprint.maxZ],
-        ]}
-        label={`Prof. casa ${br.format(dimensions.depthM)} m`}
-        labelPosition={[rightX + 0.42, 0.48, (footprint.minZ + footprint.maxZ) / 2]}
-        color="#111827"
-      />
-      <DimensionLine
-        points={[
-          [heightX, 0.08, frontZ],
-          [heightX, vertical.maxY, frontZ],
-        ]}
-        label={`Altura ${br.format(dimensions.heightM)} m`}
-        labelPosition={[heightX - 0.42, Math.max(0.7, vertical.maxY / 2), frontZ]}
-        color="#7c2d12"
-      />
-      {terrain && terrainWidthM != null && terrainDepthM != null ? (
+      {mode === "basic" ? (
+        <>
+          <Text position={[0, 0.48, frontZ]} fontSize={0.34} color="#111827" anchorX="center" anchorY="middle" outlineColor="#ffffff" outlineWidth={0.012}>
+            {`Casa ${br.format(dimensions.widthM)} m x ${br.format(dimensions.depthM)} m`}
+          </Text>
+          <Text position={[0, vertical.maxY + 0.45, frontZ]} fontSize={0.32} color="#7c2d12" anchorX="center" anchorY="middle" outlineColor="#ffffff" outlineWidth={0.012}>
+            {`Altura ${br.format(dimensions.heightM)} m`}
+          </Text>
+          {terrainWidthM != null && terrainDepthM != null ? (
+            <Text position={[0, 0.38, terrainFrontZ]} fontSize={0.3} color="#0f766e" anchorX="center" anchorY="middle" outlineColor="#ffffff" outlineWidth={0.012}>
+              {`Lote ${br.format(terrainWidthM)} m x ${br.format(terrainDepthM)} m`}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+      {mode === "detailed" ? (
+        <>
+          <DimensionLine
+            points={[
+              [footprint.minX, dimensionY, frontZ],
+              [footprint.maxX, dimensionY, frontZ],
+            ]}
+            label={`Largura casa ${br.format(dimensions.widthM)} m`}
+            labelPosition={[(footprint.minX + footprint.maxX) / 2, 0.48, frontZ]}
+            color="#111827"
+          />
+          <DimensionLine
+            points={[
+              [rightX, dimensionY, footprint.minZ],
+              [rightX, dimensionY, footprint.maxZ],
+            ]}
+            label={`Prof. casa ${br.format(dimensions.depthM)} m`}
+            labelPosition={[rightX + 0.42, 0.48, (footprint.minZ + footprint.maxZ) / 2]}
+            color="#111827"
+          />
+          <DimensionLine
+            points={[
+              [heightX, 0.08, frontZ],
+              [heightX, vertical.maxY, frontZ],
+            ]}
+            label={`Altura ${br.format(dimensions.heightM)} m`}
+            labelPosition={[heightX - 0.42, Math.max(0.7, vertical.maxY / 2), frontZ]}
+            color="#7c2d12"
+          />
+        </>
+      ) : null}
+      {mode === "detailed" && terrain && terrainWidthM != null && terrainDepthM != null ? (
         <>
           <DimensionLine
             points={[
@@ -155,38 +195,93 @@ function DimensionOverlay({ layers }: { layers: Construction3DLayer[] }) {
 function GenericScene({
   layers,
   dimensionLayers,
+  dimensionMode,
+  modelOpacity,
   showDimensions,
+  view,
 }: {
   layers: Construction3DLayer[];
   dimensionLayers: Construction3DLayer[];
+  dimensionMode: DimensionMode;
+  modelOpacity: number;
   showDimensions: boolean;
+  view: ViewMode;
 }) {
   return (
     <>
-      <CameraView layers={layers} />
+      <CameraView layers={layers} view={view} />
       <ambientLight intensity={0.72} />
       <directionalLight position={[8, 12, 8]} intensity={1.15} castShadow />
       {layers.map((layer) => (
         <group key={layer.id}>
           {layer.data.primitives.map((primitive) => (
-            <PrimitiveMesh key={`${layer.id}-${primitive.id}`} primitive={primitive} />
+            <PrimitiveMesh key={`${layer.id}-${primitive.id}`} layer={layer} modelOpacity={modelOpacity} primitive={primitive} />
           ))}
         </group>
       ))}
-      {showDimensions ? <DimensionOverlay layers={dimensionLayers} /> : null}
+      {showDimensions ? <DimensionOverlay layers={dimensionLayers} mode={dimensionMode} /> : null}
       <gridHelper args={[40, 40, "#cbd5e1", "#e2e8f0"]} position={[0, 0.01, 0]} />
       <OrbitControls makeDefault enableDamping />
     </>
   );
 }
 
-export function GenericConstructionViewer({ layers, title }: { layers: Construction3DLayer[]; title: string }) {
+function NumberControl({
+  label,
+  max,
+  min,
+  onChange,
+  step,
+  unit,
+  value,
+}: {
+  label: string;
+  max: number;
+  min: number;
+  onChange: (value: number) => void;
+  step: number;
+  unit?: string;
+  value: number;
+}) {
+  const displayValue = Number.isInteger(step) ? Math.round(value) : value;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label>{label}</Label>
+        <div className="flex items-center gap-1">
+          <Input type="number" min={min} max={max} step={step} value={displayValue} onChange={(event) => onChange(Number(event.target.value))} className="h-8 w-24" />
+          {unit ? <span className="w-5 text-xs text-muted-foreground">{unit}</span> : null}
+        </div>
+      </div>
+      <Slider min={min} max={max} step={step} value={[value]} onValueChange={([nextValue]) => onChange(nextValue)} />
+    </div>
+  );
+}
+
+export function GenericConstructionViewer({ layers, scenario, title }: { layers: Construction3DLayer[]; scenario: Scenario; title: string }) {
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({});
   const [showDimensions, setShowDimensions] = useState(true);
+  const [view, setView] = useState<ViewMode>("iso");
+  const [dimensionMode, setDimensionMode] = useState<DimensionMode>("detailed");
+  const [modelOpacity, setModelOpacity] = useState(0.78);
+  const updateScenarioMethodInputs = useProjectStore((state) => state.updateScenarioMethodInputs);
+  const updateScenarioTerrain = useProjectStore((state) => state.updateScenarioTerrain);
+  const methodInputs = useMemo(() => getScenarioMethodInputs(scenario), [scenario]);
+  const numberControls = useMemo(() => getGeneric3DNumberControls(scenario.constructionMethod, methodInputs), [methodInputs, scenario.constructionMethod]);
   const activeLayers = useMemo(() => layers.filter((layer) => visibleLayers[layer.id] ?? layer.visibleByDefault), [layers, visibleLayers]);
 
   const toggleLayer = (layerId: string, checked: boolean) => {
     setVisibleLayers((current) => ({ ...current, [layerId]: checked }));
+  };
+
+  const updateMethodNumber = (key: string, value: number) => {
+    if (!Number.isFinite(value)) return;
+    updateScenarioMethodInputs(scenario.id, scenario.constructionMethod, { ...methodInputs, [key]: value });
+  };
+
+  const updateTerrain = (updates: Partial<Scenario["terrain"]>) => {
+    updateScenarioTerrain(scenario.id, { ...scenario.terrain, ...updates });
   };
 
   const screenshot = () => {
@@ -199,25 +294,122 @@ export function GenericConstructionViewer({ layers, title }: { layers: Construct
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="min-h-[640px] overflow-hidden rounded-md border bg-slate-50">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-h-[680px] overflow-hidden rounded-md border bg-slate-50">
         <Canvas shadows camera={{ position: [16, 12, 16], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
-          <GenericScene layers={activeLayers} dimensionLayers={layers} showDimensions={showDimensions} />
+          <GenericScene
+            layers={activeLayers}
+            dimensionLayers={layers}
+            dimensionMode={dimensionMode}
+            modelOpacity={modelOpacity}
+            showDimensions={showDimensions}
+            view={view}
+          />
         </Canvas>
       </div>
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto">
-        <div className="rounded-md border bg-card p-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 font-medium">
-              <Layers3 className="h-4 w-4" />
-              Camadas
+      <aside className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
+        <div className="rounded-md border bg-card">
+          <div className="mb-3 flex items-center gap-2 font-medium">
+            <div className="flex w-full items-center gap-2 px-4 pt-4">
+              <Settings2 className="h-4 w-4" />
+              Geometria do metodo
             </div>
-            <Button variant="outline" size="sm" onClick={screenshot}>
+          </div>
+          <div className="max-h-[min(640px,calc(100vh-9rem))] overflow-y-auto overflow-x-hidden px-4 pb-6 pr-5">
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{title}</p>
+              {numberControls.map((control) => (
+                <NumberControl
+                  key={control.key}
+                  label={control.label}
+                  max={control.max}
+                  min={control.min}
+                  onChange={(value) => updateMethodNumber(control.key, value)}
+                  step={control.step}
+                  unit={control.unit}
+                  value={control.value}
+                />
+              ))}
+              <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3">
+                <div className="space-y-2">
+                  <Label>Largura lote</Label>
+                  <Input type="number" step={0.1} value={scenario.terrain.width} onChange={(event) => updateTerrain({ width: Number(event.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Prof. lote</Label>
+                  <Input type="number" step={0.1} value={scenario.terrain.depth} onChange={(event) => updateTerrain({ depth: Number(event.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Recuo frente</Label>
+                  <Input type="number" step={0.1} value={scenario.terrain.frontSetback} onChange={(event) => updateTerrain({ frontSetback: Number(event.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Recuo lateral</Label>
+                  <Input
+                    type="number"
+                    step={0.1}
+                    value={scenario.terrain.leftSetback}
+                    onChange={(event) => updateTerrain({ leftSetback: Number(event.target.value), rightSetback: Number(event.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Modo de cotas</Label>
+                <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">Basico</SelectItem>
+                    <SelectItem value="detailed">Detalhado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Transparencia volumes</Label>
+                  <span className="text-xs text-muted-foreground">{Math.round(modelOpacity * 100)}%</span>
+                </div>
+                <Slider min={0.25} max={1} step={0.01} value={[modelOpacity]} onValueChange={([value]) => setModelOpacity(value)} />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-md border p-4">
+          <div className="mb-3 flex items-center gap-2 font-medium">
+            <Camera className="h-4 w-4" />
+            Vistas
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ["iso", "Isometrica"],
+              ["top", "Topo"],
+              ["front", "Frontal"],
+              ["rear", "Posterior"],
+              ["side", "Lateral"],
+              ["section", "Corte"],
+            ].map(([id, label]) => (
+              <Button key={id} type="button" variant={view === id ? "default" : "outline"} size="sm" onClick={() => setView(id as ViewMode)}>
+                {label}
+              </Button>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setView("iso")}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={screenshot}>
               <Download className="mr-2 h-4 w-4" />
               PNG
             </Button>
           </div>
-          <p className="mb-4 text-sm text-muted-foreground">{title}</p>
+        </div>
+        <div className="rounded-md border p-4">
+          <div className="mb-3 flex items-center gap-2 font-medium">
+            <Eye className="h-4 w-4" />
+            Camadas
+          </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
               <Label htmlFor="generic-dimensions" className="text-sm font-normal">

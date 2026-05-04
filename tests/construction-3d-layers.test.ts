@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import { getConstructionMethodDefinition, type Construction3DLayerType, type ConstructionMethodId } from "@/lib/construction-methods";
+import { getGeneric3DNumberControls } from "@/lib/construction-methods/generic-3d-controls";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
 
 const genericMethodIds: ConstructionMethodId[] = ["conventional-masonry", "eco-block", "monolithic-eps"];
@@ -59,6 +60,83 @@ describe("generic construction 3D layers", () => {
     expect(walls?.data.primitives.some((primitive) => primitive.size[0] === 9)).toBe(true);
     expect(walls?.data.primitives.some((primitive) => primitive.size[2] === 11)).toBe(true);
     expect(walls?.data.primitives.every((primitive) => primitive.size[1] === 3.2)).toBe(true);
+  });
+
+  it("uses method wall thickness equivalents in generic wall layers", () => {
+    const baseScenario = defaultProject.scenarios[0];
+    const ecoBlockDefinition = getConstructionMethodDefinition("eco-block");
+    const epsDefinition = getConstructionMethodDefinition("monolithic-eps");
+    const ecoBlockScenario = {
+      ...baseScenario,
+      constructionMethod: "eco-block" as const,
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "eco-block": {
+          ...ecoBlockDefinition.getDefaultInputs(),
+          blockWidthM: 0.2,
+        },
+      },
+    };
+    const epsScenario = {
+      ...baseScenario,
+      constructionMethod: "monolithic-eps" as const,
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "monolithic-eps": {
+          ...epsDefinition.getDefaultInputs(),
+          finalWallThicknessM: 0.22,
+        },
+      },
+    };
+
+    const ecoWalls = ecoBlockDefinition.generate3DLayers?.({ project: defaultProject, scenario: ecoBlockScenario }).find((layer) => layer.type === "walls");
+    const epsWalls = epsDefinition.generate3DLayers?.({ project: defaultProject, scenario: epsScenario }).find((layer) => layer.type === "walls");
+
+    expect(ecoWalls?.data.primitives.some((primitive) => primitive.size[0] === 0.2 || primitive.size[2] === 0.2)).toBe(true);
+    expect(epsWalls?.data.primitives.some((primitive) => primitive.size[0] === 0.22 || primitive.size[2] === 0.22)).toBe(true);
+  });
+
+  it("adds a buildable area primitive from terrain setbacks", () => {
+    const definition = getConstructionMethodDefinition("conventional-masonry");
+    const baseScenario = defaultProject.scenarios[0];
+    const scenario = {
+      ...baseScenario,
+      constructionMethod: "conventional-masonry" as const,
+      terrain: {
+        ...baseScenario.terrain,
+        width: 14,
+        depth: 18,
+        frontSetback: 3,
+        rearSetback: 2,
+        leftSetback: 1.5,
+        rightSetback: 1,
+      },
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "conventional-masonry": {
+          ...definition.getDefaultInputs(),
+          widthM: 8,
+          depthM: 10,
+        },
+      },
+    };
+    const terrain = definition.generate3DLayers?.({ project: defaultProject, scenario }).find((layer) => layer.type === "terrain");
+    const buildableArea = terrain?.data.primitives.find((primitive) => primitive.id === "buildable-area");
+
+    expect(buildableArea?.size).toEqual([11.5, 0.04, 13]);
+    expect(buildableArea?.wireframe).toBe(true);
+  });
+
+  it("exposes A-frame-like dynamic controls for non-A-frame viewers", () => {
+    expect(getGeneric3DNumberControls("conventional-masonry", { widthM: 9, depthM: 12, floorHeightM: 3, floors: 2 }).map((control) => control.key)).toEqual([
+      "widthM",
+      "depthM",
+      "floorHeightM",
+      "floors",
+      "wallThicknessM",
+    ]);
+    expect(getGeneric3DNumberControls("eco-block", { blockWidthM: 0.18 }).find((control) => control.key === "blockWidthM")?.value).toBe(0.18);
+    expect(getGeneric3DNumberControls("monolithic-eps", { epsCoreThicknessM: 0.1 }).find((control) => control.key === "epsCoreThicknessM")?.value).toBe(0.1);
   });
 
   it("derives visible dimensions for non-A-frame methods", () => {
