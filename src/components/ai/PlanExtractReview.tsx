@@ -154,15 +154,19 @@ export function PlanExtractReview({
   const selectedCount = fields.filter((field) => selectedFields[field]).length;
   const notes = (result.extracted.notes ?? []).filter(Boolean);
 
-  function updateModifiedValue(field: PlanExtractEditableField, value: string | number | ConstructionMethodId | undefined) {
+  function updateModifiedValue(
+    field: PlanExtractEditableField,
+    value: string | number | ConstructionMethodId | undefined,
+    shouldSelect = value !== undefined && value !== ""
+  ) {
     const nextValues: PlanExtractModifiedValues = { ...modifiedValues };
-    if (value === undefined || value === "") {
+    if (value === undefined) {
       delete nextValues[field];
     } else {
       nextValues[field] = value;
     }
     onModifiedValuesChange(nextValues);
-    onSelectedFieldsChange({ ...selectedFields, [field]: true });
+    onSelectedFieldsChange({ ...selectedFields, [field]: shouldSelect });
   }
 
   return (
@@ -210,7 +214,11 @@ export function PlanExtractReview({
                     </div>
                     <div className="space-y-2 rounded-xl border bg-background p-3">
                       <span className="block text-xs font-medium uppercase tracking-normal text-muted-foreground">Extraido / revisado</span>
-                      <PlanExtractFieldEditor field={field} value={reviewValue} onChange={(value) => updateModifiedValue(field, value)} />
+                      <PlanExtractFieldEditor
+                        field={field}
+                        value={reviewValue}
+                        onChange={(value, shouldSelect) => updateModifiedValue(field, value, shouldSelect)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -255,7 +263,7 @@ function PlanExtractFieldEditor({
 }: {
   field: PlanExtractEditableField;
   value: PlanExtractReviewValue;
-  onChange: (value: string | number | ConstructionMethodId | undefined) => void;
+  onChange: (value: string | number | ConstructionMethodId | undefined, shouldSelect?: boolean) => void;
 }) {
   if (field === "constructionMethod") {
     return (
@@ -276,7 +284,7 @@ function PlanExtractFieldEditor({
 
   if (numberFields.has(field)) {
     const minimum = getPlanExtractNumberFieldMin(field) ?? (field === "doorCount" || field === "windowCount" ? 0 : 0.01);
-    return <PlanExtractNumberFieldEditor key={`${field}-${typeof value === "number" ? value : ""}`} field={field} value={value} minimum={minimum} onChange={onChange} />;
+    return <PlanExtractNumberFieldEditor key={`${field}-${typeof value === "number" || typeof value === "string" ? value : ""}`} field={field} value={value} minimum={minimum} onChange={onChange} />;
   }
 
   return (
@@ -300,9 +308,9 @@ function PlanExtractNumberFieldEditor({
   field: PlanExtractEditableField;
   value: PlanExtractReviewValue;
   minimum: number;
-  onChange: (value: number | undefined) => void;
+  onChange: (value: string | number | undefined, shouldSelect?: boolean) => void;
 }) {
-  const [draftValue, setDraftValue] = useState(typeof value === "number" ? String(value) : "");
+  const [draftValue, setDraftValue] = useState(typeof value === "number" || typeof value === "string" ? String(value) : "");
 
   return (
     <Input
@@ -314,12 +322,17 @@ function PlanExtractNumberFieldEditor({
         const rawValue = event.target.value.trim();
         setDraftValue(rawValue);
         if (!rawValue) {
-          onChange(undefined);
+          onChange("", false);
           return;
         }
 
         const normalizedValue = normalizePlanExtractNumberField(field, Number(rawValue));
-        if (normalizedValue !== undefined) onChange(normalizedValue);
+        if (normalizedValue !== undefined) {
+          if (integerFields.has(field)) setDraftValue(String(normalizedValue));
+          onChange(normalizedValue, true);
+        } else {
+          onChange(rawValue, false);
+        }
       }}
     />
   );
