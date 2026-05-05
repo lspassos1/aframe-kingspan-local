@@ -78,6 +78,16 @@ function formatProviderName(provider?: string) {
   return provider === "openai" ? "OpenAI" : provider;
 }
 
+function waitForNextPaint() {
+  return new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+}
+
 export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const project = useProjectStore((state) => state.project);
@@ -113,13 +123,15 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
 
     const formData = new FormData();
     formData.append("file", file);
-    setState("analyzing");
 
     try {
-      const response = await fetch("/api/ai/plan-extract", {
+      const responsePromise = fetch("/api/ai/plan-extract", {
         method: "POST",
         body: formData,
       });
+      await waitForNextPaint();
+      setState("analyzing");
+      const response = await responsePromise;
       const payload = (await response.json().catch(() => null)) as PlanExtractApiPayload | null;
       const nextState = getPlanImportStateFromResponse({
         ok: response.ok,
