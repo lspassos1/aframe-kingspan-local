@@ -525,10 +525,14 @@ function createImportedRowNotes(issues: PriceBaseImportIssue[]) {
 }
 
 function parseMoney(value: unknown) {
-  return parseDecimal(value);
+  return parseNumericText(value, { dotThousands: true });
 }
 
 function parseDecimal(value: unknown) {
+  return parseNumericText(value, { dotThousands: false });
+}
+
+function parseNumericText(value: unknown, options: { dotThousands: boolean }) {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   const text = String(value ?? "").trim();
   if (!text) return null;
@@ -537,7 +541,7 @@ function parseDecimal(value: unknown) {
   const lastDot = clean.lastIndexOf(".");
   const hasComma = lastComma >= 0;
   const hasDot = lastDot >= 0;
-  const dotGroupsOnly = /^\d{1,3}(\.\d{3})+$/.test(clean);
+  const dotGroupsOnly = options.dotThousands && /^\d{1,3}(\.\d{3})+$/.test(clean);
   const decimalComma = hasComma && (!hasDot || lastComma > lastDot);
   const normalized = decimalComma || dotGroupsOnly ? clean.replace(/\./g, "").replace(",", ".") : clean.replace(/,/g, "");
   const number = Number(normalized.replace(/[^0-9.-]/g, ""));

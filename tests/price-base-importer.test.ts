@@ -104,6 +104,32 @@ describe("price base importer", () => {
     });
   });
 
+  it("keeps dot-decimal labor hours separate from dot-thousand money parsing", () => {
+    const rows = parsePriceBaseCsv(
+      [
+        "codigo,descricao,unidade,preco_total,material,mao_obra,equipamento,hh",
+        "SINAPI-998,Servico com horas decimais,m2,1.234,1.000,200,34,0.400",
+      ].join("\n")
+    );
+
+    const result = importPriceBaseRows({
+      rows,
+      mapping: defaultPriceBaseColumnMapping,
+      source,
+      defaultConstructionMethod: "conventional-masonry",
+    });
+
+    expect(result.serviceCompositions[0]).toMatchObject({
+      directUnitCostBRL: 1234,
+      materialCostBRL: 1000,
+      totalLaborHoursPerUnit: 0.4,
+    });
+    expect(result.serviceCompositions[0].laborRoles[0]).toMatchObject({
+      hoursPerUnit: 0.4,
+      totalHours: 0.4,
+    });
+  });
+
   it("keeps incomplete JSON rows importable but pending human review", () => {
     const rows = parsePriceBaseJson(JSON.stringify([{ codigo: "COMP-1", descricao: "Servico sem preco", unidade: "m2", etapa: "civil" }]));
     const lowReliabilitySource = createImportedPriceSource({
