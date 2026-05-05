@@ -4,7 +4,7 @@ Este documento cobre a configuração técnica da extração assistida de planta
 
 ## Objetivo
 
-O fluxo lê imagem ou PDF de planta baixa e retorna JSON preliminar com campos como cidade/UF, dimensões do lote, dimensões da casa, pavimentos, pé-direito, portas, janelas, observações, incertezas e alertas.
+O fluxo lê imagem ou PDF de planta baixa e retorna JSON preliminar com campos legados simples e blocos avançados de análise. Os campos legados mantêm compatibilidade com o preenchimento atual; os blocos avançados carregam fonte, confiança, evidência, pendências e perguntas para os próximos passos de takeoff.
 
 O resultado sempre passa por revisão humana antes de ser aplicado ao projeto. A extração não substitui projeto arquitetônico, projeto estrutural, ART/RRT, aprovação municipal, sondagem, orçamento formal ou validação técnica de fornecedor.
 
@@ -69,6 +69,8 @@ Sem Upstash, o desenvolvimento pode usar memória local. Em produção, configur
 
 - Ler planta baixa em PDF/imagem quando o modelo configurado suportar visão/documento.
 - Extrair campos preliminares da planta.
+- Retornar blocos estruturados de documento, escala, localização, edificação, ambientes, paredes, aberturas, acabamentos, cobertura, fundação preliminar, elétrica, hidráulica e áreas externas.
+- Gerar `questions` quando faltar escala, cidade/UF, pé-direito, cobertura, fundação, elétrica, hidráulica ou base de preço.
 - Explicar pendências e incertezas.
 - Sugerir vínculos entre quantitativos e composições existentes em fluxos específicos.
 
@@ -80,6 +82,19 @@ Sem Upstash, o desenvolvimento pode usar memória local. Em produção, configur
 - Aprovar orçamento.
 - Substituir revisão humana.
 - Aplicar método construtivo incerto automaticamente.
+
+## Schema De Retorno
+
+O retorno usa `version: "1.0"` para compatibilidade, mas pode incluir blocos avançados:
+
+- `extractionStatus`: `complete`, `partial` ou `insufficient`.
+- `fieldConfidence` e `fieldEvidence` para campos legados.
+- `document`, `scale`, `location`, `lot`, `building`, `rooms`, `walls`, `openings`, `floorFinishes`, `wallFinishes`, `painting`, `ceiling`, `roof`, `foundation`, `structure`, `electrical`, `plumbing`, `fixtures` e `exterior`.
+- `quantitySeeds` para quantidades preliminares revisáveis.
+- `questions` para dados que o usuário precisa responder antes do orçamento.
+- `extractionWarnings` para alertas estruturados.
+
+Todo valor avançado retornado pela IA deve ter `value`, `unit`, `confidence`, `evidence`, `source`, `requiresReview` e `pendingReason` quando houver dúvida ou estimativa. Fontes geradas pela IA ou pelo sistema (`visible`, `calculated`, `estimated_rule`, `ai_visible`, `system_calculated`, `rule_estimated`) sempre exigem revisão humana. Dados de baixa confiança, confiança desconhecida ou estimados por regra exigem pendência explícita. `QuantitySeed` não pode carregar preço, composição SINAPI, H/H, consumo, perda, BDI ou aprovação.
 
 ## Fluxo Esperado
 

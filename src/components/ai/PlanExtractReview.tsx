@@ -186,6 +186,9 @@ export function prunePlanExtractReviewState({
 }
 
 export function getPlanExtractFieldEvidence(result: PlanExtractResult, field: PlanExtractEditableField) {
+  const directEvidence = result.fieldEvidence?.[field];
+  if (directEvidence) return directEvidence;
+
   const phrases = [[fieldLabels[field]], ...(fieldEvidencePhrases[field] ?? [])];
   const candidates = [...(result.extracted.notes ?? []), ...result.assumptions].filter(Boolean);
   return candidates.find((candidate) => {

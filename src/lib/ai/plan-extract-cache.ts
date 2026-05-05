@@ -45,7 +45,7 @@ export function getPlanExtractCacheVersion(env: AiPlanExtractEnv = process.env) 
     supports: provider.supports,
   }));
 
-  return hashValue(JSON.stringify({ schema: "1.0", prompt: "plan-extract-v1", providers })).slice(0, 24);
+  return hashValue(JSON.stringify({ schema: "1.0-advanced-v2", prompt: "plan-extract-advanced-v2", providers })).slice(0, 24);
 }
 
 export function createPlanExtractCacheKey({
