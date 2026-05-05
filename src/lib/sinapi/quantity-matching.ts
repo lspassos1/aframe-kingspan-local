@@ -30,6 +30,7 @@ export interface SinapiCandidateScore {
   methodCompatible: boolean;
   categoryCompatible: boolean;
   unitCompatible: boolean;
+  stateComparable: boolean;
   stateCompatible: boolean;
   referenceCompatible: boolean;
   regimeCompatible: boolean;
@@ -39,6 +40,7 @@ export interface SinapiCandidateScore {
 }
 
 export interface SinapiQuantityMatchCandidate {
+  candidateId: string;
   quantity: BudgetQuantity;
   composition: ServiceComposition;
   score: SinapiCandidateScore;
@@ -109,6 +111,7 @@ export function findSinapiQuantityMatchCandidates(input: SinapiQuantityMatchInpu
         const requiresReview = Boolean(approvalBlockedReason) || composition.requiresReview || score.total < 0.8;
         const confidence = confidenceFromSinapiScore(score, approvalBlockedReason);
         return {
+          candidateId: createLinkKey(quantity.id, composition.id),
           quantity,
           composition,
           score,
@@ -141,7 +144,8 @@ export function scoreSinapiQuantityCandidate(
   const methodCompatible = quantity.constructionMethod === composition.constructionMethod;
   const categoryCompatible = quantity.category === composition.category;
   const unitCompatible = quantity.unit === composition.unit;
-  const stateCompatible = Boolean(projectState && sourceState && projectState === sourceState);
+  const stateComparable = Boolean(projectState && sourceState);
+  const stateCompatible = stateComparable ? projectState === sourceState : false;
   const referenceCompatible = Boolean(input.referenceDate && sinapi?.referenceDate === input.referenceDate);
   const regimeCompatible = Boolean(input.regime && sinapi?.regime === input.regime);
   const priceUsable = Boolean(sinapi && usablePriceStatuses.has(sinapi.priceStatus));
@@ -149,10 +153,10 @@ export function scoreSinapiQuantityCandidate(
   const tagOverlap = calculateTagOverlap(quantity.description, composition.tags);
 
   const total = round(
-    (methodCompatible ? 0.14 : -0.1) +
+      (methodCompatible ? 0.14 : -0.1) +
       (categoryCompatible ? 0.1 : 0) +
       (unitCompatible ? 0.18 : -0.16) +
-      (stateCompatible ? 0.18 : sourceState ? -0.12 : 0) +
+      (projectState ? (stateCompatible ? 0.18 : -0.12) : 0) +
       (referenceCompatible ? 0.1 : input.referenceDate ? -0.04 : 0) +
       (regimeCompatible ? 0.08 : input.regime ? -0.04 : 0) +
       (priceUsable ? 0.12 : -0.18) +
@@ -166,6 +170,7 @@ export function scoreSinapiQuantityCandidate(
     methodCompatible,
     categoryCompatible,
     unitCompatible,
+    stateComparable,
     stateCompatible,
     referenceCompatible,
     regimeCompatible,
@@ -196,7 +201,7 @@ export function applySinapiAiCandidateRanking(
   maxCandidates = maxAiCandidates
 ): SinapiAiCandidateRankingResult {
   const parsedDecisions = parseAiDecisions(decisions);
-  const candidatesById = new Map(candidates.map((candidate) => [candidate.composition.id, candidate]));
+  const candidatesById = createAiCandidateLookup(candidates);
   const ranked: SinapiQuantityMatchCandidate[] = [];
   const rejectedIds: string[] = [];
   const acceptedDecisions: SinapiAiCandidateDecision[] = [];
@@ -207,7 +212,7 @@ export function applySinapiAiCandidateRanking(
       rejectedIds.push(decision.id);
       continue;
     }
-    if (ranked.some((item) => item.composition.id === candidate.composition.id)) continue;
+    if (ranked.some((item) => item.candidateId === candidate.candidateId)) continue;
 
     ranked.push({
       ...candidate,
@@ -219,8 +224,8 @@ export function applySinapiAiCandidateRanking(
     acceptedDecisions.push(decision);
   }
 
-  const rankedIds = new Set(ranked.map((candidate) => candidate.composition.id));
-  const remaining = candidates.filter((candidate) => !rankedIds.has(candidate.composition.id));
+  const rankedIds = new Set(ranked.map((candidate) => candidate.candidateId));
+  const remaining = candidates.filter((candidate) => !rankedIds.has(candidate.candidateId));
 
   return {
     candidates: [...ranked, ...remaining].slice(0, clampCandidateLimit(maxCandidates)),
@@ -278,7 +283,32 @@ export async function rankSinapiQuantityCandidatesWithOpenAi(
   const content = payload.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI retornou ranking SINAPI vazio.");
 
-  return applySinapiAiCandidateRanking(limitedCandidates, JSON.parse(content), options.maxCandidates);
+  let parsedContent: unknown;
+  try {
+    parsedContent = JSON.parse(content);
+  } catch {
+    throw new Error("OpenAI retornou JSON invalido para ranking SINAPI.");
+  }
+
+  return applySinapiAiCandidateRanking(limitedCandidates, parsedContent, options.maxCandidates);
+}
+
+function createAiCandidateLookup(candidates: SinapiQuantityMatchCandidate[]) {
+  const lookup = new Map<string, SinapiQuantityMatchCandidate>();
+  const candidatesByCompositionId = new Map<string, SinapiQuantityMatchCandidate[]>();
+
+  for (const candidate of candidates) {
+    lookup.set(candidate.candidateId, candidate);
+    const compositionCandidates = candidatesByCompositionId.get(candidate.composition.id) ?? [];
+    compositionCandidates.push(candidate);
+    candidatesByCompositionId.set(candidate.composition.id, compositionCandidates);
+  }
+
+  for (const [compositionId, compositionCandidates] of candidatesByCompositionId) {
+    if (compositionCandidates.length === 1) lookup.set(compositionId, compositionCandidates[0]);
+  }
+
+  return lookup;
 }
 
 function compareSinapiCandidates(a: SinapiQuantityMatchCandidate, b: SinapiQuantityMatchCandidate) {
@@ -292,7 +322,7 @@ function getSinapiMatchBlockReason(score: SinapiCandidateScore, composition: Ser
   if (!composition.sinapi) return "missing_sinapi_metadata";
   if (!score.unitCompatible) return "unit_incompatible";
   if (!score.methodCompatible) return "method_uncertain";
-  if (composition.sinapi.priceStatus === "out_of_region" || !score.stateCompatible) return "out_of_region";
+  if (composition.sinapi.priceStatus === "out_of_region" || (score.stateComparable && !score.stateCompatible)) return "out_of_region";
   if (!score.priceUsable) return "price_status";
   return undefined;
 }
@@ -308,7 +338,7 @@ function createSinapiCandidateReason(
     score.unitCompatible ? "Unidade compativel." : `Unidade incompativel: ${quantity.unit} x ${composition.unit}.`,
     score.methodCompatible ? "Metodo compativel." : "Metodo construtivo incerto; revisar.",
     score.categoryCompatible ? "Categoria compativel." : "Categoria diferente; revisar.",
-    score.stateCompatible ? `UF compativel: ${sinapi?.state ?? composition.state}.` : createStateMismatchReason(input.location, composition),
+    createStateReason(input.location, composition, score),
     score.referenceCompatible || !input.referenceDate ? `Referencia: ${sinapi?.referenceDate || composition.referenceDate || "ausente"}.` : "Referencia diferente; revisar.",
     score.regimeCompatible || !input.regime ? `Regime: ${sinapi?.regime ?? "unknown"}.` : "Regime diferente; revisar.",
     score.priceUsable ? "Preco SINAPI valido." : `Preco pendente: ${sinapi?.priceStatus ?? "sem metadado"}.`,
@@ -327,6 +357,17 @@ function createSinapiPendingReason(composition: ServiceComposition, blockReason?
   if (blockReason === "out_of_region") return "Fonte SINAPI fora da UF selecionada; manter pendente.";
   if (blockReason === "price_status") return `Status de preco ${sinapi?.priceStatus ?? "ausente"}; manter pendente.`;
   return "Metadados SINAPI ausentes; manter pendente.";
+}
+
+function createStateReason(location: SinapiQuantityMatchLocation | undefined, composition: ServiceComposition, score: SinapiCandidateScore) {
+  if (score.stateCompatible) return `UF compativel: ${composition.sinapi?.state ?? composition.state}.`;
+  if (!score.stateComparable) return createMissingStateReason(composition);
+  return createStateMismatchReason(location, composition);
+}
+
+function createMissingStateReason(composition: ServiceComposition) {
+  const compositionState = composition.sinapi?.state ?? composition.state ?? "ausente";
+  return `UF do projeto ausente; fonte ${compositionState} precisa revisao.`;
 }
 
 function createStateMismatchReason(location: SinapiQuantityMatchLocation | undefined, composition: ServiceComposition) {
@@ -369,7 +410,9 @@ function combineConfidence(current: BudgetConfidenceLevel, suggested: BudgetConf
 function toAiCandidatePayload(candidate: SinapiQuantityMatchCandidate) {
   const sinapi = candidate.composition.sinapi;
   return {
-    id: candidate.composition.id,
+    id: candidate.candidateId,
+    compositionId: candidate.composition.id,
+    quantityId: candidate.quantity.id,
     code: sinapi?.code ?? candidate.composition.serviceCode,
     quantity: {
       id: candidate.quantity.id,

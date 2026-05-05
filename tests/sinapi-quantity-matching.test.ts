@@ -160,6 +160,27 @@ describe("SINAPI quantity matching", () => {
     );
   });
 
+  it("does not mark locationless matches as out of region", () => {
+    const composition = createSinapiComposition({ id: "sinapi-locationless" });
+
+    const candidates = findSinapiQuantityMatchCandidates({
+      quantities: [quantity],
+      serviceCompositions: [composition],
+      referenceDate: "2026-05",
+      regime: "desonerado",
+    });
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      approvalBlockedReason: undefined,
+      score: {
+        stateComparable: false,
+        stateCompatible: false,
+      },
+    });
+    expect(candidates[0].reason).toContain("UF do projeto ausente");
+  });
+
   it("lets mocked AI reorder only existing candidate IDs and rejects invented IDs", () => {
     const first = createSinapiComposition({ id: "sinapi-first", description: "Alvenaria de vedacao" });
     const second = createSinapiComposition({ id: "sinapi-second", description: "Alvenaria com bloco ceramico aparente" });
@@ -184,6 +205,40 @@ describe("SINAPI quantity matching", () => {
     expect(reranked.candidates[0].requiresReview).toBe(true);
   });
 
+  it("uses unique candidate IDs when the same composition matches multiple quantities", () => {
+    const shared = createSinapiComposition({ id: "sinapi-shared", description: "Alvenaria de vedacao" });
+    const secondQuantity: BudgetQuantity = {
+      ...quantity,
+      id: "quantity-second-wall-area",
+      description: "Area de parede em alvenaria ceramica",
+    };
+    const candidates = findSinapiQuantityMatchCandidates({
+      quantities: [quantity, secondQuantity],
+      serviceCompositions: [shared],
+      location: { city: "Cruz das Almas", state: "BA" },
+      referenceDate: "2026-05",
+      regime: "desonerado",
+    });
+    const secondCandidate = candidates.find((candidate) => candidate.quantity.id === secondQuantity.id);
+
+    expect(candidates.map((candidate) => candidate.candidateId)).toEqual([
+      `${quantity.id}::sinapi-shared`,
+      `${secondQuantity.id}::sinapi-shared`,
+    ]);
+    expect(secondCandidate).toBeDefined();
+
+    const reranked = applySinapiAiCandidateRanking(candidates, {
+      candidates: [
+        { id: "sinapi-shared", confidence: "high", reason: "ID ambiguo.", pending: "Rejeitar." },
+        { id: secondCandidate?.candidateId, confidence: "medium", reason: "Mais aderente.", pending: "Revisar." },
+      ],
+    });
+
+    expect(reranked.rejectedIds).toEqual(["sinapi-shared"]);
+    expect(reranked.candidates[0].candidateId).toBe(secondCandidate?.candidateId);
+    expect(reranked.candidates).toHaveLength(2);
+  });
+
   it("calls OpenAI with existing IDs and applies the validated JSON response", async () => {
     const candidates = findSinapiQuantityMatchCandidates({
       quantities: [quantity],
@@ -199,7 +254,7 @@ describe("SINAPI quantity matching", () => {
       const body = JSON.parse(String(init?.body)) as { model: string; messages: Array<{ content: string }> };
       expect(init?.headers).toMatchObject({ Authorization: "Bearer openai-test-key" });
       expect(body.model).toBe("gpt-4o-mini");
-      expect(body.messages[1].content).toContain("sinapi-first");
+      expect(body.messages[1].content).toContain(`${quantity.id}::sinapi-first`);
       return Response.json({
         choices: [
           {
@@ -222,6 +277,28 @@ describe("SINAPI quantity matching", () => {
     expect(result.rejectedIds).toEqual([]);
     expect(result.decisions).toEqual([expect.objectContaining({ id: "sinapi-second", confidence: "medium" })]);
     expect(result.candidates[0].composition.id).toBe("sinapi-second");
+  });
+
+  it("rejects invalid OpenAI JSON with a clear error", async () => {
+    const candidates = findSinapiQuantityMatchCandidates({
+      quantities: [quantity],
+      serviceCompositions: [createSinapiComposition({ id: "sinapi-first", description: "Alvenaria de vedacao" })],
+      location: { city: "Cruz das Almas", state: "BA" },
+      referenceDate: "2026-05",
+      regime: "desonerado",
+    });
+    const fetcher = async () =>
+      Response.json({
+        choices: [{ message: { content: "{invalid" } }],
+      });
+
+    await expect(
+      rankSinapiQuantityCandidatesWithOpenAi(candidates, {
+        apiKey: "openai-test-key",
+        model: "gpt-4o-mini",
+        fetcher,
+      })
+    ).rejects.toThrow("OpenAI retornou JSON invalido para ranking SINAPI.");
   });
 });
 
