@@ -262,7 +262,10 @@ export function normalizeSinapiRows(
       });
     }
 
-    const state = normalizeBrazilStateName(getMappedText(row, mapping, "state")) || options.source.state;
+    const rawState = getMappedText(row, mapping, "state");
+    const normalizedRowState = normalizeBrazilStateName(rawState);
+    const state = rawState ? normalizedRowState || rawState : options.source.state;
+    const normalizedState = normalizeBrazilStateName(state);
     const city = getMappedText(row, mapping, "city") || options.source.city;
     const referenceDate = getMappedText(row, mapping, "referenceDate") || options.source.referenceDate;
     const regime = normalizeSinapiRegime(getMappedText(row, mapping, "regime") || options.source.regime);
@@ -270,10 +273,10 @@ export function normalizeSinapiRows(
 
     if (!state) {
       rowIssues.push({ code: "missing-state", rowNumber, status: "requires_review", message: `Linha ${rowNumber}: UF ausente.` });
-    } else if (!normalizeBrazilStateName(state)) {
+    } else if (!normalizedState) {
       rowIssues.push({ code: "invalid-state", rowNumber, status: "requires_review", message: `Linha ${rowNumber}: UF "${state}" inválida.` });
     }
-    if (expectedState && state && normalizeBrazilStateName(state) !== expectedState) {
+    if (expectedState && normalizedState && normalizedState !== expectedState) {
       rowIssues.push({
         code: "out-of-region",
         rowNumber,

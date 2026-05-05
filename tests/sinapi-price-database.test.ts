@@ -159,6 +159,12 @@ describe("SINAPI controlled price database", () => {
       defaultConstructionMethod: "conventional-masonry",
       expectedState: "BA",
     });
+    const invalidRowState = await importSinapiPriceBase({
+      rows: [{ codigo: "SINAPI-503-B", descricao: "Servico com UF invalida", unidade: "m2", preco_total: 10, uf: "XX", data_base: "2026-05", regime: "desonerado" }],
+      source,
+      defaultConstructionMethod: "conventional-masonry",
+      expectedState: "BA",
+    });
     const missingMetadata = await importSinapiPriceBase({
       rows: [{ codigo: "SINAPI-504", descricao: "Servico sem metadados", unidade: "m2", preco_total: 10 }],
       source: { id: "sinapi-missing-metadata", title: "SINAPI sem metadados" },
@@ -168,6 +174,8 @@ describe("SINAPI controlled price database", () => {
     expect(missingPrice.compositions[0]).toMatchObject({ priceStatus: "missing", requiresReview: true });
     expect(invalidUnit.compositions[0]).toMatchObject({ priceStatus: "invalid_unit", unit: "lot", requiresReview: true });
     expect(outOfRegion.compositions[0]).toMatchObject({ priceStatus: "out_of_region", requiresReview: true });
+    expect(invalidRowState.compositions[0]).toMatchObject({ state: "XX", priceStatus: "requires_review", requiresReview: true });
+    expect(invalidRowState.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid-state" })]));
     expect(missingMetadata.compositions[0]).toMatchObject({ priceStatus: "requires_review", regime: "unknown", requiresReview: true });
     expect(missingMetadata.issues).toEqual(
       expect.arrayContaining([
