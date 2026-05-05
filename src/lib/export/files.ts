@@ -15,12 +15,20 @@ let xlsxModulePromise: Promise<XlsxModule> | null = null;
 let jsPdfConstructor: JsPdfConstructor | null = null;
 let jsPdfPromise: Promise<JsPdfConstructor> | null = null;
 
-export function areExportLibrariesReady() {
-  return Boolean(xlsxModule && jsPdfConstructor);
+export function isSpreadsheetExportLibraryReady() {
+  return Boolean(xlsxModule);
 }
 
-export async function prepareExportLibraries() {
-  await Promise.all([loadXlsx(), loadJsPdf()]);
+export function isPdfExportLibraryReady() {
+  return Boolean(jsPdfConstructor);
+}
+
+export async function prepareSpreadsheetExportLibrary() {
+  await loadXlsx();
+}
+
+export async function preparePdfExportLibrary() {
+  await loadJsPdf();
 }
 
 export function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
@@ -283,18 +291,28 @@ export async function exportTechnicalPdf(project: Project, scenario: Scenario) {
 
 async function loadXlsx(): Promise<XlsxModule> {
   if (xlsxModule) return xlsxModule;
-  xlsxModulePromise ??= import("xlsx").then((module) => {
-    xlsxModule = module;
-    return module;
-  });
+  xlsxModulePromise ??= import("xlsx")
+    .then((module) => {
+      xlsxModule = module;
+      return module;
+    })
+    .catch((error) => {
+      xlsxModulePromise = null;
+      throw error;
+    });
   return xlsxModulePromise;
 }
 
 async function loadJsPdf(): Promise<JsPdfConstructor> {
   if (jsPdfConstructor) return jsPdfConstructor;
-  jsPdfPromise ??= import("jspdf").then((module) => {
-    jsPdfConstructor = module.default;
-    return module.default;
-  });
+  jsPdfPromise ??= import("jspdf")
+    .then((module) => {
+      jsPdfConstructor = module.default;
+      return module.default;
+    })
+    .catch((error) => {
+      jsPdfPromise = null;
+      throw error;
+    });
   return jsPdfPromise;
 }

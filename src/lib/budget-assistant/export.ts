@@ -560,10 +560,10 @@ function createTotals(
     lines.length > 0 ? lines.filter((line) => line.structuralCritical).length : compositions.filter((composition) => composition.structuralCritical).length;
   const sinapiPriceRowsByKey = new Map<string, { priceStatus: BudgetSourcePriceStatus }>();
   for (const composition of compositions) {
-    sinapiPriceRowsByKey.set(createSinapiPriceRowKey(composition), composition);
+    setWorstSinapiPriceRow(sinapiPriceRowsByKey, composition);
   }
   for (const line of lines) {
-    sinapiPriceRowsByKey.set(createSinapiPriceRowKey(line), line);
+    setWorstSinapiPriceRow(sinapiPriceRowsByKey, line);
   }
   const sinapiPriceRows = [...sinapiPriceRowsByKey.values()];
   return {
@@ -587,8 +587,28 @@ function createTotals(
   };
 }
 
-function createSinapiPriceRowKey(row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode">) {
-  return `${row.sourceId}::${row.sinapiCode || row.sourceCode}`;
+function setWorstSinapiPriceRow(
+  rowsByKey: Map<string, { priceStatus: BudgetSourcePriceStatus }>,
+  row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode" | "regime" | "priceStatus">
+) {
+  const key = createSinapiPriceRowKey(row);
+  const existing = rowsByKey.get(key);
+  if (!existing || getSinapiPriceStatusRank(row.priceStatus) > getSinapiPriceStatusRank(existing.priceStatus)) {
+    rowsByKey.set(key, row);
+  }
+}
+
+function createSinapiPriceRowKey(row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode" | "regime">) {
+  return `${row.sourceId}::${row.sinapiCode || row.sourceCode}::${row.regime}`;
+}
+
+function getSinapiPriceStatusRank(status: BudgetSourcePriceStatus) {
+  if (status === "valid") return 0;
+  if (status === "requires_review") return 1;
+  if (status === "out_of_region") return 2;
+  if (status === "invalid_unit") return 3;
+  if (status === "missing" || status === "zeroed") return 4;
+  return 5;
 }
 
 function createLaborHoursByRole(

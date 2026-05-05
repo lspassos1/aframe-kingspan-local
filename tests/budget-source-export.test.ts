@@ -397,6 +397,26 @@ describe("budget source export report", () => {
     expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
   });
 
+  it("preserves pending SINAPI status when deduplicating line and composition rows", () => {
+    const pendingSameCodeComposition: ServiceComposition = {
+      ...serviceComposition,
+      id: "composition-pending-same-code",
+      requiresReview: false,
+      sinapi: {
+        ...serviceComposition.sinapi,
+        priceStatus: "missing",
+        requiresReview: true,
+        pendingReason: "Preco oficial ausente.",
+      },
+    };
+    const { project, scenario } = createProjectWithBudget({ extraCompositions: [pendingSameCodeComposition] });
+
+    const report = createBudgetSourceExport(project, scenario, "2026-05-04T21:00:00.000Z");
+
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1 });
+    expect(report.budgetStatusLabel).toBe("Orcamento preliminar");
+  });
+
   it("does not count manual review lines as pending SINAPI prices", () => {
     const manualSource: PriceSource = {
       ...priceSource,

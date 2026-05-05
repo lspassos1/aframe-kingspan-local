@@ -20,18 +20,26 @@ import {
   exportReportPdf,
   exportRfqText,
   exportTechnicalPdf,
-  areExportLibrariesReady,
-  prepareExportLibraries,
+  isPdfExportLibraryReady,
+  isSpreadsheetExportLibraryReady,
+  preparePdfExportLibrary,
+  prepareSpreadsheetExportLibrary,
 } from "@/lib/export/files";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import type { Project } from "@/types/project";
+
+type ExportLibraryKind = "spreadsheet" | "pdf";
+type ExportLibraryStatus = "loading" | "ready" | "failed";
 
 export default function ExportPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const isExportingRef = useRef(false);
   const [exportError, setExportError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [exportLibrariesReady, setExportLibrariesReady] = useState(areExportLibrariesReady);
+  const [exportLibraryStatus, setExportLibraryStatus] = useState<Record<ExportLibraryKind, ExportLibraryStatus>>({
+    spreadsheet: isSpreadsheetExportLibraryReady() ? "ready" : "loading",
+    pdf: isPdfExportLibraryReady() ? "ready" : "loading",
+  });
   const project = useProjectStore((state) => state.project);
   const importProject = useProjectStore((state) => state.importProject);
   const resetProject = useProjectStore((state) => state.resetProject);
@@ -43,13 +51,29 @@ export default function ExportPage() {
 
   useEffect(() => {
     let cancelled = false;
-    prepareExportLibraries()
+
+    prepareSpreadsheetExportLibrary()
       .then(() => {
-        if (!cancelled) setExportLibrariesReady(true);
+        if (!cancelled) setExportLibraryStatus((current) => ({ ...current, spreadsheet: "ready" }));
       })
       .catch((error) => {
-        console.error("Falha ao preparar exportadores:", error);
-        if (!cancelled) setExportError("Nao foi possivel preparar os exportadores. Recarregue a pagina e tente novamente.");
+        console.error("Falha ao preparar exportadores de planilha:", error);
+        if (!cancelled) {
+          setExportLibraryStatus((current) => ({ ...current, spreadsheet: "failed" }));
+          setExportError("Nao foi possivel preparar exportadores de planilha. Recarregue a pagina e tente novamente.");
+        }
+      });
+
+    preparePdfExportLibrary()
+      .then(() => {
+        if (!cancelled) setExportLibraryStatus((current) => ({ ...current, pdf: "ready" }));
+      })
+      .catch((error) => {
+        console.error("Falha ao preparar exportadores PDF:", error);
+        if (!cancelled) {
+          setExportLibraryStatus((current) => ({ ...current, pdf: "failed" }));
+          setExportError("Nao foi possivel preparar exportadores PDF. Recarregue a pagina e tente novamente.");
+        }
       });
 
     return () => {
@@ -95,7 +119,7 @@ export default function ExportPage() {
       description: "Planilha editavel da lista de materiais e acessorios.",
       icon: FileSpreadsheet,
       action: () => exportMaterialsXlsx(project.name, materials, methodDefinition.name),
-      requiresPreparedLibrary: true,
+      requiredLibrary: "spreadsheet" as const,
       label: "Baixar XLSX",
     },
     {
@@ -103,7 +127,7 @@ export default function ExportPage() {
       description: "CSV simples para importar em planilhas ou ERPs.",
       icon: FileSpreadsheet,
       action: () => exportMaterialsCsv(project.name, materials, methodDefinition.name),
-      requiresPreparedLibrary: true,
+      requiredLibrary: "spreadsheet" as const,
       label: "Baixar CSV",
     },
     {
@@ -111,7 +135,7 @@ export default function ExportPage() {
       description: "Resumo com metodo construtivo, status preliminar, materiais, orcamento e avisos.",
       icon: FileText,
       action: () => exportReportPdf(project, scenario, materials, budget),
-      requiresPreparedLibrary: true,
+      requiredLibrary: "pdf" as const,
       label: "Baixar PDF",
     },
     {
@@ -119,7 +143,7 @@ export default function ExportPage() {
       description: "Planilha com fontes, data-base, cidade/UF, confianca, HH, BDI, contingencia e pendencias.",
       icon: FileSpreadsheet,
       action: () => exportBudgetSourceXlsx(project, scenario),
-      requiresPreparedLibrary: true,
+      requiredLibrary: "spreadsheet" as const,
       label: "Baixar XLSX",
     },
     {
@@ -134,7 +158,7 @@ export default function ExportPage() {
       description: "Relatorio preliminar com separacao de custos, fontes e avisos de revisao humana.",
       icon: FileText,
       action: () => exportBudgetSourcePdf(project, scenario),
-      requiresPreparedLibrary: true,
+      requiredLibrary: "pdf" as const,
       label: "Baixar PDF",
     },
     {
@@ -142,7 +166,7 @@ export default function ExportPage() {
       description: "PDF tecnico preliminar; A-frame inclui desenhos, demais metodos incluem resumo tecnico.",
       icon: FileText,
       action: () => exportTechnicalPdf(project, scenario),
-      requiresPreparedLibrary: true,
+      requiredLibrary: "pdf" as const,
       label: "Baixar PDF tecnico",
     },
     {
@@ -187,7 +211,8 @@ export default function ExportPage() {
         </Card>
         {actions.map((item) => {
           const Icon = item.icon;
-          const disabled = isExporting || (item.requiresPreparedLibrary === true && !exportLibrariesReady);
+          const libraryStatus = item.requiredLibrary ? exportLibraryStatus[item.requiredLibrary] : "ready";
+          const disabled = isExporting || libraryStatus !== "ready";
           return (
             <Card className="rounded-md shadow-none" key={item.title}>
               <CardHeader>
@@ -200,7 +225,7 @@ export default function ExportPage() {
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
                 <Button className="w-full" onClick={() => void handleExportAction(item.action)} disabled={disabled}>
                   <Download className="mr-2 h-4 w-4" />
-                  {item.requiresPreparedLibrary === true && !exportLibrariesReady ? "Preparando..." : item.label}
+                  {libraryStatus === "loading" ? "Preparando..." : libraryStatus === "failed" ? "Indisponivel" : item.label}
                 </Button>
               </CardContent>
             </Card>
