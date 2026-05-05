@@ -80,4 +80,22 @@ describe("AI plan extract cache", () => {
     expect(await store.get("invalid-key")).toBeNull();
     expect(entries.has("invalid-key")).toBe(false);
   });
+
+  it("prunes expired memory entries when writing new cache results", async () => {
+    const entries = new Map([
+      [
+        "expired-key",
+        {
+          value: validExtraction,
+          expiresAt: Date.now() - 1_000,
+        },
+      ],
+    ]);
+    const store = createMemoryPlanExtractCacheStore(entries);
+
+    await store.set("fresh-key", validExtraction, 60);
+
+    expect(entries.has("expired-key")).toBe(false);
+    expect(entries.has("fresh-key")).toBe(true);
+  });
 });

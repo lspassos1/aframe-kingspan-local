@@ -120,7 +120,7 @@ export function PlanImportCard() {
       }
 
       setResult(parsed.data);
-      setSelectedFields(getDefaultPlanExtractSelectedFields(parsed.data));
+      setSelectedFields(getDefaultPlanExtractSelectedFields(parsed.data, getActiveScenario(project).constructionMethod));
       setModifiedValues({});
       setProviderMeta({
         provider: payload?.provider,

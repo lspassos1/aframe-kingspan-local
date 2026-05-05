@@ -8,7 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { constructionMethodDefinitions, type ConstructionMethodId } from "@/lib/construction-methods";
-import { getPlanExtractApplicableFields, type PlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
+import {
+  getPlanExtractApplicableFields,
+  getPlanExtractNumberFieldMin,
+  normalizePlanExtractNumberField,
+  type PlanExtractSelectedFields,
+} from "@/lib/ai/apply-plan-extract";
 import type { PlanExtractConfidence, PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 
 type PlanExtractField = keyof PlanExtractResult["extracted"];
@@ -107,8 +112,8 @@ function formatCurrentFieldValue(field: PlanExtractEditableField, value: PlanExt
   return formatFieldValue(field, value) || "Nao informado";
 }
 
-function orderedApplicableFields(result: PlanExtractResult) {
-  const applicable = new Set(getPlanExtractApplicableFields(result));
+function orderedApplicableFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId) {
+  const applicable = new Set(getPlanExtractApplicableFields(result, currentMethod));
   return fieldOrder.filter((field) => {
     if (!applicable.has(field)) return false;
     const value = result.extracted[field];
@@ -140,7 +145,8 @@ export function PlanExtractReview({
   onApply,
   onDismiss,
 }: PlanExtractReviewProps) {
-  const fields = orderedApplicableFields(result);
+  const currentMethod = typeof currentValues.constructionMethod === "string" ? (currentValues.constructionMethod as ConstructionMethodId) : undefined;
+  const fields = orderedApplicableFields(result, currentMethod);
   const selectedCount = fields.filter((field) => selectedFields[field]).length;
   const notes = (result.extracted.notes ?? []).filter(Boolean);
 
@@ -265,10 +271,11 @@ function PlanExtractFieldEditor({
   }
 
   if (numberFields.has(field)) {
+    const minimum = getPlanExtractNumberFieldMin(field) ?? (field === "doorCount" || field === "windowCount" ? 0 : 0.01);
     return (
       <Input
         type="number"
-        min={field === "doorCount" || field === "windowCount" ? 0 : 0.01}
+        min={minimum}
         step={integerFields.has(field) ? 1 : 0.01}
         value={typeof value === "number" ? String(value) : ""}
         onChange={(event) => {
@@ -278,9 +285,8 @@ function PlanExtractFieldEditor({
             return;
           }
           const nextValue = Number(rawValue);
-          if (Number.isFinite(nextValue)) {
-            onChange(integerFields.has(field) ? Math.round(nextValue) : nextValue);
-          }
+          const normalizedValue = normalizePlanExtractNumberField(field, nextValue);
+          onChange(normalizedValue);
         }}
       />
     );

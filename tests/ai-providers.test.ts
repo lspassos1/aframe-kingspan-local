@@ -80,11 +80,26 @@ describe("AI plan extraction providers", () => {
     });
   });
 
-  it("allows Groq image fallback when a vision model is configured", () => {
+  it("keeps Groq image fallback disabled unless visual input is explicitly enabled", () => {
     const providers = getConfiguredAiPlanExtractProviders({
       AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq",
       GROQ_API_KEY: "groq-key",
       AI_GROQ_MODEL: "llama-3.2-11b-vision-preview",
+    });
+
+    expect(providers).toHaveLength(1);
+    expect(providers[0]).toMatchObject({
+      id: "groq",
+      supports: [],
+    });
+  });
+
+  it("allows Groq image fallback when visual input is explicitly enabled", () => {
+    const providers = getConfiguredAiPlanExtractProviders({
+      AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq",
+      GROQ_API_KEY: "groq-key",
+      AI_GROQ_MODEL: "llama-3.2-11b-vision-preview",
+      AI_GROQ_VISION_ENABLED: "true",
     });
 
     expect(providers).toHaveLength(1);

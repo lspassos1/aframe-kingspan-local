@@ -185,7 +185,8 @@ function confidenceFromScore(score: ServiceCompositionCandidateScore): BudgetCon
 }
 
 function clampCandidateLimit(limit: number) {
-  return Math.min(20, Math.max(1, Math.floor(limit)));
+  const normalizedLimit = Number.isFinite(limit) ? Math.floor(limit) : 10;
+  return Math.min(20, Math.max(1, normalizedLimit));
 }
 
 function createLinkKey(quantityId: string, compositionId: string) {

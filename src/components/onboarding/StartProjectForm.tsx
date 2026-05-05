@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type InputHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -217,6 +217,7 @@ export function StartProjectForm() {
       houseDepth: requiresFreshInput ? (undefined as unknown as number) : scenario.aFrame.houseDepth,
     },
   });
+  const manualFormStoreSyncInitializedRef = useRef(false);
 
   const methodForm = useForm<MethodProjectFormValues>({
     resolver: zodResolver(methodProjectSchema) as Resolver<MethodProjectFormValues>,
@@ -246,6 +247,43 @@ export function StartProjectForm() {
       houseDepth: Number(watched.houseDepth ?? scenario.aFrame.houseDepth),
     }
   );
+
+  useEffect(() => {
+    if (!requiresFreshInput) return;
+    if (!manualFormStoreSyncInitializedRef.current) {
+      manualFormStoreSyncInitializedRef.current = true;
+      return;
+    }
+
+    form.reset({
+      projectName: project.name,
+      address: scenario.location.address,
+      city: scenario.location.city,
+      state: scenario.location.state,
+      country: scenario.location.country,
+      terrainWidth: scenario.terrain.width,
+      terrainDepth: scenario.terrain.depth,
+      panelProductId: scenario.panelProductId,
+      panelLength: scenario.aFrame.panelLength,
+      baseAngleDeg: scenario.aFrame.baseAngleDeg,
+      houseDepth: scenario.aFrame.houseDepth,
+    });
+    void form.trigger();
+  }, [
+    form,
+    project.name,
+    requiresFreshInput,
+    scenario.aFrame.baseAngleDeg,
+    scenario.aFrame.houseDepth,
+    scenario.aFrame.panelLength,
+    scenario.location.address,
+    scenario.location.city,
+    scenario.location.country,
+    scenario.location.state,
+    scenario.panelProductId,
+    scenario.terrain.depth,
+    scenario.terrain.width,
+  ]);
 
   useEffect(() => {
     if (!selectedPanel || selectedPanel.isCustom) return;
@@ -686,7 +724,7 @@ export function StartProjectForm() {
                   {selectedMethod === "conventional-masonry" ? (
                     <ProgressiveDetails
                       title="Detalhes de alvenaria"
-                      description="Blocos, aberturas, fundacao, cobertura e acabamentos ficam aqui para nao travar o inicio do estudo."
+                      description="Blocos, aberturas, fundação, cobertura e acabamentos ficam aqui para não travar o início do estudo."
                     >
                       <NumberInput
                         id="methodFloors"
@@ -770,8 +808,8 @@ export function StartProjectForm() {
                   ) : null}
                   {selectedMethod === "eco-block" ? (
                     <ProgressiveDetails
-                      title="Detalhes do bloco ecologico"
-                      description="Modulacao, uso, acabamento, aberturas e reforcos preliminares podem ser ajustados depois dos dados basicos."
+                      title="Detalhes do bloco ecológico"
+                      description="Modulação, uso, acabamento, aberturas e reforços preliminares podem ser ajustados depois dos dados básicos."
                     >
                       <NumberInput id="ecoBlockLength" label="Comprimento bloco (m)" min={0.1} error={methodForm.formState.errors.blockLengthM?.message} {...methodForm.register("blockLengthM")} />
                       <NumberInput id="ecoBlockHeight" label="Altura bloco (m)" min={0.05} error={methodForm.formState.errors.blockHeightM?.message} {...methodForm.register("blockHeightM")} />
@@ -836,8 +874,8 @@ export function StartProjectForm() {
                   ) : null}
                   {selectedMethod === "monolithic-eps" ? (
                     <ProgressiveDetails
-                      title="Detalhes dos paineis EPS"
-                      description="Camadas do painel, aberturas, arranques e condicoes de montagem ficam recolhidos para revisao tecnica."
+                      title="Detalhes dos painéis EPS"
+                      description="Camadas do painel, aberturas, arranques e condições de montagem ficam recolhidos para revisão técnica."
                     >
                       <NumberInput id="epsCoreThickness" label="Núcleo EPS (m)" min={0.03} error={methodForm.formState.errors.epsCoreThicknessM?.message} {...methodForm.register("epsCoreThicknessM")} />
                       <NumberInput id="epsRenderThickness" label="Revest. por face (m)" min={0.01} error={methodForm.formState.errors.renderThicknessPerFaceM?.message} {...methodForm.register("renderThicknessPerFaceM")} />

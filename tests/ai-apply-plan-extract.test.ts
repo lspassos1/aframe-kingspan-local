@@ -137,8 +137,66 @@ describe("AI plan extract application", () => {
     expect(scenario.methodInputs.aframe).toMatchObject(scenario.aFrame);
   });
 
+  it("does not normalize non-Brazil states as Brazilian UF codes", () => {
+    const project = cloneProject(defaultProject);
+    const result: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        ...baseResult.extracted,
+        country: "United States",
+        state: "PA",
+      },
+    };
+
+    const updated = applyPlanExtractToProject(project, project.selectedScenarioId, result, {
+      country: true,
+      state: true,
+    });
+    const scenario = updated.scenarios[0];
+
+    expect(scenario.location.country).toBe("United States");
+    expect(scenario.location.state).toBe("PA");
+  });
+
+  it("ignores invalid numeric extracted values before writing method inputs", () => {
+    const project = cloneProject(defaultProject);
+    const result: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        ...baseResult.extracted,
+        floors: 0,
+        houseDepthM: -12,
+        doorCount: -1,
+      },
+    };
+
+    const updated = applyPlanExtractToProject(project, project.selectedScenarioId, result, getDefaultPlanExtractSelectedFields(result));
+    const masonryInputs = updated.scenarios[0].methodInputs["conventional-masonry"] as Record<string, unknown>;
+
+    expect(masonryInputs.floors).not.toBe(0);
+    expect(masonryInputs.depthM).not.toBe(-12);
+    expect(masonryInputs.doorCount).not.toBe(-1);
+  });
+
   it("lists only present fields as applicable", () => {
     expect(getPlanExtractApplicableFields(baseResult)).toContain("houseWidthM");
     expect(getPlanExtractApplicableFields(baseResult)).not.toContain("address");
+  });
+
+  it("lists only A-frame-applicable dimensions when the target method is A-frame", () => {
+    const result: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        ...baseResult.extracted,
+        constructionMethod: "aframe",
+        builtAreaM2: 90,
+      },
+    };
+    const fields = getPlanExtractApplicableFields(result, "aframe");
+
+    expect(fields).toContain("houseDepthM");
+    expect(fields).not.toContain("houseWidthM");
+    expect(fields).not.toContain("builtAreaM2");
+    expect(fields).not.toContain("floors");
   });
 });

@@ -19,9 +19,11 @@ export function validateBudgetAssistantDataForReviewedBudget(data: BudgetAssista
   const matches = data.matches ?? [];
   const sourceIds = new Set(costSources.map((source) => source.id));
   const costItemById = new Map(costItems.map((item) => [item.id, item]));
+  const matchedCostItemIds = new Set(matches.map((match) => match.costItemId));
+  const matchedCostItems = costItems.filter((item) => matchedCostItemIds.has(item.id));
 
   return [
-    ...costItems.flatMap((item) => validateCostItemSource(item, sourceIds)),
+    ...matchedCostItems.flatMap((item) => validateCostItemSource(item, sourceIds)),
     ...matches.flatMap((match) => validateReviewedMatch(match, costItemById)),
   ];
 }

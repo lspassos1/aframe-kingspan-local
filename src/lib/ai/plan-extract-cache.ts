@@ -15,6 +15,12 @@ type MemoryCacheEntry = {
 
 const sharedMemoryCache = new Map<string, MemoryCacheEntry>();
 
+function pruneExpiredEntries(entries: Map<string, MemoryCacheEntry>, now: number) {
+  for (const [key, entry] of entries.entries()) {
+    if (entry.expiresAt <= now) entries.delete(key);
+  }
+}
+
 function hashValue(value: string | Uint8Array) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -81,9 +87,11 @@ export function createMemoryPlanExtractCacheStore(entries = sharedMemoryCache): 
       return entry.value;
     },
     async set(key, value, ttlSeconds) {
+      const now = Date.now();
+      pruneExpiredEntries(entries, now);
       entries.set(key, {
         value,
-        expiresAt: Date.now() + ttlSeconds * 1000,
+        expiresAt: now + ttlSeconds * 1000,
       });
     },
   };

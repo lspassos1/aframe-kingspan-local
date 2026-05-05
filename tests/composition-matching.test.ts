@@ -121,6 +121,16 @@ describe("quantity to composition matching", () => {
     ]);
   });
 
+  it("falls back to the default candidate limit when the configured limit is NaN", () => {
+    const candidates = findServiceCompositionCandidates({
+      quantities: [quantity],
+      serviceCompositions: [cityComposition, stateComposition],
+      maxCandidatesPerQuantity: Number.NaN,
+    });
+
+    expect(candidates.map((candidate) => candidate.composition.id)).toEqual(["composition-city-wall", "composition-state-wall"]);
+  });
+
   it("marks incompatible units and weak candidates as low confidence", () => {
     const incompatibleComposition = createComposition({
       id: "composition-incompatible",
