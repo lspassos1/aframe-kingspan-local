@@ -68,4 +68,19 @@ describe("operational checklist", () => {
     expect(getStatus(checklist, "Regime")).toBe("definido");
     expect(JSON.stringify(checklist)).not.toContain("sk-");
   });
+
+  it("keeps AI active with OpenAI key while reporting an absent explicit model", () => {
+    const checklist = createOperationalChecklist(
+      {
+        ...disabledEnvironment,
+        aiPlanExtractEnabled: true,
+        openAiApiKeyConfigured: true,
+        openAiModelConfigured: false,
+      },
+      defaultProject
+    );
+
+    expect(getStatus(checklist, "IA")).toBe("ativa");
+    expect(getStatus(checklist, "Modelo")).toBe("ausente");
+  });
 });

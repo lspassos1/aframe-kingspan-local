@@ -40,7 +40,7 @@ export function createOperationalChecklist(
     sinapiSources.some((source) => source.id === composition.sourceId)
   );
   const hasSinapiBase = sinapiSources.length > 0 || hasSinapiCompositions;
-  const aiOperational = environment.aiPlanExtractEnabled && environment.openAiApiKeyConfigured && environment.openAiModelConfigured;
+  const aiOperational = environment.aiPlanExtractEnabled && environment.openAiApiKeyConfigured;
   const scenarioState = scenario.location.state.trim();
   const hasSinapiReference = sinapiSources.some((source) => source.referenceDate.trim());
   const hasRegime = hasSinapiRegimeMetadata(project);
@@ -51,8 +51,8 @@ export function createOperationalChecklist(
       label: "IA",
       status: aiOperational ? "ativa" : "desligada",
       detail: aiOperational
-        ? "Upload assistido pode ser exibido no início."
-        : "Verifique flag, OPENAI_API_KEY no servidor e modelo OpenAI.",
+        ? "Upload assistido pode ser exibido no início. Confira o status do modelo abaixo."
+        : "Verifique a flag e OPENAI_API_KEY no ambiente do servidor.",
       tone: aiOperational ? "ok" : "warning",
     },
     {

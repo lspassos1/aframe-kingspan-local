@@ -76,7 +76,7 @@ IA ligada:
 AI_PLAN_EXTRACT_ENABLED=true
 ```
 
-Mesmo com a flag ligada, upload assistido precisa de `OPENAI_API_KEY`, modelo configurado e limites válidos.
+Mesmo com a flag ligada, upload assistido precisa de `OPENAI_API_KEY` no servidor. Configure `AI_OPENAI_MODEL` explicitamente para controle operacional; se ele estiver ausente, o backend usa o padrão OpenAI atual e o checklist mostra `Modelo: ausente`.
 
 ## Limites Diários
 
