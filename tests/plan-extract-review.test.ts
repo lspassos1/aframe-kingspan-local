@@ -109,6 +109,7 @@ describe("PlanExtractReview", () => {
   it("finds field evidence only when extraction notes or assumptions reference the field", () => {
     expect(getPlanExtractFieldEvidence(reviewResult, "city")).toBe("Cidade: Salvador aparece no carimbo.");
     expect(getPlanExtractFieldEvidence(reviewResult, "builtAreaM2")).toBe("Area construida calculada por largura x profundidade.");
+    expect(getPlanExtractFieldEvidence(reviewResult, "terrainWidthM")).toBeUndefined();
     expect(getPlanExtractFieldEvidence(reviewResult, "windowCount")).toBeUndefined();
   });
 });

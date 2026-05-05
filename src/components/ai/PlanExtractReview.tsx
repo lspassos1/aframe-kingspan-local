@@ -113,22 +113,22 @@ const fieldLabels: Record<PlanExtractField, string> = {
   notes: "Observacoes detectadas",
 };
 
-const fieldEvidenceAliases: Partial<Record<PlanExtractEditableField, string[]>> = {
-  projectName: ["nome", "projeto"],
-  address: ["endereco", "rua", "logradouro"],
-  city: ["cidade", "municipio"],
-  state: ["estado", "uf"],
-  country: ["pais"],
-  constructionMethod: ["metodo", "sistema", "construtivo"],
-  terrainWidthM: ["terreno", "largura"],
-  terrainDepthM: ["terreno", "profundidade"],
-  houseWidthM: ["casa", "largura", "fachada"],
-  houseDepthM: ["casa", "profundidade"],
-  builtAreaM2: ["area", "construida"],
-  floorHeightM: ["pe-direito", "altura"],
-  floors: ["pavimento", "andar"],
-  doorCount: ["porta"],
-  windowCount: ["janela"],
+const fieldEvidencePhrases: Partial<Record<PlanExtractEditableField, string[][]>> = {
+  projectName: [["nome", "projeto"], ["projeto"]],
+  address: [["endereco"], ["rua"], ["logradouro"]],
+  city: [["cidade"], ["municipio"]],
+  state: [["estado"], ["uf"]],
+  country: [["pais"]],
+  constructionMethod: [["metodo"], ["sistema", "construtivo"]],
+  terrainWidthM: [["largura", "terreno"]],
+  terrainDepthM: [["profundidade", "terreno"]],
+  houseWidthM: [["largura", "casa"], ["fachada"]],
+  houseDepthM: [["profundidade", "casa"]],
+  builtAreaM2: [["area", "construida"]],
+  floorHeightM: [["pe", "direito"], ["altura"]],
+  floors: [["pavimento"], ["andar"]],
+  doorCount: [["porta"]],
+  windowCount: [["janela"]],
 };
 
 const confidenceLabels: Record<PlanExtractConfidence, string> = {
@@ -152,12 +152,21 @@ function normalizeTextForSearch(value: string) {
     .toLowerCase();
 }
 
+function tokenizeEvidence(value: string) {
+  return normalizeTextForSearch(value).match(/[a-z0-9]+/g) ?? [];
+}
+
+function candidateHasPhrase(candidateTokens: string[], phrase: string[]) {
+  const phraseTokens = phrase.flatMap(tokenizeEvidence);
+  return phraseTokens.length > 0 && phraseTokens.every((token) => candidateTokens.includes(token));
+}
+
 export function getPlanExtractFieldEvidence(result: PlanExtractResult, field: PlanExtractEditableField) {
-  const aliases = [fieldLabels[field], field, ...(fieldEvidenceAliases[field] ?? [])].map(normalizeTextForSearch);
+  const phrases = [[fieldLabels[field]], ...(fieldEvidencePhrases[field] ?? [])];
   const candidates = [...(result.extracted.notes ?? []), ...result.assumptions].filter(Boolean);
   return candidates.find((candidate) => {
-    const normalizedCandidate = normalizeTextForSearch(candidate);
-    return aliases.some((alias) => normalizedCandidate.includes(alias));
+    const candidateTokens = tokenizeEvidence(candidate);
+    return phrases.some((phrase) => candidateHasPhrase(candidateTokens, phrase));
   });
 }
 
