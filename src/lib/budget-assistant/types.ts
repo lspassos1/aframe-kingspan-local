@@ -83,6 +83,21 @@ export interface ServiceComposition extends BudgetSourceMeta {
   otherCostBRL: number;
   directUnitCostBRL: number;
   totalLaborHoursPerUnit: number;
+  sinapi?: {
+    sourceId: string;
+    sourceTitle?: string;
+    code: string;
+    description: string;
+    state: string;
+    city: string;
+    referenceDate: string;
+    regime: "onerado" | "nao_desonerado" | "desonerado" | "unknown";
+    priceStatus: "valid" | "zeroed" | "missing" | "requires_review" | "invalid_unit" | "out_of_region" | "invalid";
+    confidence: BudgetConfidenceLevel;
+    requiresReview: boolean;
+    pendingReason: string;
+    totalLaborHoursPerUnit: number;
+  };
 }
 
 export interface BudgetQuantity {
