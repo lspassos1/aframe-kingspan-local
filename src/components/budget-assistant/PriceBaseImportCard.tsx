@@ -29,6 +29,15 @@ import {
 } from "@/lib/budget-assistant";
 import { formatLocalDateInputValue } from "@/lib/date";
 import { isBrazilCityInState, isBrazilState, normalizeBrazilStateName } from "@/lib/locations/brazil";
+import {
+  importSinapiPriceBase,
+  parseSinapiRowsFromFile,
+  sinapiImportLimits,
+  type SinapiColumnMapping,
+  type SinapiImportIssue,
+  type SinapiPriceStatus,
+  type SinapiRegime,
+} from "@/lib/sinapi";
 
 const sourceTypeOptions: Array<{ value: PriceSourceType; label: string }> = [
   { value: "sinapi", label: "SINAPI" },
@@ -45,7 +54,25 @@ const reliabilityOptions: Array<{ value: PriceSource["reliability"]; label: stri
   { value: "low", label: "Baixa" },
 ];
 
+const sinapiRegimeOptions: Array<{ value: SinapiRegime; label: string }> = [
+  { value: "desonerado", label: "Desonerado" },
+  { value: "nao_desonerado", label: "Nao desonerado" },
+  { value: "onerado", label: "Onerado" },
+  { value: "unknown", label: "Nao informado" },
+];
+
+const sinapiStatusLabels: Record<SinapiPriceStatus, string> = {
+  valid: "validos",
+  zeroed: "zerados",
+  missing: "sem preco",
+  requires_review: "revisao",
+  invalid_unit: "unidade invalida",
+  out_of_region: "fora da UF",
+  invalid: "invalidos",
+};
+
 const columnKeys = Object.keys(defaultPriceBaseColumnMapping) as PriceBaseColumnKey[];
+type ImportIssue = PriceBaseImportIssue | SinapiImportIssue;
 
 interface PriceBaseImportCardProps {
   scenarioId: string;
@@ -70,20 +97,21 @@ export function PriceBaseImportCard({
   const [fileName, setFileName] = useState("");
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourceType, setSourceType] = useState<PriceSourceType>("sinapi");
-  const [sourceSupplier, setSourceSupplier] = useState("");
+  const [sourceSupplier, setSourceSupplier] = useState("CAIXA");
   const [sourceDate, setSourceDate] = useState(formatLocalDateInputValue);
   const [sourceCity, setSourceCity] = useState(scenarioCity);
   const [sourceState, setSourceState] = useState(normalizedScenarioState);
   const [sourceReliability, setSourceReliability] = useState<PriceSource["reliability"]>("medium");
+  const [sourceRegime, setSourceRegime] = useState<SinapiRegime>("unknown");
   const [sourceNotes, setSourceNotes] = useState("");
   const [methodId, setMethodId] = useState<ConstructionMethodId>(defaultConstructionMethod);
   const [mapping, setMapping] = useState<PriceBaseColumnMapping>(defaultPriceBaseColumnMapping);
-  const [issues, setIssues] = useState<PriceBaseImportIssue[]>([]);
+  const [issues, setIssues] = useState<ImportIssue[]>([]);
   const [summary, setSummary] = useState("");
 
   const normalizedSourceState = normalizeBrazilStateName(sourceState) || sourceState;
   const sourceStateIsValid = isBrazilState(normalizedSourceState);
-  const sourceCityIsValid = isBrazilCityInState(normalizedSourceState, sourceCity);
+  const sourceCityIsValid = sourceType === "sinapi" && !sourceCity ? true : isBrazilCityInState(normalizedSourceState, sourceCity);
   const canImport = Boolean(
     rows.length > 0 &&
       sourceTitle.trim() &&
@@ -105,12 +133,18 @@ export function PriceBaseImportCard({
 
     try {
       const extension = getFileExtension(file.name);
+      if ((sourceType === "sinapi" || extension === "zip") && file.size > sinapiImportLimits.maxUploadBytes) {
+        throw new Error(`Arquivo excede o limite de ${Math.round(sinapiImportLimits.maxUploadBytes / 1024 / 1024)} MB para importacao SINAPI.`);
+      }
+      const fileData = extension === "xlsx" || extension === "xls" || extension === "zip" ? await file.arrayBuffer() : await file.text();
       const parsedRows =
-        extension === "json"
-          ? parsePriceBaseJson(await file.text())
-          : extension === "xlsx" || extension === "xls"
-            ? parsePriceBaseXlsx(await file.arrayBuffer())
-            : parsePriceBaseCsv(await file.text());
+        sourceType === "sinapi" || extension === "zip"
+          ? await parseSinapiRowsFromFile(file.name, fileData)
+          : extension === "json"
+            ? parsePriceBaseJson(fileData as string)
+            : extension === "xlsx" || extension === "xls"
+              ? parsePriceBaseXlsx(fileData as ArrayBuffer)
+              : parsePriceBaseCsv(fileData as string);
       setRows(parsedRows);
       setSummary(`${parsedRows.length} linhas lidas de ${file.name}. Revise o mapeamento antes de importar.`);
       if (!sourceTitle.trim()) setSourceTitle(file.name.replace(/\.[^.]+$/, ""));
@@ -129,9 +163,44 @@ export function PriceBaseImportCard({
     setMapping((current) => ({ ...current, [columnKey]: value }));
   };
 
-  const handleImport = (event: FormEvent<HTMLFormElement>) => {
+  const handleSourceTypeChange = (value: string) => {
+    const nextType = value as PriceSourceType;
+    setSourceType(nextType);
+    if (nextType === "sinapi" && !sourceSupplier.trim()) setSourceSupplier("CAIXA");
+  };
+
+  const handleImport = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canImport) return;
+
+    if (sourceType === "sinapi") {
+      const result = await importSinapiPriceBase({
+        rows,
+        fileName,
+        mapping: mapPriceBaseMappingToSinapi(mapping),
+        source: {
+          title: sourceTitle,
+          supplier: sourceSupplier,
+          state: normalizedSourceState,
+          city: sourceCity,
+          referenceDate: sourceDate,
+          uploadedFileName: fileName,
+          reliability: sourceReliability,
+          regime: sourceRegime,
+          notes: sourceNotes,
+        },
+        defaultConstructionMethod: methodId,
+        expectedState: normalizedSourceState,
+      });
+      setIssues(result.issues);
+      setSummary(
+        `${result.importedRows} composicoes SINAPI importadas; ${result.reviewRows} ficaram pendentes de revisao. ${formatSinapiStatusSummary(
+          result.statusCounts
+        )}`
+      );
+      if (result.importedRows > 0) onImport(result.priceSource, result.serviceCompositions);
+      return;
+    }
 
     const source = createImportedPriceSource({
       type: sourceType,
@@ -171,8 +240,8 @@ export function PriceBaseImportCard({
         </div>
         <form onSubmit={handleImport} className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="price-base-file">Arquivo CSV, XLSX ou JSON</Label>
-            <Input id="price-base-file" type="file" accept=".csv,.xlsx,.xls,.json" onChange={handleFileChange} />
+            <Label htmlFor="price-base-file">Arquivo CSV, XLSX, JSON ou ZIP</Label>
+            <Input id="price-base-file" type="file" accept=".csv,.xlsx,.xls,.json,.zip" onChange={handleFileChange} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="price-base-title">Nome da base</Label>
@@ -180,7 +249,7 @@ export function PriceBaseImportCard({
           </div>
           <div className="space-y-2">
             <Label htmlFor="price-base-type">Tipo da fonte</Label>
-            <Select value={sourceType} onValueChange={(value) => setSourceType(value as PriceSourceType)}>
+            <Select value={sourceType} onValueChange={handleSourceTypeChange}>
               <SelectTrigger id="price-base-type" className="h-10 w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -193,6 +262,23 @@ export function PriceBaseImportCard({
               </SelectContent>
             </Select>
           </div>
+          {sourceType === "sinapi" ? (
+            <div className="space-y-2">
+              <Label htmlFor="price-base-regime">Regime SINAPI</Label>
+              <Select value={sourceRegime} onValueChange={(value) => setSourceRegime(value as SinapiRegime)}>
+                <SelectTrigger id="price-base-regime" className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sinapiRegimeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="price-base-supplier">Fornecedor/origem</Label>
             <Input id="price-base-supplier" value={sourceSupplier} onChange={(event) => setSourceSupplier(event.target.value)} placeholder="CAIXA, fornecedor ou fonte interna" />
@@ -300,4 +386,30 @@ function Metric({ label, value }: { label: string; value: number }) {
 
 function getFileExtension(fileName: string) {
   return fileName.split(".").pop()?.toLowerCase() ?? "csv";
+}
+
+function mapPriceBaseMappingToSinapi(mapping: PriceBaseColumnMapping): SinapiColumnMapping {
+  return {
+    code: mapping.sourceCode,
+    description: mapping.description,
+    unit: mapping.unit,
+    totalUnitPrice: mapping.totalUnitPrice,
+    materialCostBRL: mapping.materialCostBRL,
+    laborCostBRL: mapping.laborCostBRL,
+    equipmentCostBRL: mapping.equipmentCostBRL,
+    totalLaborHoursPerUnit: mapping.totalLaborHoursPerUnit,
+    referenceDate: mapping.referenceDate,
+    state: mapping.state,
+    city: mapping.city,
+    stage: mapping.stage,
+    tags: mapping.tags,
+    constructionMethod: mapping.constructionMethod,
+  };
+}
+
+function formatSinapiStatusSummary(statusCounts: Record<SinapiPriceStatus, number>) {
+  const parts = Object.entries(statusCounts)
+    .filter(([, count]) => count > 0)
+    .map(([status, count]) => `${count} ${sinapiStatusLabels[status as SinapiPriceStatus]}`);
+  return parts.length > 0 ? `Status: ${parts.join(", ")}.` : "";
 }
