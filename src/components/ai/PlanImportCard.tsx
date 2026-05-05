@@ -180,7 +180,7 @@ export function PlanImportCard() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="font-semibold">Importar planta baixa</h2>
+              <h2 className="font-semibold">Enviar planta baixa</h2>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
                 Envie PNG, JPG, WebP ou PDF para preencher campos preliminares com revisao humana.
               </p>
