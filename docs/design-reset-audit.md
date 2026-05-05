@@ -4,7 +4,7 @@
 
 Esta auditoria inicia a épica [#122](https://github.com/lspassos1/aframe-kingspan-local/issues/122) e referencia a issue [#123](https://github.com/lspassos1/aframe-kingspan-local/issues/123).
 
-O objetivo é registrar o estado visual atual antes do redesenho profundo. Este PR não implementa UI; ele documenta o que existe, o que está bloqueando a percepção de produto moderno e como os próximos PRs devem evoluir a experiência.
+O objetivo é registrar o estado visual atual antes do redesenho profundo. Este PR não implementa UI; ele documenta o que existe, o que ainda parece sistema técnico interno e como os próximos PRs devem evoluir a experiência.
 
 Fonte de escopo: prompt anexado/conteúdo da conversa, sem depender de caminho local em `Downloads`.
 
@@ -19,75 +19,152 @@ Fonte de escopo: prompt anexado/conteúdo da conversa, sem depender de caminho l
 - Separador usado: valor único, sem vírgula ou quebra de linha.
 - Redeploy: não é necessário porque não houve alteração de env.
 
-`/admin/feedback` não foi capturada nesta auditoria porque a sessão local não estava autenticada/autorizada como admin via Clerk. Não houve simulação, bypass ou alteração de regra de autorização.
+Depois do login real do Lucas no app em produção, `https://aframe-kingspan-local.vercel.app/api/admin/status` retornou `{"isAdmin":true}` na sessão autenticada. O acesso admin está autorizado por `ADMIN_EMAILS` em Production.
 
 ## Validação Visual Executada
 
 Ambiente:
 
-- Dev server local: `http://localhost:3000`
-- Desktop: `1440x1000`
-- Mobile: `390x844`
-- Ferramentas: Browser inicializado e Playwright para screenshots versionados.
-- Pasta: `docs/design-audit/screenshots/`
-- Peso total dos PNGs: aproximadamente 5.8 MB.
+- Produção autenticada no in-app browser: `https://aframe-kingspan-local.vercel.app/start`.
+- Dev server local autenticado via Clerk: `http://localhost:3000`.
+- Desktop: `1440x1000`.
+- Mobile: `390x844`.
+- Ferramentas: Browser para validar sessão real do usuário e Playwright para screenshots versionados.
+- Pasta: `docs/design-audit/screenshots/`.
+- Peso total dos PNGs: aproximadamente 3.3 MB.
 
-Observação importante: as rotas protegidas por Clerk redirecionaram para `/` sem sessão autenticada. Os screenshots dessas rotas registram o estado bloqueado. Isso é um achado da auditoria, não validação visual autenticada das telas internas.
+Fluxo usado:
+
+1. Lucas fez login real no in-app browser em produção.
+2. A sessão de produção confirmou acesso a `/start` e status admin verdadeiro.
+3. O preview da Vercel do PR estava `Ready`, mas o acesso HTTP direto permanecia protegido por SSO/401.
+4. Para screenshots desktop/mobile consistentes, foi usado o dev server local com sessão Clerk autenticada e o exemplo carregado por `/start?mode=example`.
+5. As rotas internas foram abertas pelo shell autenticado, não por screenshots de redirect.
+
+Achado técnico de navegação: a abertura direta de rotas internas em um novo carregamento pode redirecionar para `/start` antes da hidratação do project store local. Para capturar o app real, as rotas internas foram acessadas pelo shell autenticado depois de carregar o exemplo. Isso deve ser tratado nos PRs de shell/onboarding, sem remover a proteção de rotas.
+
+`/admin/feedback` foi capturada. A autorização admin foi confirmada em Production, mas a tela local exibiu erro operacional ao carregar a lista de melhorias porque `/api/admin/feedback` retornou `502`. Isso afeta dados da tabela, não a autorização visual da rota.
 
 ## Inventário De Screenshots
 
 | Rota | Desktop | Mobile | Resultado |
 | --- | --- | --- | --- |
-| `/` | `home-desktop.png` | `home-mobile.png` | Capturada |
-| `/start` | `start-desktop.png` | `start-mobile.png` | Redirecionou para `/` sem auth |
-| `/dashboard` | `dashboard-desktop.png` | `dashboard-mobile.png` | Redirecionou para `/` sem auth |
-| `/edit` | `edit-desktop.png` | `edit-mobile.png` | Redirecionou para `/` sem auth |
-| `/budget` | `budget-desktop.png` | `budget-mobile.png` | Redirecionou para `/` sem auth |
-| `/budget-assistant` | `budget-assistant-desktop.png` | `budget-assistant-mobile.png` | Redirecionou para `/` sem auth |
-| `/model-3d` | `model-3d-desktop.png` | `model-3d-mobile.png` | Redirecionou para `/` sem auth |
-| `/materials` | `materials-desktop.png` | `materials-mobile.png` | Redirecionou para `/` sem auth |
-| `/technical-project` | `technical-project-desktop.png` | `technical-project-mobile.png` | Redirecionou para `/` sem auth |
-| `/structure` | `structure-desktop.png` | `structure-mobile.png` | Redirecionou para `/` sem auth |
-| `/settings` | `settings-desktop.png` | `settings-mobile.png` | Redirecionou para `/` sem auth |
-| `/quotation` | `quotation-desktop.png` | `quotation-mobile.png` | Redirecionou para `/` sem auth |
-| `/scenarios` | `scenarios-desktop.png` | `scenarios-mobile.png` | Redirecionou para `/` sem auth |
-| `/export` | `export-desktop.png` | `export-mobile.png` | Redirecionou para `/` sem auth |
-| `/help` | `help-desktop.png` | `help-mobile.png` | Redirecionou para `/` sem auth |
-| `/feedback` | `feedback-desktop.png` | `feedback-mobile.png` | Capturada |
-| `/admin/feedback` | não capturada | não capturada | Sessão não autorizada como admin |
+| `/` | `home-desktop.png` | `home-mobile.png` | Capturada autenticada |
+| `/start` | `start-desktop.png` | `start-mobile.png` | Capturada autenticada |
+| `/dashboard` | `dashboard-desktop.png` | `dashboard-mobile.png` | Capturada com projeto exemplo |
+| `/edit` | `edit-desktop.png` | `edit-mobile.png` | Capturada com projeto exemplo |
+| `/budget` | `budget-desktop.png` | `budget-mobile.png` | Capturada com projeto exemplo |
+| `/budget-assistant` | `budget-assistant-desktop.png` | `budget-assistant-mobile.png` | Capturada com projeto exemplo |
+| `/model-3d` | `model-3d-desktop.png` | `model-3d-mobile.png` | Capturada com projeto exemplo |
+| `/materials` | `materials-desktop.png` | `materials-mobile.png` | Capturada com projeto exemplo |
+| `/technical-project` | `technical-project-desktop.png` | `technical-project-mobile.png` | Capturada com projeto exemplo |
+| `/structure` | `structure-desktop.png` | `structure-mobile.png` | Capturada com projeto exemplo |
+| `/settings` | `settings-desktop.png` | `settings-mobile.png` | Capturada com projeto exemplo |
+| `/quotation` | `quotation-desktop.png` | `quotation-mobile.png` | Capturada com projeto exemplo |
+| `/scenarios` | `scenarios-desktop.png` | `scenarios-mobile.png` | Capturada com projeto exemplo |
+| `/export` | `export-desktop.png` | `export-mobile.png` | Capturada com projeto exemplo |
+| `/help` | `help-desktop.png` | `help-mobile.png` | Capturada com projeto exemplo |
+| `/feedback` | `feedback-desktop.png` | `feedback-mobile.png` | Capturada autenticada |
+| `/admin/feedback` | `admin-feedback-desktop.png` | `admin-feedback-mobile.png` | Capturada; lista retornou erro 502 |
+
+## Análise Visual Por Rota
+
+### `/`
+
+A Home já comunica planta baixa, revisão, base de preço, orçamento e exportação. Ainda parece uma página explicativa com muito texto antes da ação concreta. O CTA "Começar com planta" é correto, mas a tela não mostra uma interação de upload ou exemplo visual no primeiro viewport.
+
+### `/start`
+
+O início está mais alinhado ao produto: três caminhos claros, método fora da primeira camada e upload como opção primária. O problema é que o upload aparece como "IA desligada" sem uma explicação operacional curta no próprio card. A experiência ainda não mostra uma prévia do que acontecerá depois da escolha.
+
+### `/dashboard`
+
+O painel tem bons números executivos, mas ainda mistura resumo, alertas, projetos salvos e estado técnico em uma página longa. No mobile, o conteúdo vira uma sequência extensa de cartões e o usuário perde a noção de progresso. Precisa de uma hierarquia mais forte: status do estudo, pendências, próximo passo e ação primária.
+
+### `/edit`
+
+É a tela mais crítica visualmente. Ainda parece formulário técnico interno: localização, terreno, método, painel, geometria e preço aparecem juntos. A etapa deveria ser "Dados da obra" com seções guiadas e editores menores, não uma página única de parâmetros.
+
+### `/budget`
+
+O orçamento mostra total preliminar e pendências, mas ainda se comporta como relatório/tabela. Falta transformar cada grupo em decisão: quantidade revisada, fonte, status, confiança e ação de resolver pendência. Os avisos existem, mas competem com tabelas densas.
+
+### `/budget-assistant`
+
+A tela de base de preços concentra importação, fontes, composições, candidatos e vínculos. Está correta tecnicamente, mas pesada para um usuário novo. Deve virar fluxo: importar base, validar UF/referência/regime, buscar composições e aprovar vínculo.
+
+### `/model-3d`
+
+O 3D é uma das melhores provas de valor, mas aparece cercado por muitos controles técnicos. No desktop, o painel de parâmetros domina a percepção. No mobile, a experiência fica apertada e os controles competem com a visualização. Precisa de modo visual mais limpo e painel recolhível.
+
+### `/materials`
+
+A lista de materiais ainda parece uma planilha operacional. É útil para regressão A-frame, mas não deve ser a primeira linguagem visual do produto modular. Precisa agrupar por sistema, pendência e fonte.
+
+### `/technical-project`
+
+A tela tem informação técnica útil, mas reforça a sensação de documento interno. Deve ser reposicionada como área avançada, com desenhos e premissas sob demanda.
+
+### `/structure`
+
+A tela confirma que o baseline A-frame segue funcionando, mas o rótulo "Estrutura A-frameA-frame" aparece duplicado na navegação mobile. Essa duplicação deve ser corrigida no redesign do shell. Conteúdo técnico deve permanecer protegido por método.
+
+### `/settings`
+
+"Premissas" concentra catálogos e parâmetros editáveis. A tela é necessária, mas parece administração de banco interno. Deve virar área avançada com linguagem de "fontes, catálogos e premissas" e menos tabela visível no primeiro viewport.
+
+### `/quotation`
+
+A cotação entrega textos prontos, mas visualmente parece uma página utilitária isolada. Deve se conectar ao estado do orçamento: itens pendentes, fontes ausentes e próximos pedidos.
+
+### `/scenarios`
+
+A comparação de alternativas é valiosa, mas ainda é muito orientada a gráfico/tabela técnica. Precisa destacar decisão: cenário atual, diferença de custo, diferença de área e risco técnico.
+
+### `/export`
+
+A exportação lista JSON, XLSX, CSV e PDF com boa clareza. Ainda falta mostrar status do que será exportado: orçamento preliminar, pendências, data-base, fonte e revisão humana.
+
+### `/help`
+
+O checklist operacional é útil e já explica IA, OpenAI, SINAPI, UF, referência e regime. Visualmente, deve virar uma área de diagnóstico mais direta, com ações para resolver configuração ausente.
+
+### `/feedback`
+
+A tela é funcional, mas tem copy longa sobre privacidade e GitHub antes do formulário. Deve manter segurança, mas com leitura mais leve.
+
+### `/admin/feedback`
+
+A rota admin fica visível para usuário autorizado. Os cards de Pendentes/Aprovadas/Recusadas são claros, mas a tela mostrou erro "Nao foi possivel carregar as melhorias" porque a API retornou `502`. O design deve separar estado de autorização, estado de integração GitHub e estado vazio da tabela.
 
 ## Achados Críticos
 
-1. `/start` está protegido pelo middleware, mas a experiência planejada depende de começar por `/start`. Um usuário sem sessão não vê as três opções de entrada; é redirecionado para a Home.
-2. A auditoria autenticada das rotas internas ficou bloqueada por falta de sessão Clerk. Para os próximos PRs de UI, a validação deve ocorrer em sessão real autenticada ou registrar bloqueio.
-3. A Home comunica melhor a proposta de planta -> revisão -> orçamento, mas ainda carrega sensação de página pública genérica em vez de colocar a ação de upload como primeira interação concreta.
-4. O app ainda depende de telas internas densas e especializadas, segundo inspeção de código das páginas. `/edit` concentra dados de projeto, terreno, painel, A-frame e preço no mesmo fluxo.
-5. O orçamento atual ainda é fragmentado por método e por tabelas. A tela precisa virar uma superfície de decisão com total preliminar, pendências, fonte ativa, data-base e revisão humana.
-6. O schema atual de IA é estreito: cobre projeto, localização, método, dimensões básicas e contagem de portas/janelas, mas não cobre documento, escala, ambientes, paredes, aberturas detalhadas, elétrica, hidráulica, fundação, cobertura, perguntas e `QuantitySeed`.
-7. O fluxo manual ainda não tem modelo de ambientes, portas e janelas como objetos editáveis. Sem isso, o takeoff manual não consegue alimentar quantitativos ricos.
-8. A navegação foi simplificada anteriormente, mas a experiência ainda começa pesada depois do login porque o produto não tem um shell visual de etapas do estudo.
+1. O produto já tem fluxo autenticado funcional, mas as telas internas ainda parecem uma suíte técnica A-frame em vez de estudo construtivo guiado.
+2. `/edit`, `/budget-assistant`, `/materials`, `/settings` e `/technical-project` concentram a maior parte da sensação de sistema interno.
+3. O shell mobile expõe duplicação de label: `Estrutura A-frameA-frame`.
+4. O onboarding em `/start` está no caminho certo, mas ainda depende de "IA desligada" sem diagnóstico acionável no primeiro card.
+5. O 3D funciona como baseline de valor, mas precisa de uma apresentação visual mais limpa antes dos controles técnicos.
+6. O orçamento ainda não deixa a revisão humana, fonte e pendências fortes o bastante por linha.
+7. A rota admin está autorizada, mas a integração de dados de feedback falhou com `502`; isso deve aparecer como pendência operacional.
+8. Console local registrou avisos existentes de Recharts em containers com largura/altura `-1` em rotas de orçamento/cenários e avisos de Three.js deprecated no 3D. Não são bloqueios deste PR de auditoria, mas devem entrar como risco de polish/performance.
 
 ## O Que Está Ruim Visualmente
 
-- Primeira camada ainda tem texto explicativo demais para uma tarefa operacional.
-- A ação "Enviar planta" não parece ser o centro absoluto da experiência.
-- Cards e tabelas aparecem como superfícies administrativas, não como etapas de decisão.
-- O app mistura premissas técnicas, método construtivo, orçamento e configurações cedo demais.
-- Telas como `/edit`, `/budget` e `/budget-assistant` tendem a crescer como formulários ou planilhas.
-- Falta resumo fixo de pendências e progresso.
-- Falta vocabulário visual consistente para confiança, evidência, fonte, revisão e pendência.
-- Faltam editores dedicados para ambientes, portas e janelas.
+- Formulários e tabelas ainda dominam as telas internas.
+- Cards técnicos competem com decisões principais.
+- Há muita linguagem de parâmetro, catálogo, composição e estrutura cedo demais.
+- O app não mantém uma linha visual contínua de planta -> revisão -> quantitativo -> fonte -> orçamento.
+- Mobile funciona, mas parece uma versão empilhada do desktop, não um fluxo pensado para decisão.
+- Falta uma gramática visual consistente para `pendente`, `revisado`, `fonte`, `confiança`, `evidência` e `ação`.
 
-## Direção Visual Recomendada
+## Nova Direção Visual
 
-- Fundo claro, contraste limpo e menos peso visual escuro.
-- Headings curtos, sem paredes de texto.
-- Fluxo por etapas com um resumo lateral/sticky quando houver decisão.
-- Upload de planta como card/área primária, com dropzone e estado operacional claro.
-- Técnica sob demanda em disclosures, drawers ou painéis avançados.
-- Cards de revisão com antes/depois, evidência, confiança e seleção.
-- Orçamento como superfície de aprovação, não como tabela bruta.
-- 3D grande e útil, com painel lateral recolhível e ações de edição/orçamento/exportação.
+- Primeiro viewport deve mostrar ação e estado, não documentação.
+- Cada tela deve ter uma ação primária e um resumo de pendências.
+- Detalhe técnico deve ficar em área avançada, disclosure, drawer ou seção secundária.
+- O 3D deve aparecer grande e útil, com controles progressivos.
+- Orçamento deve ser superfície de aprovação, não apenas tabela.
+- Manual e IA devem produzir o mesmo tipo de revisão: perguntas, campos editáveis, evidência, confiança e seeds de quantidade.
 
 ## Componentes Necessários
 

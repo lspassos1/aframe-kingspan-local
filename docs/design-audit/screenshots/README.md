@@ -7,6 +7,9 @@ Viewports:
 - Desktop: `1440x1000`
 - Mobile: `390x844`
 
-Observação: as rotas protegidas por Clerk redirecionaram para `/` sem sessão autenticada. Os arquivos dessas rotas registram o bloqueio de auditoria autenticada e não devem ser tratados como validação visual das telas internas.
+Sessão:
 
-`/admin/feedback` não foi capturada porque a sessão local não estava autenticada/autorizada como admin por auth real.
+- Produção validada no in-app browser com login real do Lucas.
+- Screenshots versionados capturados no dev server local com sessão Clerk autenticada e projeto exemplo carregado.
+- Rotas internas foram capturadas pelo shell autenticado, não como redirect para `/`.
+- `/admin/feedback` foi capturada; a autorização admin foi confirmada em Production, mas a lista de melhorias mostrou erro operacional porque `/api/admin/feedback` retornou `502`.
