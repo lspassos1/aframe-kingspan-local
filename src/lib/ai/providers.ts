@@ -70,10 +70,8 @@ function getBooleanEnv(env: AiPlanExtractEnv, key: string, fallback = false) {
 }
 
 export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.env) {
-  const configuredOrder = env.AI_PLAN_EXTRACT_PROVIDER_ORDER?.split(",").map((provider) => provider.trim()).filter(Boolean) ?? [];
-  if (configuredOrder.length > 0 && !configuredOrder.includes("openai")) {
-    return officialProviderOrder;
-  }
+  void env;
+  // OpenAI is the only official provider for plan extraction in this execution.
   return officialProviderOrder;
 }
 
