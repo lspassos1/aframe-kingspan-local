@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import { FileUp, TableProperties } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,6 +92,7 @@ export function PriceBaseImportCard({
   importedCompositionCount,
   onImport,
 }: PriceBaseImportCardProps) {
+  const parseRequestIdRef = useRef(0);
   const normalizedScenarioState = normalizeBrazilStateName(scenarioState) || scenarioState;
   const [rows, setRows] = useState<PriceBaseRawRow[]>([]);
   const [fileName, setFileName] = useState("");
@@ -124,6 +125,7 @@ export function PriceBaseImportCard({
   );
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const requestId = ++parseRequestIdRef.current;
     const file = event.target.files?.[0];
     setIssues([]);
     setSummary("");
@@ -131,24 +133,29 @@ export function PriceBaseImportCard({
     setFileName(file?.name ?? "");
     if (!file) return;
 
+    const selectedFileName = file.name;
     try {
-      const extension = getFileExtension(file.name);
+      const extension = getFileExtension(selectedFileName);
       if ((sourceType === "sinapi" || extension === "zip") && file.size > sinapiImportLimits.maxUploadBytes) {
         throw new Error(`Arquivo excede o limite de ${Math.round(sinapiImportLimits.maxUploadBytes / 1024 / 1024)} MB para importacao SINAPI.`);
       }
       const fileData = extension === "xlsx" || extension === "xls" || extension === "zip" ? await file.arrayBuffer() : await file.text();
-      const parsedRows =
-        sourceType === "sinapi" || extension === "zip"
-          ? await parseSinapiRowsFromFile(file.name, fileData)
-          : extension === "json"
-            ? parsePriceBaseJson(fileData as string)
-            : extension === "xlsx" || extension === "xls"
-              ? parsePriceBaseXlsx(fileData as ArrayBuffer)
-              : parsePriceBaseCsv(fileData as string);
+      let parsedRows: PriceBaseRawRow[];
+      if (sourceType === "sinapi" || extension === "zip") {
+        parsedRows = await parseSinapiRowsFromFile(selectedFileName, fileData);
+      } else if (extension === "json") {
+        parsedRows = parsePriceBaseJson(fileData as string);
+      } else if (extension === "xlsx" || extension === "xls") {
+        parsedRows = await parsePriceBaseXlsx(fileData as ArrayBuffer);
+      } else {
+        parsedRows = await parsePriceBaseCsv(fileData as string);
+      }
+      if (requestId !== parseRequestIdRef.current) return;
       setRows(parsedRows);
-      setSummary(`${parsedRows.length} linhas lidas de ${file.name}. Revise o mapeamento antes de importar.`);
-      if (!sourceTitle.trim()) setSourceTitle(file.name.replace(/\.[^.]+$/, ""));
+      setSummary(`${parsedRows.length} linhas lidas de ${selectedFileName}. Revise o mapeamento antes de importar.`);
+      setSourceTitle((current) => (current.trim() ? current : selectedFileName.replace(/\.[^.]+$/, "")));
     } catch (error) {
+      if (requestId !== parseRequestIdRef.current) return;
       setIssues([{ code: "empty-file", message: error instanceof Error ? error.message : "Nao foi possivel ler o arquivo." }]);
     }
   };

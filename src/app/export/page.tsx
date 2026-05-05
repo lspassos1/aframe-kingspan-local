@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useRef } from "react";
+import { ChangeEvent, useRef, useState } from "react";
 import { Download, FileJson, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,9 @@ import type { Project } from "@/types/project";
 
 export default function ExportPage() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isExportingRef = useRef(false);
+  const [exportError, setExportError] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const project = useProjectStore((state) => state.project);
   const importProject = useProjectStore((state) => state.importProject);
   const resetProject = useProjectStore((state) => state.resetProject);
@@ -42,6 +45,22 @@ export default function ExportPage() {
     const parsed = JSON.parse(text) as Project;
     importProject(parsed);
     event.target.value = "";
+  };
+
+  const handleExportAction = async (action: () => void | Promise<void>) => {
+    if (isExportingRef.current) return;
+    isExportingRef.current = true;
+    setIsExporting(true);
+    setExportError("");
+    try {
+      await action();
+    } catch (error) {
+      console.error("Falha ao exportar arquivo:", error);
+      setExportError("Nao foi possivel gerar o arquivo. Tente novamente.");
+    } finally {
+      isExportingRef.current = false;
+      setIsExporting(false);
+    }
   };
 
   const actions = [
@@ -98,7 +117,7 @@ export default function ExportPage() {
       title: "Projeto tecnico PDF",
       description: "PDF tecnico preliminar; A-frame inclui desenhos, demais metodos incluem resumo tecnico.",
       icon: FileText,
-      action: () => void exportTechnicalPdf(project, scenario),
+      action: () => exportTechnicalPdf(project, scenario),
       label: "Baixar PDF tecnico",
     },
     {
@@ -118,6 +137,11 @@ export default function ExportPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Os arquivos do projeto ficam no navegador. Login e autenticacao ficam no Clerk; este app nao armazena senhas.
         </p>
+        {exportError ? (
+          <p className="mt-3 text-sm text-destructive" role="alert">
+            {exportError}
+          </p>
+        ) : null}
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -148,7 +172,7 @@ export default function ExportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
-                <Button className="w-full" onClick={item.action}>
+                <Button className="w-full" onClick={() => void handleExportAction(item.action)} disabled={isExporting}>
                   <Download className="mr-2 h-4 w-4" />
                   {item.label}
                 </Button>

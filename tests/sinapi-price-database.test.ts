@@ -230,6 +230,19 @@ describe("SINAPI controlled price database", () => {
     });
   });
 
+  it("normalizes non-desonerated SINAPI regime labels with accents and separators", () => {
+    const normalized = normalizeSinapiRows(
+      [
+        { codigo: "SINAPI-551", descricao: "Alvenaria nao desonerada", unidade: "m2", preco_total: 80, uf: "BA", data_base: "2026-05", regime: "Não desonerado" },
+        { codigo: "SINAPI-552", descricao: "Pintura sem desoneracao", unidade: "m2", preco_total: 40, uf: "BA", data_base: "2026-05", regime: "sem desoneração" },
+      ],
+      { source, defaultConstructionMethod: "conventional-masonry", expectedState: "BA" }
+    );
+
+    expect(normalized.compositions.map((composition) => composition.regime)).toEqual(["nao_desonerado", "nao_desonerado"]);
+    expect(normalized.issues).not.toEqual(expect.arrayContaining([expect.objectContaining({ code: "unknown-regime" })]));
+  });
+
   it("searches compositions deterministically by query, UF, reference, regime and unit", () => {
     const normalized = normalizeSinapiRows(
       [

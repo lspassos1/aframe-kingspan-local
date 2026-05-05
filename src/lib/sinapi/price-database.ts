@@ -1,5 +1,3 @@
-import JSZip from "jszip";
-import * as XLSX from "xlsx";
 import { constructionMethodIds, type ConstructionMethodId } from "@/lib/construction-methods";
 import type {
   BudgetConfidenceLevel,
@@ -165,6 +163,9 @@ type SinapiSearchScoreInput = Omit<SinapiSearchInput, "tags"> & {
   state: string;
   tags: Set<string>;
 };
+
+type XlsxWorkbook = import("xlsx").WorkBook;
+type XlsxUtils = typeof import("xlsx")["utils"];
 
 export const defaultSinapiColumnMapping: Required<SinapiColumnMapping> = {
   code: ["codigo", "cod", "composicao", "item"],
@@ -499,6 +500,7 @@ function mapSinapiSourceToPriceSource(source: SinapiSource): PriceSource {
 }
 
 async function parseSinapiZip(data: string | ArrayBuffer): Promise<SinapiRawRow[]> {
+  const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(toArrayBuffer(data));
   const fileEntries = Object.values(zip.files).filter((file) => !file.dir);
   if (fileEntries.length > sinapiImportLimits.maxZipEntries) {
@@ -512,24 +514,26 @@ async function parseSinapiZip(data: string | ArrayBuffer): Promise<SinapiRawRow[
     if (extension === "xlsx" || extension === "xls") {
       const dataBuffer = await entry.async("arraybuffer");
       assertByteLength(dataBuffer.byteLength, sinapiImportLimits.maxExtractedFileBytes, `Arquivo ${entry.name} dentro do ZIP`);
-      rows.push(...parseSinapiXlsx(dataBuffer));
+      rows.push(...(await parseSinapiXlsx(dataBuffer)));
       continue;
     }
 
     const content = await entry.async("text");
     assertByteLength(getDataByteLength(content), sinapiImportLimits.maxExtractedFileBytes, `Arquivo ${entry.name} dentro do ZIP`);
-    rows.push(...(extension === "json" ? parseSinapiJson(content) : parseSinapiCsv(content)));
+    rows.push(...(extension === "json" ? parseSinapiJson(content) : await parseSinapiCsv(content)));
   }
 
   return rows;
 }
 
-function parseSinapiCsv(content: string) {
-  return readFirstWorksheetRows(XLSX.read(content, { type: "string", raw: true }));
+async function parseSinapiCsv(content: string) {
+  const XLSX = await import("xlsx");
+  return readFirstWorksheetRows(XLSX.read(content, { type: "string", raw: true }), XLSX.utils);
 }
 
-function parseSinapiXlsx(data: ArrayBuffer) {
-  return readFirstWorksheetRows(XLSX.read(data, { type: "array" }));
+async function parseSinapiXlsx(data: ArrayBuffer) {
+  const XLSX = await import("xlsx");
+  return readFirstWorksheetRows(XLSX.read(data, { type: "array" }), XLSX.utils);
 }
 
 function parseSinapiJson(content: string) {
@@ -542,12 +546,12 @@ function parseSinapiJson(content: string) {
   return [];
 }
 
-function readFirstWorksheetRows(workbook: XLSX.WorkBook): SinapiRawRow[] {
+function readFirstWorksheetRows(workbook: XlsxWorkbook, utils: XlsxUtils): SinapiRawRow[] {
   const firstSheetName = workbook.SheetNames[0];
   if (!firstSheetName) return [];
   const worksheet = workbook.Sheets[firstSheetName];
   if (!worksheet) return [];
-  return XLSX.utils.sheet_to_json<SinapiRawRow>(worksheet, { defval: "" });
+  return utils.sheet_to_json<SinapiRawRow>(worksheet, { defval: "" });
 }
 
 function readPriceParts(row: SinapiRawRow, mapping: SinapiColumnMapping) {
@@ -739,10 +743,11 @@ function normalizeConstructionMethod(value: string, fallback: ConstructionMethod
 
 function normalizeSinapiRegime(value: unknown): SinapiRegime {
   const normalized = normalizeText(String(value ?? ""));
+  const compact = normalized.replace(/[^a-z0-9]/g, "");
   if (!normalized) return "unknown";
   if (["desonerado", "desonerada"].includes(normalized)) return "desonerado";
   if (["onerado", "onerada"].includes(normalized)) return "onerado";
-  if (["naodesonerado", "naodesonerada", "nao-desonerado", "nao_desonerado", "sem_desoneracao", "semdesoneracao"].includes(normalized)) {
+  if (["naodesonerado", "naodesonerada", "semdesoneracao"].includes(compact)) {
     return "nao_desonerado";
   }
   return "unknown";

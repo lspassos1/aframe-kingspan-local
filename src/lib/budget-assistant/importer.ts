@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import type { ConstructionMethodId } from "@/lib/construction-methods";
 import type { MaterialCategory, MaterialUnit } from "@/types/project";
 import type {
@@ -114,15 +113,20 @@ export const priceBaseColumnLabels: Record<PriceBaseColumnKey, string> = {
   constructionMethod: "Metodo",
 };
 
+type XlsxWorkbook = import("xlsx").WorkBook;
+type XlsxUtils = typeof import("xlsx")["utils"];
+
 const validMaterialUnits = new Set<MaterialUnit>(["un", "m", "m2", "m3", "kg", "package", "lot"]);
 const validConstructionMethodIds = new Set<ConstructionMethodId>(["aframe", "conventional-masonry", "eco-block", "monolithic-eps"]);
 
-export function parsePriceBaseCsv(content: string): PriceBaseRawRow[] {
-  return readFirstWorksheetRows(XLSX.read(content, { type: "string", raw: true }));
+export async function parsePriceBaseCsv(content: string): Promise<PriceBaseRawRow[]> {
+  const XLSX = await import("xlsx");
+  return readFirstWorksheetRows(XLSX.read(content, { type: "string", raw: true }), XLSX.utils);
 }
 
-export function parsePriceBaseXlsx(data: ArrayBuffer): PriceBaseRawRow[] {
-  return readFirstWorksheetRows(XLSX.read(data, { type: "array" }));
+export async function parsePriceBaseXlsx(data: ArrayBuffer): Promise<PriceBaseRawRow[]> {
+  const XLSX = await import("xlsx");
+  return readFirstWorksheetRows(XLSX.read(data, { type: "array" }), XLSX.utils);
 }
 
 export function parsePriceBaseJson(content: string): PriceBaseRawRow[] {
@@ -315,12 +319,12 @@ export function importPriceBaseRows(input: PriceBaseImportInput): PriceBaseImpor
   };
 }
 
-function readFirstWorksheetRows(workbook: XLSX.WorkBook): PriceBaseRawRow[] {
+function readFirstWorksheetRows(workbook: XlsxWorkbook, utils: XlsxUtils): PriceBaseRawRow[] {
   const firstSheetName = workbook.SheetNames[0];
   if (!firstSheetName) return [];
   const worksheet = workbook.Sheets[firstSheetName];
   if (!worksheet) return [];
-  return XLSX.utils.sheet_to_json<PriceBaseRawRow>(worksheet, { defval: "" });
+  return utils.sheet_to_json<PriceBaseRawRow>(worksheet, { defval: "" });
 }
 
 function getNormalizedHeaders(rows: PriceBaseRawRow[]) {
