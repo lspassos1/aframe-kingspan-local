@@ -166,6 +166,11 @@ type SinapiSearchScoreInput = Omit<SinapiSearchInput, "tags"> & {
 
 type XlsxWorkbook = import("xlsx").WorkBook;
 type XlsxUtils = typeof import("xlsx")["utils"];
+type ZipEntryWithSizeMetadata = {
+  _data?: {
+    uncompressedSize?: number;
+  };
+};
 
 export const defaultSinapiColumnMapping: Required<SinapiColumnMapping> = {
   code: ["codigo", "cod", "composicao", "item"],
@@ -511,6 +516,7 @@ async function parseSinapiZip(data: string | ArrayBuffer): Promise<SinapiRawRow[
   const entries = fileEntries.filter((file) => supportedFileExtensions.has(getFileExtension(file.name)));
   for (const entry of entries) {
     const extension = getFileExtension(entry.name);
+    assertZipEntrySizeBeforeInflate(entry);
     if (extension === "xlsx" || extension === "xls") {
       const dataBuffer = await entry.async("arraybuffer");
       assertByteLength(dataBuffer.byteLength, sinapiImportLimits.maxExtractedFileBytes, `Arquivo ${entry.name} dentro do ZIP`);
@@ -524,6 +530,12 @@ async function parseSinapiZip(data: string | ArrayBuffer): Promise<SinapiRawRow[
   }
 
   return rows;
+}
+
+function assertZipEntrySizeBeforeInflate(entry: ZipEntryWithSizeMetadata & { name: string }) {
+  const uncompressedSize = entry._data?.uncompressedSize;
+  if (typeof uncompressedSize !== "number") return;
+  assertByteLength(uncompressedSize, sinapiImportLimits.maxExtractedFileBytes, `Arquivo ${entry.name} dentro do ZIP`);
 }
 
 async function parseSinapiCsv(content: string) {

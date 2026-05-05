@@ -217,7 +217,9 @@ export function createBudgetSourceExport(project: Project, scenario: Scenario, g
   );
   const usedCompositionIds = new Set(serviceLines.map((line) => line.compositionId));
   const methodCompositions = assistant.serviceCompositions.filter(
-    (composition) => composition.constructionMethod === scenario.constructionMethod && (serviceLines.length === 0 || usedCompositionIds.has(composition.id))
+    (composition) =>
+      composition.constructionMethod === scenario.constructionMethod &&
+      (serviceLines.length === 0 || usedCompositionIds.has(composition.id))
   );
   const sourceIds = new Set([
     ...viewModel.costItems.map((item) => item.sourceId),
@@ -555,11 +557,24 @@ function createTotals(
   lowConfidenceCount: number
 ): BudgetSourceExportTotals {
   const costItemTotal = costItems.reduce((sum, item) => sum + item.totalBRL, 0);
-  const outOfRegionCompositionCount =
-    lines.length > 0 ? lines.filter((line) => line.outOfRegion).length : compositions.filter((composition) => composition.outOfRegion).length;
-  const structuralCriticalCount =
-    lines.length > 0 ? lines.filter((line) => line.structuralCritical).length : compositions.filter((composition) => composition.structuralCritical).length;
-  const sinapiPriceRows = lines.length > 0 ? lines : compositions;
+  const regionalRowsByKey = new Map<string, { outOfRegion: boolean; structuralCritical: boolean }>();
+  for (const composition of compositions) {
+    setMergedRegionalRow(regionalRowsByKey, composition);
+  }
+  for (const line of lines) {
+    setMergedRegionalRow(regionalRowsByKey, line);
+  }
+  const regionalRows = [...regionalRowsByKey.values()];
+  const outOfRegionCompositionCount = regionalRows.filter((row) => row.outOfRegion).length;
+  const structuralCriticalCount = regionalRows.filter((row) => row.structuralCritical).length;
+  const sinapiPriceRowsByKey = new Map<string, { priceStatus: BudgetSourcePriceStatus }>();
+  for (const composition of compositions) {
+    setWorstSinapiPriceRow(sinapiPriceRowsByKey, composition);
+  }
+  for (const line of lines) {
+    setWorstSinapiPriceRow(sinapiPriceRowsByKey, line);
+  }
+  const sinapiPriceRows = [...sinapiPriceRowsByKey.values()];
   return {
     materialCostBRL: sumLines(lines, "materialCostBRL"),
     laborCostBRL: sumLines(lines, "laborCostBRL"),
@@ -579,6 +594,42 @@ function createTotals(
     structuralCriticalCount,
     pendingSinapiPriceCount: sinapiPriceRows.filter((line) => line.priceStatus !== "valid").length,
   };
+}
+
+function setMergedRegionalRow(
+  rowsByKey: Map<string, { outOfRegion: boolean; structuralCritical: boolean }>,
+  row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode" | "regime" | "outOfRegion" | "structuralCritical">
+) {
+  const key = createSinapiPriceRowKey(row);
+  const existing = rowsByKey.get(key);
+  rowsByKey.set(key, {
+    outOfRegion: Boolean(existing?.outOfRegion || row.outOfRegion),
+    structuralCritical: Boolean(existing?.structuralCritical || row.structuralCritical),
+  });
+}
+
+function setWorstSinapiPriceRow(
+  rowsByKey: Map<string, { priceStatus: BudgetSourcePriceStatus }>,
+  row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode" | "regime" | "priceStatus">
+) {
+  const key = createSinapiPriceRowKey(row);
+  const existing = rowsByKey.get(key);
+  if (!existing || getSinapiPriceStatusRank(row.priceStatus) > getSinapiPriceStatusRank(existing.priceStatus)) {
+    rowsByKey.set(key, row);
+  }
+}
+
+function createSinapiPriceRowKey(row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode" | "regime">) {
+  return `${row.sourceId}::${row.sinapiCode || row.sourceCode}::${row.regime}`;
+}
+
+function getSinapiPriceStatusRank(status: BudgetSourcePriceStatus) {
+  if (status === "valid") return 0;
+  if (status === "requires_review") return 1;
+  if (status === "out_of_region") return 2;
+  if (status === "invalid_unit") return 3;
+  if (status === "missing" || status === "zeroed") return 4;
+  return 5;
 }
 
 function createLaborHoursByRole(

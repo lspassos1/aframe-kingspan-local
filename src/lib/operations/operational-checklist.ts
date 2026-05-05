@@ -41,7 +41,8 @@ export function createOperationalChecklist(
   );
   const hasSinapiBase = sinapiSources.length > 0 || hasSinapiCompositions;
   const aiOperational = environment.aiPlanExtractEnabled && environment.openAiApiKeyConfigured;
-  const scenarioState = scenario?.location.state.trim() ?? "";
+  const scenarioLocation = scenario?.location as Partial<Scenario["location"]> | undefined;
+  const scenarioState = typeof scenarioLocation?.state === "string" ? scenarioLocation.state.trim() : "";
   const hasSinapiReference = sinapiSources.some((source) => source.referenceDate.trim());
   const hasRegime = hasSinapiRegimeMetadata(project);
 

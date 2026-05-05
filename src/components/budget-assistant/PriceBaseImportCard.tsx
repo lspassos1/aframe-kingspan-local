@@ -93,6 +93,7 @@ export function PriceBaseImportCard({
   onImport,
 }: PriceBaseImportCardProps) {
   const parseRequestIdRef = useRef(0);
+  const sourceTypeRef = useRef<PriceSourceType>("sinapi");
   const normalizedScenarioState = normalizeBrazilStateName(scenarioState) || scenarioState;
   const [rows, setRows] = useState<PriceBaseRawRow[]>([]);
   const [fileName, setFileName] = useState("");
@@ -126,6 +127,7 @@ export function PriceBaseImportCard({
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const requestId = ++parseRequestIdRef.current;
+    const requestSourceType = sourceTypeRef.current;
     const file = event.target.files?.[0];
     setIssues([]);
     setSummary("");
@@ -136,12 +138,12 @@ export function PriceBaseImportCard({
     const selectedFileName = file.name;
     try {
       const extension = getFileExtension(selectedFileName);
-      if ((sourceType === "sinapi" || extension === "zip") && file.size > sinapiImportLimits.maxUploadBytes) {
+      if ((requestSourceType === "sinapi" || extension === "zip") && file.size > sinapiImportLimits.maxUploadBytes) {
         throw new Error(`Arquivo excede o limite de ${Math.round(sinapiImportLimits.maxUploadBytes / 1024 / 1024)} MB para importacao SINAPI.`);
       }
       const fileData = extension === "xlsx" || extension === "xls" || extension === "zip" ? await file.arrayBuffer() : await file.text();
       let parsedRows: PriceBaseRawRow[];
-      if (sourceType === "sinapi" || extension === "zip") {
+      if (requestSourceType === "sinapi" || extension === "zip") {
         parsedRows = await parseSinapiRowsFromFile(selectedFileName, fileData);
       } else if (extension === "json") {
         parsedRows = parsePriceBaseJson(fileData as string);
@@ -150,12 +152,12 @@ export function PriceBaseImportCard({
       } else {
         parsedRows = await parsePriceBaseCsv(fileData as string);
       }
-      if (requestId !== parseRequestIdRef.current) return;
+      if (requestId !== parseRequestIdRef.current || requestSourceType !== sourceTypeRef.current) return;
       setRows(parsedRows);
       setSummary(`${parsedRows.length} linhas lidas de ${selectedFileName}. Revise o mapeamento antes de importar.`);
       setSourceTitle((current) => (current.trim() ? current : selectedFileName.replace(/\.[^.]+$/, "")));
     } catch (error) {
-      if (requestId !== parseRequestIdRef.current) return;
+      if (requestId !== parseRequestIdRef.current || requestSourceType !== sourceTypeRef.current) return;
       setIssues([{ code: "empty-file", message: error instanceof Error ? error.message : "Nao foi possivel ler o arquivo." }]);
     }
   };
@@ -171,7 +173,9 @@ export function PriceBaseImportCard({
   };
 
   const handleSourceTypeChange = (value: string) => {
+    parseRequestIdRef.current += 1;
     const nextType = value as PriceSourceType;
+    sourceTypeRef.current = nextType;
     setSourceType(nextType);
     if (nextType === "sinapi" && !sourceSupplier.trim()) setSourceSupplier("CAIXA");
   };

@@ -159,6 +159,22 @@ describe("SINAPI controlled price database", () => {
     ).rejects.toThrow(/limite atual/);
   });
 
+  it("rejects oversized ZIP entries before inflating their payload", async () => {
+    const zip = new JSZip();
+    zip.file("sinapi-large.csv", "codigo,descricao,unidade,preco_total\n" + "a".repeat(sinapiImportLimits.maxExtractedFileBytes + 1));
+    const data = await zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
+
+    await expect(
+      importSinapiPriceBase({
+        fileName: "sinapi-large.zip",
+        data,
+        source,
+        defaultConstructionMethod: "conventional-masonry",
+        expectedState: "BA",
+      })
+    ).rejects.toThrow(/excede o limite/);
+  });
+
   it("classifies missing price, invalid unit, out-of-region and missing source metadata", async () => {
     const missingPrice = await importSinapiPriceBase({
       rows: [{ codigo: "SINAPI-501", descricao: "Servico sem preco", unidade: "m2", uf: "BA", data_base: "2026-05", regime: "desonerado" }],
