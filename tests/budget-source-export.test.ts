@@ -425,6 +425,51 @@ describe("budget source export report", () => {
     expect(report.budgetStatusLabel).toBe("Orcamento preliminar");
   });
 
+  it("does not collapse pending SINAPI rows with same code but different regimes", () => {
+    const desoneradoComposition: ServiceComposition = {
+      ...serviceComposition,
+      id: "composition-desonerado",
+      requiresReview: false,
+      sinapi: {
+        ...serviceComposition.sinapi,
+        regime: "desonerado",
+        priceStatus: "missing",
+        requiresReview: true,
+        pendingReason: "Preco desonerado ausente.",
+      },
+    };
+    const naoDesoneradoComposition: ServiceComposition = {
+      ...serviceComposition,
+      id: "composition-nao-desonerado",
+      requiresReview: false,
+      sinapi: {
+        ...serviceComposition.sinapi,
+        regime: "nao_desonerado",
+        priceStatus: "missing",
+        requiresReview: true,
+        pendingReason: "Preco nao desonerado ausente.",
+      },
+    };
+    const { project, scenario } = createProjectWithBudget({
+      composition: desoneradoComposition,
+      extraCompositions: [naoDesoneradoComposition],
+    });
+    const compositionOnlyProject: Project = {
+      ...project,
+      budgetAssistant: {
+        ...project.budgetAssistant,
+        budgetServiceLines: [],
+      },
+    };
+
+    const report = createBudgetSourceExport(compositionOnlyProject, scenario, "2026-05-04T21:00:00.000Z");
+
+    expect(report.serviceLines).toEqual([]);
+    expect(report.serviceCompositions).toHaveLength(2);
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 2 });
+    expect(report.budgetStatusLabel).toBe("Orcamento preliminar");
+  });
+
   it("does not count manual review lines as pending SINAPI prices", () => {
     const manualSource: PriceSource = {
       ...priceSource,
