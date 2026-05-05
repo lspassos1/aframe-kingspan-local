@@ -65,6 +65,7 @@ describe("PlanImportCard", () => {
     expect(html).toContain("AI_PLAN_EXTRACT_ENABLED=true");
     expect(html).toContain("OPENAI_API_KEY");
     expect(html).toContain("Assinatura ChatGPT nao configura esta API automaticamente");
+    expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
   });
 });

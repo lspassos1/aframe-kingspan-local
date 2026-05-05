@@ -178,15 +178,15 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
   }
 
   function handleDragEnter(event: DragEvent<HTMLButtonElement>) {
-    if (!canUpload) return;
     event.preventDefault();
+    if (!canUpload) return;
     setIsDragging(true);
   }
 
   function handleDragOver(event: DragEvent<HTMLButtonElement>) {
-    if (!canUpload) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
+    event.dataTransfer.dropEffect = canUpload ? "copy" : "none";
+    if (!canUpload) return;
     setIsDragging(true);
   }
 
@@ -198,8 +198,9 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
   }
 
   function handleDrop(event: DragEvent<HTMLButtonElement>) {
-    if (!canUpload) return;
     event.preventDefault();
+    setIsDragging(false);
+    if (!canUpload) return;
     const file = event.dataTransfer.files?.[0];
     if (file) void uploadFile(file);
   }
@@ -255,14 +256,16 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
       <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
         <button
           type="button"
-          disabled={!canUpload}
-          onClick={() => inputRef.current?.click()}
+          aria-disabled={!canUpload}
+          onClick={() => {
+            if (canUpload) inputRef.current?.click();
+          }}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={cn(
-            "group flex min-h-56 flex-1 flex-col items-center justify-center rounded-lg border border-dashed bg-card p-5 text-center transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-75",
+            "group flex min-h-56 flex-1 flex-col items-center justify-center rounded-lg border border-dashed bg-card p-5 text-center transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/35 aria-disabled:cursor-not-allowed aria-disabled:opacity-75",
             canUpload && "hover:border-primary/45 hover:bg-primary/[0.035]",
             isDragging && "border-primary bg-primary/5"
           )}
