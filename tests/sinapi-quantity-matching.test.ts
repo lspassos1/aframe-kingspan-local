@@ -191,11 +191,14 @@ describe("SINAPI quantity matching", () => {
       referenceDate: "2026-05",
       regime: "desonerado",
     });
+    const secondCandidate = candidates.find((candidate) => candidate.composition.id === "sinapi-second");
+
+    expect(secondCandidate).toBeDefined();
 
     const reranked = applySinapiAiCandidateRanking(candidates, {
       candidates: [
         { id: "sinapi-invented", confidence: "high", reason: "ID criado pela IA.", pending: "Rejeitar." },
-        { id: "sinapi-second", confidence: "high", reason: "Descricao mais aderente.", pending: "" },
+        { id: secondCandidate?.candidateId, confidence: "high", reason: "Descricao mais aderente.", pending: "" },
       ],
     });
 
@@ -252,6 +255,8 @@ describe("SINAPI quantity matching", () => {
     });
     const fetcher = async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body)) as { model: string; messages: Array<{ content: string }> };
+      const secondCandidateId = candidates.find((candidate) => candidate.composition.id === "sinapi-second")?.candidateId;
+      expect(secondCandidateId).toBeDefined();
       expect(init?.headers).toMatchObject({ Authorization: "Bearer openai-test-key" });
       expect(body.model).toBe("gpt-4o-mini");
       expect(body.messages[1].content).toContain(`${quantity.id}::sinapi-first`);
@@ -260,7 +265,7 @@ describe("SINAPI quantity matching", () => {
           {
             message: {
               content: JSON.stringify({
-                candidates: [{ id: "sinapi-second", confidence: "medium", reason: "Melhor descricao.", pending: "Revisar vinculo." }],
+                candidates: [{ id: secondCandidateId, confidence: "medium", reason: "Melhor descricao.", pending: "Revisar vinculo." }],
               }),
             },
           },
@@ -275,7 +280,7 @@ describe("SINAPI quantity matching", () => {
     });
 
     expect(result.rejectedIds).toEqual([]);
-    expect(result.decisions).toEqual([expect.objectContaining({ id: "sinapi-second", confidence: "medium" })]);
+    expect(result.decisions).toEqual([expect.objectContaining({ id: `${quantity.id}::sinapi-second`, confidence: "medium" })]);
     expect(result.candidates[0].composition.id).toBe("sinapi-second");
   });
 

@@ -295,17 +295,9 @@ export async function rankSinapiQuantityCandidatesWithOpenAi(
 
 function createAiCandidateLookup(candidates: SinapiQuantityMatchCandidate[]) {
   const lookup = new Map<string, SinapiQuantityMatchCandidate>();
-  const candidatesByCompositionId = new Map<string, SinapiQuantityMatchCandidate[]>();
 
   for (const candidate of candidates) {
     lookup.set(candidate.candidateId, candidate);
-    const compositionCandidates = candidatesByCompositionId.get(candidate.composition.id) ?? [];
-    compositionCandidates.push(candidate);
-    candidatesByCompositionId.set(candidate.composition.id, compositionCandidates);
-  }
-
-  for (const [compositionId, compositionCandidates] of candidatesByCompositionId) {
-    if (compositionCandidates.length === 1) lookup.set(compositionId, compositionCandidates[0]);
   }
 
   return lookup;
