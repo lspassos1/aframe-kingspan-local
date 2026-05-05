@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardCheck, PencilLine, RotateCcw, XCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ConfidenceBadge, EvidenceCard, InlineHelp, QuestionCard, ReviewCard, StatusPill } from "@/components/shared/design-system";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   getPlanExtractApplicableFields,
   getPlanExtractNumberFieldMin,
@@ -23,6 +24,7 @@ export type PlanExtractReviewValue = string | number | ConstructionMethodId | st
 
 export type PlanExtractModifiedValues = Partial<Record<PlanExtractEditableField, string | number | ConstructionMethodId>>;
 export type PlanExtractCurrentValues = Partial<Record<PlanExtractEditableField, string | number | ConstructionMethodId>>;
+export type PlanExtractQuestionAnswers = Record<string, string>;
 
 const fieldOrder: PlanExtractEditableField[] = [
   "constructionMethod",
@@ -137,14 +139,6 @@ const confidenceLabels: Record<PlanExtractConfidence, string> = {
   low: "baixa",
 };
 
-function confidenceClass(confidence: PlanExtractConfidence) {
-  return cn(
-    confidence === "high" && "border-emerald-500/25 bg-emerald-500/10 text-emerald-700",
-    confidence === "medium" && "border-amber-500/25 bg-amber-500/10 text-amber-700",
-    confidence === "low" && "border-destructive/25 bg-destructive/10 text-destructive"
-  );
-}
-
 function normalizeTextForSearch(value: string) {
   return value
     .normalize("NFD")
@@ -197,6 +191,180 @@ export function getPlanExtractFieldEvidence(result: PlanExtractResult, field: Pl
   });
 }
 
+export function getPlanExtractAdvancedHighlights(result: PlanExtractResult) {
+  const highlights: Array<{ label: string; value: string; tone: "neutral" | "info" | "warning" | "pending" }> = [];
+
+  if (result.extractionStatus) {
+    const statusLabels = {
+      complete: "Completa",
+      partial: "Parcial",
+      insufficient: "Insuficiente",
+    } as const;
+    highlights.push({
+      label: "Leitura",
+      value: statusLabels[result.extractionStatus],
+      tone: result.extractionStatus === "complete" ? "info" : result.extractionStatus === "partial" ? "pending" : "warning",
+    });
+  }
+  if (result.rooms?.length) highlights.push({ label: "Ambientes", value: String(result.rooms.length), tone: "info" });
+  if (result.quantitySeeds?.length) highlights.push({ label: "Quantitativos sugeridos", value: String(result.quantitySeeds.length), tone: "pending" });
+  if (result.questions?.length) highlights.push({ label: "Perguntas", value: String(result.questions.length), tone: "warning" });
+  if (result.extractionWarnings?.length) highlights.push({ label: "Alertas", value: String(result.extractionWarnings.length), tone: "warning" });
+
+  return highlights;
+}
+
+type AdvancedReviewItem = {
+  label: string;
+  value: string;
+  evidence?: string;
+  source?: string;
+  confidence?: string;
+  pendingReason?: string;
+  requiresReview?: boolean;
+};
+
+type AdvancedReviewBlock = {
+  id: string;
+  title: string;
+  current: string;
+  status: string;
+  tone: "neutral" | "info" | "warning" | "pending";
+  items: AdvancedReviewItem[];
+};
+
+const advancedBlockDefinitions: Array<{ id: string; title: string; current: string; values: (result: PlanExtractResult) => unknown[] }> = [
+  { id: "document-scale", title: "Documento e escala", current: "Escala e documento ainda nao aplicados.", values: (result) => [result.document, result.scale] },
+  { id: "location", title: "Localizacao", current: "Local atual aparece nos campos aplicaveis.", values: (result) => [result.location] },
+  { id: "lot", title: "Lote e implantacao", current: "Implantacao atual fica no estudo da obra.", values: (result) => [result.lot] },
+  { id: "dimensions", title: "Area e dimensoes", current: "Dimensoes atuais aparecem nos campos aplicaveis.", values: (result) => [result.building] },
+  { id: "rooms", title: "Ambientes", current: "Ambientes detalhados ainda nao alteram o estudo.", values: (result) => [result.rooms] },
+  { id: "walls", title: "Paredes", current: "Paredes permanecem pendentes ate revisao.", values: (result) => [result.walls] },
+  { id: "openings", title: "Portas e janelas", current: "Contagens atuais aparecem nos campos aplicaveis.", values: (result) => [result.openings] },
+  { id: "foundation-roof", title: "Fundacao e cobertura", current: "Itens tecnicos exigem revisao antes do orcamento.", values: (result) => [result.foundation, result.roof, result.structure] },
+  { id: "systems", title: "Eletrica e hidraulica", current: "Estimativas por media ficam pendentes ate confirmacao.", values: (result) => [result.electrical, result.plumbing, result.fixtures] },
+  { id: "quantities", title: "Quantitativos", current: "Seeds sugeridas ainda nao viraram orcamento revisado.", values: (result) => [result.quantitySeeds] },
+];
+
+function humanizeKey(key: string) {
+  const labels: Record<string, string> = {
+    areaM2: "Area",
+    backSetbackM: "Recuo fundo",
+    builtAreaM2: "Area construida",
+    ceilingAreaM2: "Forro",
+    city: "Cidade",
+    depthM: "Profundidade",
+    doorCount: "Portas",
+    dryAreaM2: "Piso seco",
+    externalCoatingAreaM2: "Revestimento externo",
+    externalPaintingAreaM2: "Pintura externa",
+    floorHeightM: "Pe-direito",
+    frontSetbackM: "Recuo frontal",
+    hasCeilingPlan: "Planta de forro",
+    hasElectricalPlan: "Projeto eletrico",
+    hasPlumbingPlan: "Projeto hidraulico",
+    internalCoatingAreaM2: "Revestimento interno",
+    internalLengthM: "Parede interna",
+    internalPaintingAreaM2: "Pintura interna",
+    leftSetbackM: "Recuo esquerdo",
+    name: "Nome",
+    netAreaM2: "Area liquida",
+    pageCount: "Folhas",
+    ratio: "Escala",
+    referenceMeasureM: "Medida referencia",
+    rightSetbackM: "Recuo direito",
+    roofAreaM2: "Area de cobertura",
+    scaleText: "Escala",
+    sinks: "Lavatorios",
+    state: "UF",
+    toilets: "Bacias sanitarias",
+    type: "Tipo",
+    visibleSystem: "Sistema visivel",
+    wetAreaWallTileM2: "Revestimento areas molhadas",
+    widthM: "Largura",
+    windowCount: "Janelas",
+  };
+  return labels[key] ?? key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function isExtractedValue(value: unknown): value is {
+  value: unknown;
+  unit?: string;
+  confidence?: string;
+  evidence?: string;
+  source?: string;
+  requiresReview?: boolean;
+  pendingReason?: string;
+} {
+  return Boolean(value && typeof value === "object" && "value" in value && "confidence" in value && "source" in value && "requiresReview" in value);
+}
+
+function formatExtractedPrimitiveValue(value: unknown, unit?: string) {
+  if (typeof value === "number") {
+    return unit && unit !== "un" ? `${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${unit}` : value.toLocaleString("pt-BR");
+  }
+  if (typeof value === "boolean") return value ? "Sim" : "Nao";
+  if (value === undefined || value === null || value === "") return "Nao informado";
+  return String(value);
+}
+
+function collectAdvancedReviewItems(value: unknown, label = "", depth = 0): AdvancedReviewItem[] {
+  if (!value || depth > 4) return [];
+  if (isExtractedValue(value)) {
+    return [
+      {
+        label,
+        value: formatExtractedPrimitiveValue(value.value, value.unit),
+        evidence: value.evidence,
+        source: value.source,
+        confidence: value.confidence,
+        pendingReason: value.pendingReason,
+        requiresReview: value.requiresReview,
+      },
+    ];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => collectAdvancedReviewItems(item, label ? `${label} ${index + 1}` : `Item ${index + 1}`, depth + 1));
+  }
+  if (typeof value === "object") {
+    if ("description" in value && "quantity" in value && "unit" in value) {
+      const seed = value as { description?: unknown; quantity?: unknown; unit?: unknown; source?: unknown; confidence?: unknown; evidence?: unknown; pendingReason?: unknown; requiresReview?: unknown };
+      return [
+        {
+          label: typeof seed.description === "string" ? seed.description : label,
+          value: formatExtractedPrimitiveValue(seed.quantity, typeof seed.unit === "string" ? seed.unit : undefined),
+          source: typeof seed.source === "string" ? seed.source : undefined,
+          confidence: typeof seed.confidence === "string" ? seed.confidence : undefined,
+          evidence: typeof seed.evidence === "string" ? seed.evidence : undefined,
+          pendingReason: typeof seed.pendingReason === "string" ? seed.pendingReason : undefined,
+          requiresReview: typeof seed.requiresReview === "boolean" ? seed.requiresReview : undefined,
+        },
+      ];
+    }
+    return Object.entries(value).flatMap(([key, nested]) => collectAdvancedReviewItems(nested, humanizeKey(key), depth + 1));
+  }
+  return [];
+}
+
+export function getPlanExtractDecisionBlocks(result: PlanExtractResult): AdvancedReviewBlock[] {
+  return advancedBlockDefinitions
+    .map((definition) => {
+      const items = definition.values(result).flatMap((value) => collectAdvancedReviewItems(value)).filter((item) => item.value !== "Nao informado");
+      const hasPending = items.some((item) => item.pendingReason);
+      const hasLowConfidence = items.some((item) => item.confidence === "low" || item.confidence === "unknown");
+      const hasReview = items.some((item) => item.requiresReview);
+      return {
+        id: definition.id,
+        title: definition.title,
+        current: definition.current,
+        status: hasPending ? "pendente" : hasLowConfidence ? "baixa confianca" : hasReview ? "revisar" : "informativo",
+        tone: hasPending || hasLowConfidence ? "warning" : hasReview ? "pending" : "info",
+        items,
+      } satisfies AdvancedReviewBlock;
+    })
+    .filter((block) => block.items.length > 0);
+}
+
 function formatFieldValue(field: PlanExtractField, value: PlanExtractReviewValue) {
   if (value === undefined) return "";
   if (field === "constructionMethod" && typeof value === "string") {
@@ -246,9 +414,11 @@ type PlanExtractReviewProps = {
   selectedFields: PlanExtractSelectedFields;
   currentValues: PlanExtractCurrentValues;
   modifiedValues: PlanExtractModifiedValues;
+  questionAnswers?: PlanExtractQuestionAnswers;
   isApplying?: boolean;
   onSelectedFieldsChange: (fields: PlanExtractSelectedFields) => void;
   onModifiedValuesChange: (values: PlanExtractModifiedValues) => void;
+  onQuestionAnswersChange?: (answers: PlanExtractQuestionAnswers) => void;
   onApply: (selectedFields?: PlanExtractSelectedFields, modifiedValues?: PlanExtractModifiedValues) => void;
   onDismiss: () => void;
   onBackToManual?: () => void;
@@ -259,13 +429,16 @@ export function PlanExtractReview({
   selectedFields,
   currentValues,
   modifiedValues,
+  questionAnswers,
   isApplying,
   onSelectedFieldsChange,
   onModifiedValuesChange,
+  onQuestionAnswersChange,
   onApply,
   onDismiss,
   onBackToManual,
 }: PlanExtractReviewProps) {
+  const [localQuestionAnswers, setLocalQuestionAnswers] = useState<PlanExtractQuestionAnswers>({});
   const currentMethod = typeof currentValues.constructionMethod === "string" ? (currentValues.constructionMethod as ConstructionMethodId) : undefined;
   const reviewedMethod =
     typeof modifiedValues.constructionMethod === "string" ? (modifiedValues.constructionMethod as ConstructionMethodId) : result.extracted.constructionMethod;
@@ -275,6 +448,12 @@ export function PlanExtractReview({
   const selectedCount = fields.filter((field) => selectedFields[field]).length;
   const notes = (result.extracted.notes ?? []).filter(Boolean);
   const uncertainties = [...result.missingInformation, ...result.assumptions].filter(Boolean);
+  const questions = result.questions ?? [];
+  const extractionWarnings = result.extractionWarnings ?? [];
+  const structuredWarningItems = extractionWarnings.map((warning) => `${warning.code}: ${warning.message}`);
+  const highlights = getPlanExtractAdvancedHighlights(result);
+  const decisionBlocks = getPlanExtractDecisionBlocks(result);
+  const effectiveQuestionAnswers = questionAnswers ?? localQuestionAnswers;
   const methodConfidence = result.fieldConfidence.constructionMethod ?? result.confidence;
   const hasUncertainMethod = Boolean(result.extracted.constructionMethod && methodConfidence !== "high");
 
@@ -300,6 +479,15 @@ export function PlanExtractReview({
     onApply(prunedState.selectedFields, prunedState.modifiedValues);
   }
 
+  function updateQuestionAnswer(questionId: string, value: string) {
+    const nextAnswers = { ...effectiveQuestionAnswers, [questionId]: value };
+    if (onQuestionAnswersChange) {
+      onQuestionAnswersChange(nextAnswers);
+    } else {
+      setLocalQuestionAnswers(nextAnswers);
+    }
+  }
+
   return (
     <div className="mt-4 rounded-lg border bg-background/90 p-4 shadow-sm shadow-foreground/5">
       <div className="flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
@@ -307,26 +495,85 @@ export function PlanExtractReview({
           <div className="flex flex-wrap items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-primary" />
             <h3 className="font-semibold">Revisao da importacao</h3>
-            <Badge variant="outline" className={confidenceClass(result.confidence)}>
-              confianca {confidenceLabels[result.confidence]}
-            </Badge>
+            <ConfidenceBadge level={result.confidence} />
           </div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.summary}</p>
           {hasUncertainMethod ? (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <InlineHelp tone="warning" className="mt-3">
               <span>Metodo sugerido com confianca {confidenceLabels[methodConfidence]}; ele fica desmarcado ate voce confirmar.</span>
-            </div>
+            </InlineHelp>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">{selectedCount} campos selecionados</Badge>
-          <Badge variant="outline">revisao humana obrigatoria</Badge>
+          <StatusPill tone="info" icon={false}>
+            {selectedCount} campos selecionados
+          </StatusPill>
+          <StatusPill tone="pending" icon={false}>
+            revisao humana obrigatoria
+          </StatusPill>
         </div>
       </div>
 
+      <InlineHelp tone="info" className="mt-4">
+        A IA apenas sugere. Edite, marque ou descarte cada campo antes de aplicar ao estudo.
+      </InlineHelp>
+
+      {highlights.length > 0 ? (
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {highlights.map((highlight) => (
+            <div key={highlight.label} className="rounded-xl border bg-muted/25 p-3">
+              <p className="text-xs text-muted-foreground">{highlight.label}</p>
+              <div className="mt-1">
+                <StatusPill tone={highlight.tone} icon={false}>
+                  {highlight.value}
+                </StatusPill>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {decisionBlocks.length > 0 ? (
+        <section className="mt-5 space-y-3">
+          <div>
+            <h4 className="text-sm font-semibold">Blocos da planta</h4>
+            <p className="mt-1 text-xs text-muted-foreground">Cada bloco mostra o estado atual, os dados extraidos e a acao necessaria antes do orcamento.</p>
+          </div>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {decisionBlocks.map((block) => (
+              <ReviewCard
+                key={block.id}
+                title={block.title}
+                description={<span>Atual: {block.current}</span>}
+                status={<StatusPill tone={block.tone}>{block.status}</StatusPill>}
+                selected={block.tone === "info"}
+              >
+                <div className="space-y-2">
+                  {block.items.slice(0, 4).map((item, index) => (
+                    <div key={`${block.id}-${item.label}-${index}`} className="rounded-xl border bg-background/80 p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium">{item.label}</span>
+                        {item.confidence ? <ConfidenceBadge level={item.confidence} /> : null}
+                      </div>
+                      <p className="mt-1 text-foreground">{item.value}</p>
+                      {item.evidence || item.pendingReason ? (
+                        <EvidenceCard className="mt-2 text-xs" evidence={item.evidence} source={item.source} pending={item.pendingReason} />
+                      ) : null}
+                    </div>
+                  ))}
+                  {block.items.length > 4 ? <p className="text-xs text-muted-foreground">+{block.items.length - 4} itens neste bloco.</p> : null}
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <a href="#campos-aplicaveis">Editar ou confirmar campos aplicaveis</a>
+                  </Button>
+                </div>
+              </ReviewCard>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {groupedFields.length > 0 ? (
-        <div className="mt-4 space-y-4">
+        <div id="campos-aplicaveis" className="mt-4 scroll-mt-6 space-y-4">
           {groupedFields.map((group) => (
             <section key={group.id} className="space-y-3">
               <div>
@@ -342,8 +589,11 @@ export function PlanExtractReview({
                   const evidence = getPlanExtractFieldEvidence(result, field);
                   const selectionDisabled = isInvalidPlanExtractNumericDraft(field, reviewValue);
                   return (
-                    <article key={field} className={cn("rounded-lg border bg-card p-3", selectedFields[field] && "border-primary/35 bg-primary/[0.035]")}>
-                      <div className="flex items-start justify-between gap-3">
+                    <ReviewCard
+                      key={field}
+                      selected={Boolean(selectedFields[field])}
+                      status={<ConfidenceBadge level={confidence} />}
+                      title={
                         <div className="flex min-w-0 items-start gap-2">
                           <Checkbox
                             id={checkboxId}
@@ -352,21 +602,21 @@ export function PlanExtractReview({
                             onCheckedChange={(checked) => onSelectedFieldsChange({ ...selectedFields, [field]: checked === true })}
                             aria-label={`Aplicar ${fieldLabels[field]}`}
                           />
-                          <div className="min-w-0">
-                            <label htmlFor={checkboxId} className="block cursor-pointer text-sm font-semibold">
-                              {fieldLabels[field]}
-                            </label>
-                            {confidence === "low" ? <p className="mt-1 text-xs text-destructive">Baixa confianca; desmarcado por padrao.</p> : null}
-                            {field === "constructionMethod" && confidence !== "high" ? (
-                              <p className="mt-1 text-xs text-muted-foreground">Sugestao revisavel; nao altera o metodo sozinha.</p>
-                            ) : null}
-                            {selectionDisabled ? <p className="mt-1 text-xs text-destructive">Corrija o numero para aplicar este campo.</p> : null}
-                          </div>
+                          <label htmlFor={checkboxId} className="block cursor-pointer text-sm font-semibold">
+                            {fieldLabels[field]}
+                          </label>
                         </div>
-                        <Badge variant="outline" className={cn("shrink-0", confidenceClass(confidence))}>
-                          {confidenceLabels[confidence]}
-                        </Badge>
-                      </div>
+                      }
+                      description={
+                        <>
+                          {confidence === "low" ? <span className="block text-destructive">Baixa confianca; desmarcado por padrao.</span> : null}
+                          {field === "constructionMethod" && confidence !== "high" ? (
+                            <span className="block">Sugestao revisavel; nao altera o metodo sozinha.</span>
+                          ) : null}
+                          {selectionDisabled ? <span className="block text-destructive">Corrija o numero para aplicar este campo.</span> : null}
+                        </>
+                      }
+                    >
 
                       <div className="mt-3 grid gap-2 md:grid-cols-2">
                         <div className="rounded-lg border bg-muted/25 p-3">
@@ -387,11 +637,9 @@ export function PlanExtractReview({
                       </div>
 
                       {evidence ? (
-                        <p className="mt-3 rounded-lg border bg-muted/25 p-2 text-xs leading-5 text-muted-foreground">
-                          <span className="font-medium text-foreground">Evidencia:</span> {evidence}
-                        </p>
+                        <EvidenceCard className="mt-3 text-xs" evidence={evidence} />
                       ) : null}
-                    </article>
+                    </ReviewCard>
                   );
                 })}
               </div>
@@ -404,15 +652,52 @@ export function PlanExtractReview({
         </p>
       )}
 
-      {(notes.length > 0 || uncertainties.length > 0 || result.warnings.length > 0) && (
+      {questions.length > 0 ? (
+        <section className="mt-4 space-y-3">
+          <div>
+            <h4 className="text-sm font-semibold">Perguntas antes do orçamento</h4>
+            <p className="mt-1 text-xs text-muted-foreground">Responda o que estiver faltando antes de transformar a leitura em quantitativos.</p>
+          </div>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {questions.map((question) => {
+              const answerId = `plan-question-${question.id}`;
+              return (
+                <QuestionCard key={question.id} question={question.question} reason={question.reason} required={question.requiredBeforeBudget}>
+                  <label htmlFor={answerId} className="text-xs font-medium text-amber-950">
+                    Resposta
+                  </label>
+                  <Textarea
+                    id={answerId}
+                    value={effectiveQuestionAnswers[question.id] ?? ""}
+                    onChange={(event) => updateQuestionAnswer(question.id, event.target.value)}
+                    className="mt-1 min-h-20 border-amber-200 bg-white/80 text-foreground"
+                    aria-label={`Resposta para ${question.question}`}
+                  />
+                  {(effectiveQuestionAnswers[question.id] ?? "").trim() ? (
+                    <p className="mt-2 rounded-lg border border-amber-200 bg-white/70 p-2 text-xs leading-5 text-amber-950">
+                      Resposta registrada nesta revisao. Ela ainda fica como pendencia ate ser aplicada nos campos ou no preenchimento manual.
+                    </p>
+                  ) : null}
+                </QuestionCard>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {(notes.length > 0 || uncertainties.length > 0 || result.warnings.length > 0 || structuredWarningItems.length > 0) && (
         <div className="mt-4 grid gap-3 text-sm lg:grid-cols-3">
           {notes.length > 0 ? <ExtractList title="Observacoes" items={notes} icon="notes" /> : null}
           {uncertainties.length > 0 ? <ExtractList title="Incertezas" items={uncertainties} icon="uncertainty" /> : null}
           {result.warnings.length > 0 ? <ExtractList title="Alertas" items={result.warnings} icon="warning" /> : null}
+          {structuredWarningItems.length > 0 ? <ExtractList title="Alertas estruturados" items={structuredWarningItems} icon="warning" /> : null}
         </div>
       )}
 
       <div className="mt-4 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+        <InlineHelp tone="pending" className="sm:mr-auto">
+          Proximo passo: aplicar somente campos selecionados, responder pendencias e seguir para quantitativos revisaveis.
+        </InlineHelp>
         <Button type="button" variant="ghost" onClick={onDismiss} disabled={isApplying}>
           <XCircle className="h-4 w-4" />
           Descartar extracao

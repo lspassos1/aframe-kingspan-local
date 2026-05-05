@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   PlanExtractReview,
+  getPlanExtractAdvancedHighlights,
+  getPlanExtractDecisionBlocks,
   getPlanExtractFieldEvidence,
   isInvalidPlanExtractNumericDraft,
   prunePlanExtractReviewState,
@@ -15,6 +17,7 @@ const reviewResult: PlanExtractResult = {
   version: "1.0",
   summary: "Planta com cotas principais e informacoes parciais.",
   confidence: "medium",
+  extractionStatus: "partial",
   extracted: {
     projectName: "Casa Jardim",
     city: "Salvador",
@@ -41,6 +44,70 @@ const reviewResult: PlanExtractResult = {
   assumptions: ["Area construida calculada por largura x profundidade."],
   missingInformation: ["Escala grafica nao visivel."],
   warnings: ["Metodo construtivo precisa de confirmacao humana."],
+  document: {
+    type: {
+      value: "planta baixa",
+      unit: "texto",
+      confidence: "high",
+      evidence: "Carimbo identifica a prancha como planta baixa.",
+      source: "visible",
+      requiresReview: true,
+    },
+  },
+  scale: {
+    scaleText: {
+      value: "1:50",
+      unit: "texto",
+      confidence: "low",
+      evidence: "Escala aparece pouco legivel no carimbo.",
+      source: "visible",
+      requiresReview: true,
+      pendingReason: "Confirmar escala antes de derivar medidas.",
+    },
+  },
+  rooms: [
+    {
+      id: "room-1",
+      name: {
+        value: "Sala",
+        unit: "texto",
+        confidence: "medium",
+        evidence: "Texto Sala visivel no ambiente principal.",
+        source: "visible",
+        requiresReview: true,
+      },
+    },
+  ],
+  quantitySeeds: [
+    {
+      id: "seed-walls",
+      category: "walls",
+      description: "Area preliminar de paredes",
+      quantity: 120,
+      unit: "m2",
+      source: "system_calculated",
+      confidence: "medium",
+      requiresReview: true,
+      notes: "Calculado a partir das cotas principais.",
+    },
+  ],
+  questions: [
+    {
+      id: "q-scale",
+      question: "Qual medida real posso usar como referencia?",
+      target: "scale",
+      reason: "Escala grafica nao esta legivel.",
+      requiredBeforeBudget: true,
+    },
+  ],
+  extractionWarnings: [
+    {
+      code: "method-review",
+      message: "Metodo construtivo precisa de confirmacao humana.",
+      severity: "warning",
+      target: "constructionMethod",
+    },
+  ],
 };
 
 const currentValues: PlanExtractCurrentValues = {
@@ -69,8 +136,10 @@ describe("PlanExtractReview", () => {
         selectedFields,
         currentValues,
         modifiedValues: {},
+        questionAnswers: { "q-scale": "Usar a cota frontal de 8 m." },
         onSelectedFieldsChange: vi.fn(),
         onModifiedValuesChange: vi.fn(),
+        onQuestionAnswersChange: vi.fn(),
         onApply: vi.fn(),
         onDismiss: vi.fn(),
         onBackToManual: vi.fn(),
@@ -78,15 +147,26 @@ describe("PlanExtractReview", () => {
     );
 
     expect(html).toContain("Metodo sugerido");
+    expect(html).toContain("Blocos da planta");
+    expect(html).toContain("Documento e escala");
+    expect(html).toContain("Ambientes");
+    expect(html).toContain("Quantitativos");
+    expect(html).toContain("Atual:");
     expect(html).toContain("Localizacao");
     expect(html).toContain("Area e dimensoes");
     expect(html).toContain("Ambientes");
     expect(html).toContain("Portas e janelas");
     expect(html).toContain("Antes");
     expect(html).toContain("Depois");
-    expect(html).toContain("Evidencia:");
+    expect(html).toContain("Evidência");
     expect(html).toContain("Incertezas");
     expect(html).toContain("Alertas");
+    expect(html).toContain("Perguntas antes do orçamento");
+    expect(html).toContain("Qual medida real posso usar como referencia?");
+    expect(html).toContain("Usar a cota frontal de 8 m.");
+    expect(html).toContain("Resposta registrada nesta revisao");
+    expect(html).toContain("Alertas estruturados");
+    expect(html).toContain("Proximo passo");
     expect(html).toContain("Descartar extracao");
     expect(html).toContain("Voltar para manual");
     expect(html).toContain("Aplicar campos selecionados");
@@ -110,6 +190,32 @@ describe("PlanExtractReview", () => {
     expect(selectedFields.constructionMethod).toBe(false);
     expect(html).toContain("Metodo sugerido com confianca media");
     expect(html).toContain("Sugestao revisavel; nao altera o metodo sozinha.");
+  });
+
+  it("summarizes advanced extraction blocks for the review surface", () => {
+    expect(getPlanExtractAdvancedHighlights(reviewResult)).toEqual([
+      { label: "Leitura", value: "Parcial", tone: "pending" },
+      { label: "Ambientes", value: "1", tone: "info" },
+      { label: "Quantitativos sugeridos", value: "1", tone: "pending" },
+      { label: "Perguntas", value: "1", tone: "warning" },
+      { label: "Alertas", value: "1", tone: "warning" },
+    ]);
+  });
+
+  it("creates decision blocks for advanced review domains", () => {
+    const blocks = getPlanExtractDecisionBlocks(reviewResult);
+
+    expect(blocks.map((block) => block.title)).toEqual(["Documento e escala", "Ambientes", "Quantitativos"]);
+    expect(blocks[0]).toMatchObject({
+      title: "Documento e escala",
+      status: "pendente",
+      tone: "warning",
+    });
+    expect(blocks[2]?.items[0]).toMatchObject({
+      label: "Area preliminar de paredes",
+      value: "120 m2",
+      source: "system_calculated",
+    });
   });
 
   it("finds field evidence only when extraction notes or assumptions reference the field", () => {

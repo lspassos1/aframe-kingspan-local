@@ -2,7 +2,7 @@
 
 import { useRef, useState, type DragEvent } from "react";
 import { AlertTriangle, CheckCircle2, FileCheck2, FileUp, Loader2, UploadCloud } from "lucide-react";
-import { PlanExtractReview, type PlanExtractCurrentValues, type PlanExtractModifiedValues } from "@/components/ai/PlanExtractReview";
+import { PlanExtractReview, type PlanExtractCurrentValues, type PlanExtractModifiedValues, type PlanExtractQuestionAnswers } from "@/components/ai/PlanExtractReview";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { applyPlanExtractToProject, getDefaultPlanExtractSelectedFields, type PlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
@@ -98,6 +98,7 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
   const [result, setResult] = useState<PlanExtractResult | null>(null);
   const [selectedFields, setSelectedFields] = useState<PlanExtractSelectedFields>({});
   const [modifiedValues, setModifiedValues] = useState<PlanExtractModifiedValues>({});
+  const [questionAnswers, setQuestionAnswers] = useState<PlanExtractQuestionAnswers>({});
   const [message, setMessage] = useState("");
   const [providerMeta, setProviderMeta] = useState<{ provider?: string; model?: string; remaining?: string; limit?: string; cached?: boolean }>({});
 
@@ -130,6 +131,7 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
     setMessage("");
     setResult(null);
     setModifiedValues({});
+    setQuestionAnswers({});
     setProviderMeta({});
 
     const formData = new FormData();
@@ -232,6 +234,7 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
     setResult(null);
     setSelectedFields({});
     setModifiedValues({});
+    setQuestionAnswers({});
     setProviderMeta({});
     setMessage("");
     setState("idle");
@@ -344,8 +347,10 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
           selectedFields={selectedFields}
           currentValues={currentValues}
           modifiedValues={modifiedValues}
+          questionAnswers={questionAnswers}
           onSelectedFieldsChange={setSelectedFields}
           onModifiedValuesChange={setModifiedValues}
+          onQuestionAnswersChange={setQuestionAnswers}
           onApply={applyExtractedFields}
           onDismiss={resetReview}
           onBackToManual={returnToManual}
