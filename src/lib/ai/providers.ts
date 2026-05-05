@@ -31,7 +31,7 @@ export type AiPlanExtractProviderResult = {
   tokens?: number;
 };
 
-const defaultProviderOrder: AiPlanExtractProviderId[] = ["openai", "openrouter", "groq", "generic"];
+const officialProviderOrder: AiPlanExtractProviderId[] = ["openai"];
 
 const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyEnv?: string; defaultModel: string; baseUrl?: string; supports: AiPlanExtractMimeType[] }> = {
   openai: {
@@ -71,9 +71,10 @@ function getBooleanEnv(env: AiPlanExtractEnv, key: string, fallback = false) {
 
 export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.env) {
   const configuredOrder = env.AI_PLAN_EXTRACT_PROVIDER_ORDER?.split(",").map((provider) => provider.trim()).filter(Boolean) ?? [];
-  const order = configuredOrder.length > 0 ? configuredOrder : defaultProviderOrder;
-  const supportedOrder = order.filter((provider): provider is AiPlanExtractProviderId => provider in providerDefaults);
-  return supportedOrder.length > 0 ? supportedOrder : defaultProviderOrder;
+  if (configuredOrder.length > 0 && !configuredOrder.includes("openai")) {
+    return officialProviderOrder;
+  }
+  return officialProviderOrder;
 }
 
 function getProviderSupportedMimeTypes(id: AiPlanExtractProviderId, env: AiPlanExtractEnv, defaults: (typeof providerDefaults)[AiPlanExtractProviderId]) {
