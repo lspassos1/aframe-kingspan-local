@@ -1,13 +1,14 @@
 "use client";
 
-import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
 import type { BudgetSummary, MaterialLine, Project, QuotationRequest, Scenario } from "@/types/project";
 import { generateAssemblyDrawings } from "@/lib/calculations/drawings";
 import { createBudgetSourceExport, createBudgetSourceWorkbookRows } from "@/lib/budget-assistant";
 import { generateScenarioTechnicalSummary } from "@/lib/construction-methods/scenario-calculations";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { formatCurrency, slugify } from "@/lib/format";
+
+type XlsxModule = typeof import("xlsx");
+type JsPdfConstructor = typeof import("jspdf")["default"];
 
 export function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mime });
@@ -23,7 +24,8 @@ export function exportProjectJson(project: Project) {
   downloadTextFile(`${slugify(project.name) || "projeto-aframe"}.json`, JSON.stringify(project, null, 2), "application/json");
 }
 
-export function exportMaterialsCsv(projectName: string, materials: MaterialLine[], methodName: string) {
+export async function exportMaterialsCsv(projectName: string, materials: MaterialLine[], methodName: string) {
+  const XLSX = await loadXlsx();
   const rows = materials.map((line) => ({
     metodo: methodName,
     codigo: line.code,
@@ -44,7 +46,8 @@ export function exportMaterialsCsv(projectName: string, materials: MaterialLine[
   downloadTextFile(`${slugify(projectName)}-materiais.csv`, csv, "text/csv;charset=utf-8");
 }
 
-export function exportMaterialsXlsx(projectName: string, materials: MaterialLine[], methodName: string) {
+export async function exportMaterialsXlsx(projectName: string, materials: MaterialLine[], methodName: string) {
+  const XLSX = await loadXlsx();
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(
     materials.map((line) => ({
@@ -77,7 +80,8 @@ export function exportBudgetSourceJson(project: Project, scenario: Scenario) {
   downloadTextFile(`${slugify(project.name)}-orcamento-fontes.json`, JSON.stringify(report, null, 2), "application/json");
 }
 
-export function exportBudgetSourceXlsx(project: Project, scenario: Scenario) {
+export async function exportBudgetSourceXlsx(project: Project, scenario: Scenario) {
+  const XLSX = await loadXlsx();
   const report = createBudgetSourceExport(project, scenario);
   const rows = createBudgetSourceWorkbookRows(report);
   const workbook = XLSX.utils.book_new();
@@ -90,7 +94,8 @@ export function exportBudgetSourceXlsx(project: Project, scenario: Scenario) {
   XLSX.writeFile(workbook, `${slugify(project.name)}-orcamento-fontes.xlsx`);
 }
 
-export function exportBudgetSourcePdf(project: Project, scenario: Scenario) {
+export async function exportBudgetSourcePdf(project: Project, scenario: Scenario) {
+  const jsPDF = await loadJsPdf();
   const report = createBudgetSourceExport(project, scenario);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setFont("helvetica", "bold");
@@ -150,7 +155,8 @@ export function exportBudgetSourcePdf(project: Project, scenario: Scenario) {
   doc.save(`${slugify(project.name)}-orcamento-fontes.pdf`);
 }
 
-export function exportReportPdf(project: Project, scenario: Scenario, materials: MaterialLine[], budget: BudgetSummary) {
+export async function exportReportPdf(project: Project, scenario: Scenario, materials: MaterialLine[], budget: BudgetSummary) {
+  const jsPDF = await loadJsPdf();
   const summary = generateScenarioTechnicalSummary(project, scenario);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setFont("helvetica", "bold");
@@ -225,6 +231,8 @@ function svgToPngDataUrl(svg: string, width = 720, height = 480): Promise<string
 }
 
 export async function exportTechnicalPdf(project: Project, scenario: Scenario) {
+  const jsPDF = await loadJsPdf();
+
   if (scenario.constructionMethod !== "aframe") {
     const summary = generateScenarioTechnicalSummary(project, scenario);
     const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -258,4 +266,13 @@ export async function exportTechnicalPdf(project: Project, scenario: Scenario) {
     doc.addImage(png, "PNG", 10, 26, 190, 126);
   }
   doc.save(`${slugify(project.name)}-projeto-tecnico.pdf`);
+}
+
+async function loadXlsx(): Promise<XlsxModule> {
+  return import("xlsx");
+}
+
+async function loadJsPdf(): Promise<JsPdfConstructor> {
+  const jsPdfModule = await import("jspdf");
+  return jsPdfModule.default;
 }

@@ -1,10 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { AFrameViewer } from "@/components/3d/AFrameViewer";
-import { GenericConstructionViewer } from "@/components/3d/GenericConstructionViewer";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
+
+const AFrameViewer = dynamic(() => import("@/components/3d/AFrameViewer").then((module) => module.AFrameViewer), {
+  ssr: false,
+  loading: () => <ViewerLoading />,
+});
+
+const GenericConstructionViewer = dynamic(() => import("@/components/3d/GenericConstructionViewer").then((module) => module.GenericConstructionViewer), {
+  ssr: false,
+  loading: () => <ViewerLoading />,
+});
 
 export default function Model3DPage() {
   const project = useProjectStore((state) => state.project);
@@ -27,4 +36,8 @@ export default function Model3DPage() {
       {isAFrame ? <AFrameViewer project={project} scenario={scenario} /> : <GenericConstructionViewer scenario={scenario} title={methodDefinition.name} layers={layers} />}
     </div>
   );
+}
+
+function ViewerLoading() {
+  return <div className="grid min-h-[480px] place-items-center rounded-md border bg-muted/20 text-sm text-muted-foreground">Carregando visualizacao 3D...</div>;
 }

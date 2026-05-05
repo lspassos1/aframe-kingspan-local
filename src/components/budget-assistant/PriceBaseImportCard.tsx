@@ -137,14 +137,16 @@ export function PriceBaseImportCard({
         throw new Error(`Arquivo excede o limite de ${Math.round(sinapiImportLimits.maxUploadBytes / 1024 / 1024)} MB para importacao SINAPI.`);
       }
       const fileData = extension === "xlsx" || extension === "xls" || extension === "zip" ? await file.arrayBuffer() : await file.text();
-      const parsedRows =
-        sourceType === "sinapi" || extension === "zip"
-          ? await parseSinapiRowsFromFile(file.name, fileData)
-          : extension === "json"
-            ? parsePriceBaseJson(fileData as string)
-            : extension === "xlsx" || extension === "xls"
-              ? parsePriceBaseXlsx(fileData as ArrayBuffer)
-              : parsePriceBaseCsv(fileData as string);
+      let parsedRows: PriceBaseRawRow[];
+      if (sourceType === "sinapi" || extension === "zip") {
+        parsedRows = await parseSinapiRowsFromFile(file.name, fileData);
+      } else if (extension === "json") {
+        parsedRows = parsePriceBaseJson(fileData as string);
+      } else if (extension === "xlsx" || extension === "xls") {
+        parsedRows = await parsePriceBaseXlsx(fileData as ArrayBuffer);
+      } else {
+        parsedRows = await parsePriceBaseCsv(fileData as string);
+      }
       setRows(parsedRows);
       setSummary(`${parsedRows.length} linhas lidas de ${file.name}. Revise o mapeamento antes de importar.`);
       if (!sourceTitle.trim()) setSourceTitle(file.name.replace(/\.[^.]+$/, ""));

@@ -56,28 +56,28 @@ export default function ExportPage() {
       title: "Lista XLSX",
       description: "Planilha editavel da lista de materiais e acessorios.",
       icon: FileSpreadsheet,
-      action: () => exportMaterialsXlsx(project.name, materials, methodDefinition.name),
+      action: () => void exportMaterialsXlsx(project.name, materials, methodDefinition.name),
       label: "Baixar XLSX",
     },
     {
       title: "Lista CSV",
       description: "CSV simples para importar em planilhas ou ERPs.",
       icon: FileSpreadsheet,
-      action: () => exportMaterialsCsv(project.name, materials, methodDefinition.name),
+      action: () => void exportMaterialsCsv(project.name, materials, methodDefinition.name),
       label: "Baixar CSV",
     },
     {
       title: "Relatorio PDF",
       description: "Resumo com metodo construtivo, status preliminar, materiais, orcamento e avisos.",
       icon: FileText,
-      action: () => exportReportPdf(project, scenario, materials, budget),
+      action: () => void exportReportPdf(project, scenario, materials, budget),
       label: "Baixar PDF",
     },
     {
       title: "Orcamento por fontes XLSX",
       description: "Planilha com fontes, data-base, cidade/UF, confianca, HH, BDI, contingencia e pendencias.",
       icon: FileSpreadsheet,
-      action: () => exportBudgetSourceXlsx(project, scenario),
+      action: () => void exportBudgetSourceXlsx(project, scenario),
       label: "Baixar XLSX",
     },
     {
@@ -91,7 +91,7 @@ export default function ExportPage() {
       title: "Orcamento por fontes PDF",
       description: "Relatorio preliminar com separacao de custos, fontes e avisos de revisao humana.",
       icon: FileText,
-      action: () => exportBudgetSourcePdf(project, scenario),
+      action: () => void exportBudgetSourcePdf(project, scenario),
       label: "Baixar PDF",
     },
     {
@@ -148,7 +148,7 @@ export default function ExportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
-                <Button className="w-full" onClick={item.action}>
+                <Button className="w-full" onClick={() => item.action()}>
                   <Download className="mr-2 h-4 w-4" />
                   {item.label}
                 </Button>

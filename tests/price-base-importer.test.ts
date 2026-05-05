@@ -26,8 +26,8 @@ const source = createImportedPriceSource({
 });
 
 describe("price base importer", () => {
-  it("imports a mapped CSV row as sourced service composition", () => {
-    const rows = parsePriceBaseCsv(
+  it("imports a mapped CSV row as sourced service composition", async () => {
+    const rows = await parsePriceBaseCsv(
       [
         "codigo,descricao,unidade,preco_total,material,mao_obra,equipamento,hh,data_base,uf,cidade,etapa,tags,metodo",
         "SINAPI-123,Alvenaria de vedacao,m2,80,45,30,5,0.4,2026-05-04,BA,Cruz das Almas,alvenaria,parede;bloco,alvenaria",
@@ -65,8 +65,8 @@ describe("price base importer", () => {
     expect(result.serviceCompositions[0].laborRoles[0]).toMatchObject({ role: "Mao de obra importada", hoursPerUnit: 0.4, total: 30 });
   });
 
-  it("validates required mapped columns before importing rows", () => {
-    const rows = parsePriceBaseCsv("descricao,unidade,preco_total\nAlvenaria,m2,80");
+  it("validates required mapped columns before importing rows", async () => {
+    const rows = await parsePriceBaseCsv("descricao,unidade,preco_total\nAlvenaria,m2,80");
 
     expect(validatePriceBaseColumnMapping(rows, defaultPriceBaseColumnMapping)).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "required-column-missing", columnKey: "sourceCode" })])
@@ -81,8 +81,8 @@ describe("price base importer", () => {
     ).toMatchObject({ importedRows: 0, serviceCompositions: [] });
   });
 
-  it("parses Brazilian dot-thousand monetary values without shrinking totals", () => {
-    const rows = parsePriceBaseCsv(
+  it("parses Brazilian dot-thousand monetary values without shrinking totals", async () => {
+    const rows = await parsePriceBaseCsv(
       [
         "codigo,descricao,unidade,preco_total,material,mao_obra,equipamento",
         "SINAPI-999,Servico com milhar,m2,1.234,1.000,200,34",
@@ -104,8 +104,8 @@ describe("price base importer", () => {
     });
   });
 
-  it("keeps dot-decimal labor hours separate from dot-thousand money parsing", () => {
-    const rows = parsePriceBaseCsv(
+  it("keeps dot-decimal labor hours separate from dot-thousand money parsing", async () => {
+    const rows = await parsePriceBaseCsv(
       [
         "codigo,descricao,unidade,preco_total,material,mao_obra,equipamento,hh",
         "SINAPI-998,Servico com horas decimais,m2,1.234,1.000,200,34,0.400",
@@ -160,7 +160,7 @@ describe("price base importer", () => {
     });
   });
 
-  it("parses XLSX rows with explicit column mapping", () => {
+  it("parses XLSX rows with explicit column mapping", async () => {
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet([
       {
@@ -179,7 +179,7 @@ describe("price base importer", () => {
     ]);
     XLSX.utils.book_append_sheet(workbook, worksheet, "Base");
     const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-    const rows = parsePriceBaseXlsx(data);
+    const rows = await parsePriceBaseXlsx(data);
 
     const result = importPriceBaseRows({
       rows,
@@ -209,8 +209,8 @@ describe("price base importer", () => {
     });
   });
 
-  it("serializes imported sources and compositions with the project JSON", () => {
-    const rows = parsePriceBaseCsv("codigo,descricao,unidade,preco_total\nSINAPI-123,Alvenaria,m2,80");
+  it("serializes imported sources and compositions with the project JSON", async () => {
+    const rows = await parsePriceBaseCsv("codigo,descricao,unidade,preco_total\nSINAPI-123,Alvenaria,m2,80");
     const result = importPriceBaseRows({
       rows,
       mapping: defaultPriceBaseColumnMapping,
