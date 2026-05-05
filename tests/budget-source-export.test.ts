@@ -196,6 +196,10 @@ describe("budget source export report", () => {
     expect(report.budgetStatusLabel).toBe("Orcamento preliminar");
     expect(report.serviceCompositions[0]).toMatchObject({ outOfRegion: true, structuralCritical: true });
     expect(report.serviceLines[0]).toMatchObject({ outOfRegion: true, structuralCritical: true, requiresReview: true });
+    expect(report.totals).toMatchObject({
+      outOfRegionCompositionCount: 1,
+      structuralCriticalCount: 1,
+    });
     expect(report.warnings).toEqual(
       expect.arrayContaining([
         expect.stringContaining("nao representa orcamento final"),

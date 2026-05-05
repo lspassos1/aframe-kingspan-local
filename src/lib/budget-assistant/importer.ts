@@ -118,7 +118,7 @@ const validMaterialUnits = new Set<MaterialUnit>(["un", "m", "m2", "m3", "kg", "
 const validConstructionMethodIds = new Set<ConstructionMethodId>(["aframe", "conventional-masonry", "eco-block", "monolithic-eps"]);
 
 export function parsePriceBaseCsv(content: string): PriceBaseRawRow[] {
-  return readFirstWorksheetRows(XLSX.read(content, { type: "string" }));
+  return readFirstWorksheetRows(XLSX.read(content, { type: "string", raw: true }));
 }
 
 export function parsePriceBaseXlsx(data: ArrayBuffer): PriceBaseRawRow[] {
@@ -535,8 +535,11 @@ function parseDecimal(value: unknown) {
   const clean = text.replace(/R\$/gi, "").replace(/\s/g, "");
   const lastComma = clean.lastIndexOf(",");
   const lastDot = clean.lastIndexOf(".");
-  const decimalComma = lastComma > lastDot;
-  const normalized = decimalComma ? clean.replace(/\./g, "").replace(",", ".") : clean.replace(/,/g, "");
+  const hasComma = lastComma >= 0;
+  const hasDot = lastDot >= 0;
+  const dotGroupsOnly = /^\d{1,3}(\.\d{3})+$/.test(clean);
+  const decimalComma = hasComma && (!hasDot || lastComma > lastDot);
+  const normalized = decimalComma || dotGroupsOnly ? clean.replace(/\./g, "").replace(",", ".") : clean.replace(/,/g, "");
   const number = Number(normalized.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(number) ? number : null;
 }

@@ -497,6 +497,10 @@ function createTotals(
   lowConfidenceCount: number
 ): BudgetSourceExportTotals {
   const costItemTotal = costItems.reduce((sum, item) => sum + item.totalBRL, 0);
+  const outOfRegionCompositionCount =
+    lines.length > 0 ? lines.filter((line) => line.outOfRegion).length : compositions.filter((composition) => composition.outOfRegion).length;
+  const structuralCriticalCount =
+    lines.length > 0 ? lines.filter((line) => line.structuralCritical).length : compositions.filter((composition) => composition.structuralCritical).length;
   return {
     materialCostBRL: sumLines(lines, "materialCostBRL"),
     laborCostBRL: sumLines(lines, "laborCostBRL"),
@@ -512,8 +516,8 @@ function createTotals(
     unpricedCount: pendingItems.length,
     lowConfidenceCount,
     reviewableLineCount: lines.filter((line) => line.requiresReview || !line.approvedByUser).length + costItems.filter((item) => item.requiresReview).length,
-    outOfRegionCompositionCount: compositions.filter((composition) => composition.outOfRegion).length + lines.filter((line) => line.outOfRegion).length,
-    structuralCriticalCount: compositions.filter((composition) => composition.structuralCritical).length + lines.filter((line) => line.structuralCritical).length,
+    outOfRegionCompositionCount,
+    structuralCriticalCount,
   };
 }
 
