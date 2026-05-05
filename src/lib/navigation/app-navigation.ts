@@ -67,7 +67,7 @@ export function isAFrameOnlyAppRoute(pathname: string) {
 export function isAdminOnlyAppRoute(pathname: string) {
   const normalizedPathname = normalizePathname(pathname);
 
-  return normalizedPathname.startsWith("/admin") || adminOnlyRoutes.has(normalizedPathname);
+  return normalizedPathname === "/admin" || normalizedPathname.startsWith("/admin/") || adminOnlyRoutes.has(normalizedPathname);
 }
 
 export function isAppNavigationItemVisible(pathname: string, constructionMethod?: ConstructionMethodId, isAdmin = false) {

@@ -164,6 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const project = useProjectStore((state) => state.project);
   const onboardingCompleted = project.onboardingCompleted;
   const selectedScenario = project.scenarios.find((scenario) => scenario.id === project.selectedScenarioId) ?? project.scenarios[0];
@@ -227,7 +228,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
           <div className="flex items-center gap-2">
             <UserButton />
-            <Sheet>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" aria-label="Abrir navegação">
                   <Menu className="h-4 w-4" />
@@ -242,7 +243,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <p className="mt-1 text-sm font-medium">{methodName}</p>
                 </div>
                 <div className="mt-6">
-                  <NavList constructionMethod={constructionMethod} isAdmin={isAdmin} />
+                  <NavList constructionMethod={constructionMethod} isAdmin={isAdmin} onNavigate={() => setIsSheetOpen(false)} />
                 </div>
               </SheetContent>
             </Sheet>

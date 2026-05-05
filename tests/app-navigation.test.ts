@@ -17,6 +17,7 @@ describe("app navigation visibility by construction method", () => {
     expect(isAdminOnlyAppRoute("/admin/feedback")).toBe(true);
     expect(isAdminOnlyAppRoute("/admin/feedback/")).toBe(true);
     expect(isAdminOnlyAppRoute("/dashboard")).toBe(false);
+    expect(isAdminOnlyAppRoute("/admin-feedback")).toBe(false);
     expect(isAppNavigationItemVisible("/admin/feedback", "aframe", false)).toBe(false);
     expect(isAppNavigationItemVisible("/admin/feedback", "aframe", true)).toBe(true);
   });
