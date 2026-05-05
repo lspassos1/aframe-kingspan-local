@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, FileUp, FolderOpen, Keyboard } from "lucide-react";
 import { PlanImportCard } from "@/components/ai/PlanImportCard";
@@ -29,16 +29,28 @@ export function StartGuidedAssistant({
   const setProject = useProjectStore((state) => state.setProject);
   const setOnboardingCompleted = useProjectStore((state) => state.setOnboardingCompleted);
   const [mode, setMode] = useState<StartAssistantMode>(initialMode);
+  const openedInitialExampleRef = useRef(false);
   const viewModel = useMemo(() => createStartAssistantViewModel({ mode, planExtractEnabled }), [mode, planExtractEnabled]);
 
-  function openExampleProject() {
-    setMode("example");
+  const loadExampleProject = useCallback(() => {
     setProject({
       ...cloneProject(defaultProject),
       onboardingCompleted: true,
     });
     setOnboardingCompleted(true);
     router.push("/model-3d");
+  }, [router, setOnboardingCompleted, setProject]);
+
+  useEffect(() => {
+    if (initialMode !== "example" || openedInitialExampleRef.current) return;
+
+    openedInitialExampleRef.current = true;
+    loadExampleProject();
+  }, [initialMode, loadExampleProject]);
+
+  function openExampleProject() {
+    setMode("example");
+    loadExampleProject();
   }
 
   function selectMode(nextMode: StartAssistantMode) {

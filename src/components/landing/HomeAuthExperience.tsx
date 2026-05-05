@@ -1,52 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { SignIn, UserButton, useUser } from "@clerk/nextjs";
-import { ArrowRight, Box, CheckCircle2, ClipboardList, Layers3, MessageSquare, ShieldCheck, WalletCards } from "lucide-react";
-import { ApprovedContributions } from "@/components/landing/ApprovedContributions";
+import { UserButton, useUser } from "@clerk/nextjs";
+import { ArrowRight, Box, Calculator, CheckCircle2, ClipboardList, FileDown, FileText, FileUp, MessageSquare, PenLine, ShieldCheck, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const methods = [
+const decisionSteps = [
   {
-    name: "A-frame com painéis",
-    description: "Modelo atual preservado, com geometria inclinada, painéis, estrutura preliminar e 3D completo.",
+    title: "IA lê e sugere",
+    body: "Com OpenAI ativa, a planta vira campos preliminares, pendências e incertezas para revisão.",
   },
   {
-    name: "Alvenaria convencional",
-    description: "Estimativa inicial para blocos, revestimentos, fundação e placeholders de estrutura e mão de obra.",
+    title: "Sistema calcula",
+    body: "Quantitativos, geometria, 3D e orçamento usam regras determinísticas do método confirmado.",
   },
   {
-    name: "Bloco ecológico",
-    description: "Quantitativos preliminares de solo-cimento, modulação, graute, armaduras e acabamento aparente ou rebocado.",
-  },
-  {
-    name: "Painéis monolíticos EPS",
-    description: "Levantamento de painéis, malha, revestimento por face, arranques e reforços para cotação com fornecedor.",
+    title: "Usuário aprova",
+    body: "Nada entra no orçamento revisado sem fonte, status e aceite humano.",
   },
 ];
 
 const workflow = [
-  "Escolha o método construtivo",
-  "Informe lote, dimensões e premissas técnicas",
-  "Compare 3D, quantitativos, custo preliminar e alertas",
-  "Exporte relatórios, materiais e pedidos de cotação",
+  { label: "Planta", detail: "PDF ou imagem", icon: FileUp },
+  { label: "Revisão", detail: "Campos editáveis", icon: PenLine },
+  { label: "Método", detail: "Escolha revisável", icon: ClipboardList },
+  { label: "Base", detail: "Preço com origem", icon: WalletCards },
+  { label: "Orçamento", detail: "Prévia exportável", icon: Calculator },
+  { label: "Exportação", detail: "JSON, XLSX e PDF", icon: FileDown },
 ];
 
-const calculations = [
-  "Geometria e áreas por cenário",
-  "Materiais e perdas preliminares",
-  "Orçamento com fonte, data, unidade e confiança",
-  "Alertas técnicos e itens pendentes de revisão",
+const sourceRules = [
+  "Preço sem fonte fica pendente.",
+  "IA não inventa composição nem valor.",
+  "SINAPI entra por importação controlada.",
+  "Fluxos existentes continuam preservados.",
 ];
 
 export function HomeAuthExperience() {
   const { isLoaded, isSignedIn } = useUser();
+  const primaryHref = isLoaded && isSignedIn ? "/start?mode=ai" : "/sign-up";
 
   return (
-    <main className="bg-[#f5f3ed] text-neutral-950">
-      <section className="relative min-h-[86svh] overflow-hidden bg-neutral-950 text-white">
+    <main className="bg-[#f6f7f4] text-neutral-950">
+      <section className="relative min-h-[82svh] overflow-hidden bg-neutral-950 text-white">
         <video
-          className="absolute inset-0 h-full w-full object-cover opacity-80 brightness-[0.58] contrast-[1.08] saturate-[0.92]"
+          className="absolute inset-0 h-full w-full object-cover opacity-72 brightness-[0.5] contrast-[1.08] saturate-[0.85]"
           autoPlay
           muted
           loop
@@ -59,9 +57,9 @@ export function HomeAuthExperience() {
           <source src="/hero/aframe-transform.webm" type="video/webm" />
           <source src="/hero/aframe-transform.mp4" type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.82),rgba(0,0,0,0.42)_48%,rgba(0,0,0,0.18)),linear-gradient(180deg,rgba(0,0,0,0.24),rgba(0,0,0,0.72))]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,0.88),rgba(5,5,5,0.56)_45%,rgba(5,5,5,0.18)),linear-gradient(180deg,rgba(5,5,5,0.2),rgba(5,5,5,0.78))]" />
 
-        <header className="relative z-10 flex items-center justify-between px-5 py-5 sm:px-8">
+        <header className="relative z-10 flex items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-12">
           <Link href="/" className="flex items-center gap-3" aria-label="Estudo Construtivo">
             <span className="grid h-10 w-10 place-items-center rounded-md bg-white text-neutral-950">
               <Box className="h-5 w-5" />
@@ -69,100 +67,118 @@ export function HomeAuthExperience() {
             <span className="text-sm font-semibold tracking-normal">Estudo Construtivo</span>
           </Link>
           <nav className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm" className="hidden text-white/75 hover:bg-white/10 hover:text-white sm:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden text-white/72 hover:bg-white/10 hover:text-white sm:inline-flex">
               <Link href="/feedback">
-                <MessageSquare className="mr-2 h-4 w-4" />
+                <MessageSquare className="h-4 w-4" />
                 Melhorias
               </Link>
             </Button>
-            {isLoaded && isSignedIn ? <UserButton /> : null}
+            {!isLoaded ? (
+              <div className="h-8 w-32" aria-hidden="true" />
+            ) : isSignedIn ? (
+              <>
+                <Button asChild size="sm" className="bg-white text-neutral-950 hover:bg-white/90">
+                  <Link href="/dashboard">Abrir app</Link>
+                </Button>
+                <UserButton />
+              </>
+            ) : (
+              <>
+                <Button asChild variant="ghost" size="sm" className="text-white/72 hover:bg-white/10 hover:text-white">
+                  <Link href="/sign-in">Entrar</Link>
+                </Button>
+                <Button asChild size="sm" className="bg-white text-neutral-950 hover:bg-white/90">
+                  <Link href="/sign-up">Criar conta</Link>
+                </Button>
+              </>
+            )}
           </nav>
         </header>
 
-        <div className="relative z-10 flex min-h-[calc(86svh-80px)] items-center px-5 pb-14 pt-8 sm:px-8 lg:px-12">
+        <div className="relative z-10 flex min-h-[calc(82svh-80px)] items-center px-5 pb-16 pt-8 sm:px-8 lg:px-12">
           <div className="max-w-4xl">
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-white/60">Plataforma modular de pré-projeto</p>
-            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-normal text-balance sm:text-6xl lg:text-7xl">
-              Projete e estime sua construção em minutos.
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-emerald-200/80">Pré-orçamento assistido</p>
+            <h1 className="mt-5 max-w-4xl text-4xl font-semibold tracking-normal text-balance sm:text-6xl lg:text-7xl">
+              Orçamento preliminar de obra a partir da planta baixa.
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-white/74 sm:text-lg">
-              Escolha o método construtivo, configure o lote, visualize em 3D e gere uma estimativa técnica com materiais, custos e alertas.
+            <p className="mt-6 max-w-2xl text-base leading-7 text-white/76 sm:text-lg">
+              Envie a planta, revise os dados e gere quantitativos com fonte de preço. O método construtivo entra depois,
+              como escolha ou sugestão revisável.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {isLoaded && isSignedIn ? (
-                <Button asChild size="lg" className="h-11 rounded-full bg-white px-6 text-neutral-950 hover:bg-white/90">
-                  <Link href="/dashboard">
-                    Abrir app
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              ) : (
-                <>
-                  <Button asChild size="lg" className="h-11 rounded-full bg-white px-6 text-neutral-950 hover:bg-white/90">
-                    <Link href="/sign-up">
-                      Criar conta
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" size="lg" className="h-11 rounded-full border-white/35 bg-white/5 px-6 text-white hover:bg-white/12 hover:text-white">
-                    <Link href="/sign-in">Entrar</Link>
-                  </Button>
-                </>
-              )}
+              <Button asChild size="lg" className="h-11 rounded-full bg-white px-6 text-neutral-950 hover:bg-white/90">
+                <Link href={primaryHref}>
+                  Começar com planta
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="h-11 rounded-full border-white/35 bg-white/5 px-6 text-white hover:bg-white/12 hover:text-white">
+                <Link href="#exemplo">Ver exemplo</Link>
+              </Button>
             </div>
           </div>
         </div>
-
-        <ApprovedContributions />
       </section>
 
-      <section className="border-y border-neutral-950/10 bg-[#f5f3ed] px-5 py-14 sm:px-8 lg:px-12">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
-            <div>
-              <p className="text-sm text-neutral-500">Métodos construtivos</p>
-              <h2 className="mt-2 max-w-md text-3xl font-semibold tracking-normal sm:text-4xl">Comece pelo sistema da obra.</h2>
-            </div>
-            <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
-              {methods.map((method) => (
-                <div key={method.name} className="border-t border-neutral-950/20 pt-4">
-                  <h3 className="text-lg font-semibold">{method.name}</h3>
-                  <p className="mt-2 text-sm leading-6 text-neutral-600">{method.description}</p>
-                </div>
-              ))}
-            </div>
+      <section id="exemplo" className="border-b border-neutral-950/10 px-5 py-14 sm:px-8 lg:px-12">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+          <div>
+            <p className="text-sm text-neutral-500">Como a decisão acontece</p>
+            <h2 className="mt-2 max-w-xl text-3xl font-semibold tracking-normal sm:text-4xl">A IA sugere. O sistema calcula. Você aprova.</h2>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {decisionSteps.map((step) => (
+              <div key={step.title} className="border-t border-neutral-950/18 pt-4">
+                <CheckCircle2 className="mb-4 h-5 w-5 text-emerald-700" />
+                <h3 className="text-lg font-semibold">{step.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-neutral-600">{step.body}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       <section className="px-5 py-16 sm:px-8 lg:px-12">
-        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-          <div className="lg:sticky lg:top-8">
-            <p className="text-sm text-neutral-500">Como funciona</p>
-            <h2 className="mt-2 max-w-lg text-3xl font-semibold tracking-normal sm:text-4xl">Um fluxo técnico para sair da ideia e chegar na cotação.</h2>
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 max-w-2xl">
+            <p className="text-sm text-neutral-500">Fluxo principal</p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-normal sm:text-4xl">Planta, revisão e preço antes de qualquer relatório.</h2>
           </div>
-          <div className="divide-y divide-neutral-950/12 border-y border-neutral-950/12">
-            {workflow.map((item, index) => (
-              <div key={item} className="grid gap-4 py-6 sm:grid-cols-[80px_1fr]">
-                <span className="font-mono text-sm text-neutral-400">{String(index + 1).padStart(2, "0")}</span>
-                <p className="text-xl font-medium">{item}</p>
-              </div>
-            ))}
+          <div className="grid gap-0 border-y border-neutral-950/14 md:grid-cols-3 xl:grid-cols-6">
+            {workflow.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="group min-h-36 border-b border-neutral-950/10 py-5 transition-colors hover:bg-white md:border-r md:px-5 xl:border-b-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <Icon className="h-5 w-5 text-neutral-500 transition-colors group-hover:text-emerald-700" />
+                    <span className="font-mono text-xs text-neutral-400">{String(index + 1).padStart(2, "0")}</span>
+                  </div>
+                  <h3 className="mt-8 text-lg font-semibold">{item.label}</h3>
+                  <p className="mt-1 text-sm text-neutral-500">{item.detail}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       <section className="bg-neutral-950 px-5 py-16 text-white sm:px-8 lg:px-12">
-        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
-            <p className="text-sm text-white/50">O que o app calcula</p>
-            <h2 className="mt-2 max-w-md text-3xl font-semibold tracking-normal sm:text-4xl">Dados preliminares para decidir o próximo passo.</h2>
+            <p className="text-sm text-white/50">Base de preços</p>
+            <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-normal sm:text-4xl">
+              Orçamento preliminar só aparece com fonte, status e revisão.
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-white/66">
+              O app transforma quantitativos em linhas de orçamento, mas mantém pendente o que não tiver preço válido, UF,
+              referência, unidade compatível e revisão humana.
+            </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {calculations.map((item) => (
-              <div key={item} className="flex gap-3 border-t border-white/14 pt-4">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
-                <p className="text-sm leading-6 text-white/76">{item}</p>
+          <div className="divide-y divide-white/12 border-y border-white/12">
+            {sourceRules.map((rule) => (
+              <div key={rule} className="flex items-center gap-3 py-4 text-sm text-white/78">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-300" />
+                <span>{rule}</span>
               </div>
             ))}
           </div>
@@ -170,28 +186,15 @@ export function HomeAuthExperience() {
       </section>
 
       <section className="px-5 py-16 sm:px-8 lg:px-12">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm text-neutral-500">Exemplo visual 3D</p>
-              <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-normal sm:text-4xl">Visualize o método antes de pedir preço.</h2>
-            </div>
-            <div className="grid max-w-md gap-3 text-sm text-neutral-600 sm:grid-cols-3">
-              <span className="flex items-center gap-2">
-                <Layers3 className="h-4 w-4" />
-                Camadas
-              </span>
-              <span className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Quantitativos
-              </span>
-              <span className="flex items-center gap-2">
-                <WalletCards className="h-4 w-4" />
-                Orçamento
-              </span>
-            </div>
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div>
+            <p className="text-sm text-neutral-500">Saída do estudo</p>
+            <h2 className="mt-2 max-w-xl text-3xl font-semibold tracking-normal sm:text-4xl">Quantitativos, 3D e exportação no mesmo fluxo.</h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-neutral-600">
+              Depois da revisão, o app mostra orçamento preliminar, visualização 3D e arquivos para continuar a conversa com fornecedores.
+            </p>
           </div>
-          <div className="relative aspect-[16/8] overflow-hidden rounded-md bg-neutral-950">
+          <div className="relative aspect-[16/9] overflow-hidden rounded-md bg-neutral-950">
             <video
               className="h-full w-full object-cover"
               autoPlay
@@ -206,71 +209,42 @@ export function HomeAuthExperience() {
               <source src="/hero/aframe-transform.webm" type="video/webm" />
               <source src="/hero/aframe-transform.mp4" type="video/mp4" />
             </video>
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-neutral-950/86 to-transparent p-4 text-sm text-white/78">
+              Estudo visual para revisar método, quantitativos e pendências.
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="border-y border-amber-900/20 bg-[#efe3c4] px-5 py-12 sm:px-8 lg:px-12">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+      <section className="border-y border-amber-900/20 bg-[#f1dfb5] px-5 py-10 sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <ShieldCheck className="h-6 w-6" />
-            <h2 className="text-2xl font-semibold tracking-normal">Aviso técnico</h2>
+            <ShieldCheck className="h-5 w-5" />
+            <h2 className="text-xl font-semibold tracking-normal">Aviso técnico</h2>
           </div>
           <p className="max-w-3xl text-sm leading-7 text-neutral-800">
-            A estimativa é preliminar. O app não substitui projeto estrutural, projeto arquitetônico, ART/RRT, aprovação municipal, sondagem,
-            validação técnica do fornecedor, compatibilização de instalações ou orçamento formal revisado.
+            A estimativa é preliminar e não substitui projeto executivo, ART/RRT, aprovação municipal, sondagem ou orçamento formal revisado.
           </p>
         </div>
       </section>
 
       <section className="px-5 py-16 sm:px-8 lg:px-12">
-        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_420px] lg:items-start">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm text-neutral-500">Login / criar conta</p>
-            <h2 className="mt-2 max-w-xl text-3xl font-semibold tracking-normal sm:text-4xl">Salve estudos no navegador e continue quando precisar.</h2>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-neutral-600">
-              Autenticação via Clerk. Projetos continuam no navegador e podem ser exportados em JSON, CSV, XLSX e PDF.
-            </p>
+            <p className="text-sm text-neutral-500">Começar agora</p>
+            <h2 className="mt-2 max-w-xl text-3xl font-semibold tracking-normal sm:text-4xl">Abra um estudo pela planta baixa.</h2>
           </div>
-          {!isLoaded ? (
-            <div className="h-[420px] animate-pulse rounded-md bg-neutral-200" aria-hidden="true" />
-          ) : isSignedIn ? (
-            <div className="rounded-md border border-neutral-950/12 bg-white p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium">Sessão ativa</p>
-                  <p className="text-xs text-neutral-500">Você já está logado neste navegador.</p>
-                </div>
-                <UserButton />
-              </div>
-              <Button asChild size="lg" className="mt-5 h-11 w-full rounded-full">
-                <Link href="/dashboard">
-                  Abrir app
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="rounded-md border border-neutral-950/12 bg-white p-1.5 shadow-sm">
-              <SignIn
-                routing="hash"
-                signUpUrl="/sign-up"
-                forceRedirectUrl="/start"
-                appearance={{
-                  elements: {
-                    rootBox: "w-full",
-                    cardBox: "shadow-none border-0",
-                    card: "shadow-none border-0",
-                    headerTitle: "text-neutral-950",
-                    headerSubtitle: "text-neutral-500",
-                    socialButtonsBlockButton: "rounded-full border-neutral-200 hover:bg-neutral-50 text-neutral-950",
-                    formButtonPrimary: "rounded-full bg-neutral-950 hover:bg-neutral-800 normal-case",
-                    footerActionLink: "text-neutral-950",
-                  },
-                }}
-              />
-            </div>
-          )}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg" className="h-11 rounded-full px-6">
+              <Link href={primaryHref}>
+                Começar com planta
+                <FileText className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" className="h-11 rounded-full px-6">
+              <Link href={isLoaded && isSignedIn ? "/dashboard" : "/sign-in"}>{isLoaded && isSignedIn ? "Abrir app" : "Entrar"}</Link>
+            </Button>
+          </div>
         </div>
       </section>
     </main>
