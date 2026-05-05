@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useRef } from "react";
+import { ChangeEvent, useRef, useState } from "react";
 import { Download, FileJson, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import type { Project } from "@/types/project";
 
 export default function ExportPage() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [exportError, setExportError] = useState("");
   const project = useProjectStore((state) => state.project);
   const importProject = useProjectStore((state) => state.importProject);
   const resetProject = useProjectStore((state) => state.resetProject);
@@ -44,6 +45,16 @@ export default function ExportPage() {
     event.target.value = "";
   };
 
+  const handleExportAction = async (action: () => void | Promise<void>) => {
+    setExportError("");
+    try {
+      await action();
+    } catch (error) {
+      console.error("Falha ao exportar arquivo:", error);
+      setExportError("Nao foi possivel gerar o arquivo. Tente novamente.");
+    }
+  };
+
   const actions = [
     {
       title: "Projeto JSON",
@@ -56,28 +67,28 @@ export default function ExportPage() {
       title: "Lista XLSX",
       description: "Planilha editavel da lista de materiais e acessorios.",
       icon: FileSpreadsheet,
-      action: () => void exportMaterialsXlsx(project.name, materials, methodDefinition.name),
+      action: () => exportMaterialsXlsx(project.name, materials, methodDefinition.name),
       label: "Baixar XLSX",
     },
     {
       title: "Lista CSV",
       description: "CSV simples para importar em planilhas ou ERPs.",
       icon: FileSpreadsheet,
-      action: () => void exportMaterialsCsv(project.name, materials, methodDefinition.name),
+      action: () => exportMaterialsCsv(project.name, materials, methodDefinition.name),
       label: "Baixar CSV",
     },
     {
       title: "Relatorio PDF",
       description: "Resumo com metodo construtivo, status preliminar, materiais, orcamento e avisos.",
       icon: FileText,
-      action: () => void exportReportPdf(project, scenario, materials, budget),
+      action: () => exportReportPdf(project, scenario, materials, budget),
       label: "Baixar PDF",
     },
     {
       title: "Orcamento por fontes XLSX",
       description: "Planilha com fontes, data-base, cidade/UF, confianca, HH, BDI, contingencia e pendencias.",
       icon: FileSpreadsheet,
-      action: () => void exportBudgetSourceXlsx(project, scenario),
+      action: () => exportBudgetSourceXlsx(project, scenario),
       label: "Baixar XLSX",
     },
     {
@@ -91,14 +102,14 @@ export default function ExportPage() {
       title: "Orcamento por fontes PDF",
       description: "Relatorio preliminar com separacao de custos, fontes e avisos de revisao humana.",
       icon: FileText,
-      action: () => void exportBudgetSourcePdf(project, scenario),
+      action: () => exportBudgetSourcePdf(project, scenario),
       label: "Baixar PDF",
     },
     {
       title: "Projeto tecnico PDF",
       description: "PDF tecnico preliminar; A-frame inclui desenhos, demais metodos incluem resumo tecnico.",
       icon: FileText,
-      action: () => void exportTechnicalPdf(project, scenario),
+      action: () => exportTechnicalPdf(project, scenario),
       label: "Baixar PDF tecnico",
     },
     {
@@ -118,6 +129,11 @@ export default function ExportPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Os arquivos do projeto ficam no navegador. Login e autenticacao ficam no Clerk; este app nao armazena senhas.
         </p>
+        {exportError ? (
+          <p className="mt-3 text-sm text-destructive" role="alert">
+            {exportError}
+          </p>
+        ) : null}
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -148,7 +164,7 @@ export default function ExportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
-                <Button className="w-full" onClick={() => item.action()}>
+                <Button className="w-full" onClick={() => void handleExportAction(item.action)}>
                   <Download className="mr-2 h-4 w-4" />
                   {item.label}
                 </Button>

@@ -39,5 +39,14 @@ export default function Model3DPage() {
 }
 
 function ViewerLoading() {
-  return <div className="grid min-h-[480px] place-items-center rounded-md border bg-muted/20 text-sm text-muted-foreground">Carregando visualizacao 3D...</div>;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="grid min-h-[480px] place-items-center rounded-md border bg-muted/20 text-sm text-muted-foreground"
+    >
+      Carregando visualizacao 3D...
+    </div>
+  );
 }
