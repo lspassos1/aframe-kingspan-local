@@ -6,12 +6,12 @@ import { constructionMethodDefinitions } from "@/lib/construction-methods";
 import { getMethodSelectorCardCopy } from "@/lib/onboarding/construction-method-selector";
 
 describe("ConstructionMethodSelector", () => {
-  it("uses compact visible copy with one sentence and up to two chips per method", () => {
+  it("uses compact visible copy with one sentence and exactly two chips per method", () => {
     for (const definition of constructionMethodDefinitions) {
       const copy = getMethodSelectorCardCopy(definition);
 
       expect(copy.visibleDescription.endsWith(".")).toBe(true);
-      expect(copy.visibleDescription.split(".").filter(Boolean)).toHaveLength(1);
+      expect(copy.visibleDescription.match(/\./g) ?? []).toHaveLength(1);
       expect(copy.visibleDescription.length).toBeLessThanOrEqual(56);
       expect(copy.chips).toHaveLength(2);
     }

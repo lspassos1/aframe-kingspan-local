@@ -57,7 +57,7 @@ export function ConstructionMethodSelector({
                   </Badge>
                 ))}
               </div>
-              <details className="group/details mt-4 text-xs text-muted-foreground" onClick={(event) => event.stopPropagation()}>
+              <details className="group/details mt-4 text-xs text-muted-foreground">
                 <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground/75">
                   <Info className="h-3.5 w-3.5" />
                   Detalhes técnicos
