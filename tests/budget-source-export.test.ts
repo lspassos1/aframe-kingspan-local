@@ -326,6 +326,46 @@ describe("budget source export report", () => {
     });
   });
 
+  it("keeps composition-only reports preliminary when SINAPI prices are pending", () => {
+    const zeroedComposition: ServiceComposition = {
+      ...serviceComposition,
+      directUnitCostBRL: 0,
+      materialCostBRL: 0,
+      laborCostBRL: 0,
+      equipmentCostBRL: 0,
+      thirdPartyCostBRL: 0,
+      otherCostBRL: 0,
+      requiresReview: false,
+      sinapi: {
+        ...serviceComposition.sinapi,
+        priceStatus: "zeroed",
+        requiresReview: true,
+        pendingReason: "Preco oficial veio zerado.",
+      },
+    };
+    const { project, scenario } = createProjectWithBudget({ composition: zeroedComposition });
+    const compositionOnlyProject: Project = {
+      ...project,
+      budgetAssistant: {
+        ...project.budgetAssistant,
+        budgetServiceLines: [],
+      },
+    };
+
+    const report = createBudgetSourceExport(compositionOnlyProject, scenario, "2026-05-04T21:00:00.000Z");
+
+    expect(report.serviceLines).toEqual([]);
+    expect(report.serviceCompositions[0]).toMatchObject({
+      priceStatus: "zeroed",
+      reviewStatus: "pendente",
+      humanReviewRequired: true,
+      requiresReview: true,
+    });
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1, reviewableLineCount: 0 });
+    expect(report.budgetStatusLabel).toBe("Orcamento preliminar");
+    expect(report.finalBudget).toBe(false);
+  });
+
   it("does not count manual review lines as pending SINAPI prices", () => {
     const manualSource: PriceSource = {
       ...priceSource,

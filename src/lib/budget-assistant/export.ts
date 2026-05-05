@@ -234,7 +234,12 @@ export function createBudgetSourceExport(project: Project, scenario: Scenario, g
   const pendingPriceItems = viewModel.pendingPriceItems.map(toPendingItem);
   const totals = createTotals(lines, costItems, compositions, pendingPriceItems, viewModel.lowConfidenceCount);
   const budgetStatus: BudgetSourceExportStatus =
-    totals.unpricedCount === 0 && totals.reviewableLineCount === 0 && totals.lowConfidenceCount === 0 ? "reviewed" : "preliminary";
+    totals.unpricedCount === 0 &&
+    totals.reviewableLineCount === 0 &&
+    totals.lowConfidenceCount === 0 &&
+    totals.pendingSinapiPriceCount === 0
+      ? "reviewed"
+      : "preliminary";
 
   return {
     generatedAt,
