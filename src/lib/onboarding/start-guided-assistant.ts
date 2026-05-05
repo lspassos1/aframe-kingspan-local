@@ -35,7 +35,7 @@ export function createStartAssistantViewModel({
   const options: StartAssistantOption[] = [
     {
       id: "ai",
-      title: "Enviar planta baixa",
+      title: "Enviar planta",
       description: planExtractEnabled ? "A IA lê a planta e você revisa os campos." : "Disponível quando a OpenAI API estiver configurada.",
       primary: planExtractEnabled,
       disabledReason: planExtractEnabled ? undefined : "IA desligada",
@@ -66,11 +66,11 @@ export function createStartAssistantViewModel({
             : "Comece pela planta baixa.",
     subtitle:
       mode === "choose"
-        ? "Envie uma planta, preencha medidas simples ou use um exemplo. Você revisa tudo antes de gerar orçamento e 3D."
-        : "A etapa de método construtivo vem depois da planta ou das medidas iniciais.",
+        ? "Envie uma planta, preencha medidas simples ou use um exemplo. IA sugere, sistema calcula e você aprova antes de gerar orçamento e 3D."
+        : "Revise os dados antes de confirmar método, quantitativos e orçamento.",
     options,
     showPlanImport: mode === "ai",
-    showManualForm: mode === "manual" || mode === "ai",
+    showManualForm: mode === "manual",
     showAiDisabledNotice: mode === "ai" && !planExtractEnabled,
     shouldRunExample: mode === "example",
   };
