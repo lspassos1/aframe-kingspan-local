@@ -1,8 +1,20 @@
-# A-frame Kingspan Local
+# Estudo Construtivo
 
-Aplicacao local para estudo preliminar de casa A-frame com paineis sanduiche Kingspan Isoeste / KingRoofing.
+Aplicação para estudo construtivo modular, pré-orçamento assistido e revisão de quantitativos a partir de planta baixa, medidas manuais ou projeto exemplo.
 
-## Rodar localmente
+O produto não começa pelo método construtivo. O fluxo principal é:
+
+1. enviar planta baixa;
+2. revisar dados extraídos ou preencher medidas simples;
+3. escolher ou confirmar o método construtivo;
+4. gerar quantitativos;
+5. vincular base de preços importada;
+6. revisar orçamento preliminar;
+7. exportar JSON, XLSX, CSV e PDF.
+
+A experiência atual ainda mantém o fluxo A-frame completo como baseline de regressão técnica. Isso significa que criação de estudo A-frame, modelo 3D, geometria, materiais, estrutura, orçamento preliminar e exportações existentes não devem quebrar durante a evolução do produto.
+
+## Rodar Localmente
 
 ```bash
 npm install
@@ -11,9 +23,11 @@ npm run dev
 
 Abra `http://localhost:3000`.
 
-## Autenticacao e feedback
+## Configuração
 
-Copie `.env.example` para `.env.local` e configure:
+Copie `.env.example` para `.env.local` no desenvolvimento local. Em produção ou preview Vercel, configure as mesmas variáveis em Project Settings > Environment Variables e faça redeploy quando alterar valores usados no servidor.
+
+Variáveis comuns:
 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
@@ -24,47 +38,71 @@ Copie `.env.example` para `.env.local` e configure:
 - `GITHUB_FEEDBACK_TOKEN`
 - `GITHUB_FEEDBACK_REPO=lspassos1/aframe-kingspan-local`
 
-O app nao armazena senhas, hashes, OAuth tokens ou refresh tokens. Autenticacao e email ficam no Clerk; projetos continuam no LocalStorage do navegador. O token do GitHub deve ter permissao minima para criar issues no repositorio privado.
+Para IA assistiva de planta baixa, use somente OpenAI API nesta entrega:
 
-Para a extracao opcional de planta baixa com IA, consulte `docs/AI_PLAN_EXTRACT.md` antes de habilitar `AI_PLAN_EXTRACT_ENABLED=true`. A planta enviada e processada pelo provider configurado e deve passar por revisao humana antes de aplicar dados ao projeto.
+```txt
+AI_PLAN_EXTRACT_ENABLED=true
+AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
+OPENAI_API_KEY=...
+AI_OPENAI_MODEL=gpt-4o-mini
+AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER=3
+AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP=5
+AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT=50
+AI_PLAN_EXTRACT_MAX_FILE_MB=8
+AI_PLAN_EXTRACT_CACHE_TTL_HOURS=24
+AI_RATE_LIMIT_SALT=valor_secreto_forte
+```
 
-## O que o MVP faz
+`OPENAI_API_KEY` é server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY`, nunca exponha a chave no frontend, em logs ou respostas de API. Assinatura ChatGPT não configura automaticamente a API deste app; é preciso uma chave de API da plataforma OpenAI.
 
-- calcula geometria A-frame, areas totais, areas uteis, zonas mortas e fit no lote;
-- mostra modelo 3D interativo com terreno, recuos, paineis, estrutura interna, tercas e pavimento superior/mezanino opcional;
-- recalcula lista de materiais com seed real Kingspan/KingRoofing;
-- trava produtos de catalogo em opcoes compraveis e deixa medidas livres apenas no painel customizado;
-- separa pacote de paineis, frete, aco, civil, mao de obra, tecnico/legal e contingencia;
-- usa fontes de preco de aco como referencia preliminar, com cotacao formal ainda obrigatoria;
-- gera cenarios, pedidos de cotacao, JSON, PDF, XLSX e CSV;
+Veja [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md) para setup completo de OpenAI, Vercel, limites diários e SINAPI.
+
+## O Que O App Faz
+
+- inicia estudos por planta baixa, medidas manuais ou exemplo;
+- mantém revisão humana antes de aplicar dados extraídos por IA;
+- calcula geometria, áreas, materiais, painéis e estrutura do fluxo A-frame existente;
+- suporta métodos modulares adicionais em modo preliminar;
+- importa bases de preço controladas, incluindo SINAPI ou base normalizada equivalente;
+- sugere vínculos entre quantitativos e composições existentes sem inventar preço;
+- gera orçamento preliminar revisável com fonte, data-base, unidade, confiança e pendências;
 - salva no LocalStorage e permite importar/exportar JSON.
 
-## Editar catalogos
+## IA Assistiva
 
-- Paineis: `Premissas > Paineis`
-- Acessorios: `Premissas > Acessorios`
-- Perfis de aco: `Premissas > Aco`
-- Fornecedores: `Premissas > Fornecedores`
-- Premissas de consumo: `Premissas > Materiais`
+A IA é opcional, sob demanda e limitada por cota diária. Ela pode ler planta baixa em PDF/imagem quando o modelo OpenAI configurado suportar visão/documento, extrair campos preliminares e sugerir pendências.
 
-Os dados seed ficam em `src/data`. Use a interface para alterar valores no navegador; exporte JSON para guardar o projeto.
+A IA nunca deve:
 
-## Exportar
+- inventar preço;
+- criar composição SINAPI;
+- inventar H/H, consumo, perda ou BDI;
+- aprovar orçamento;
+- aplicar método construtivo incerto automaticamente;
+- substituir revisão humana.
 
-Use a pagina `Exportar` para baixar:
+## SINAPI
 
-- projeto JSON;
-- lista de materiais XLSX;
-- lista de materiais CSV;
-- relatorio PDF;
-- projeto tecnico PDF preliminar;
-- pedidos de cotacao TXT.
+Não há crawler SINAPI nesta entrega. O usuário deve importar arquivo oficial, ZIP oficial, CSV/XLSX/JSON ou base normalizada equivalente.
 
-## Limitacoes
+Enquanto não houver banco externo configurado, bases importadas persistem no modelo atual do app: project store, export/import JSON, `budgetAssistant.priceSources`, `budgetAssistant.serviceCompositions` e coleções técnicas existentes. Arquivos SINAPI não devem ser gravados no filesystem runtime da Vercel/serverless.
 
-Esta ferramenta e somente uma estimativa preliminar para estudo de viabilidade. Nao substitui projeto estrutural, projeto arquitetonico, ART/RRT, aprovacao municipal, sondagem de solo, calculo de fundacoes, verificacao de vento, ligacoes metalicas ou validacao tecnica do fornecedor dos paineis.
+Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 
-## Validacao
+## Documentação
+
+- [docs/product-experience.md](docs/product-experience.md): direção de produto e experiência.
+- [docs/onboarding-ux.md](docs/onboarding-ux.md): fluxo guiado de entrada.
+- [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md): variáveis locais, Vercel, OpenAI API e SINAPI.
+- [docs/sinapi-integration.md](docs/sinapi-integration.md): regras da base SINAPI controlada.
+- [docs/AI_PLAN_EXTRACT.md](docs/AI_PLAN_EXTRACT.md): contrato técnico da extração de planta por IA.
+- [docs/budget-assistant.md](docs/budget-assistant.md): orçamento assistido e revisão humana.
+
+## Limitações
+
+Esta ferramenta gera estudo e orçamento preliminar. Não substitui projeto estrutural, projeto arquitetônico, ART/RRT, aprovação municipal, sondagem, cálculo de fundações, verificação de vento, ligações metálicas, orçamento formal ou validação técnica de fornecedor.
+
+## Validação
 
 ```bash
 npm run lint
