@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, PencilLine, RotateCcw, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { constructionMethodDefinitions, type ConstructionMethodId } from "@/lib/construction-methods";
 import {
   getPlanExtractApplicableFields,
   getPlanExtractNumberFieldMin,
@@ -16,6 +14,8 @@ import {
   type PlanExtractSelectedFields,
 } from "@/lib/ai/apply-plan-extract";
 import type { PlanExtractConfidence, PlanExtractResult } from "@/lib/ai/plan-extract-schema";
+import { constructionMethodDefinitions, type ConstructionMethodId } from "@/lib/construction-methods";
+import { cn } from "@/lib/utils";
 
 type PlanExtractField = keyof PlanExtractResult["extracted"];
 type PlanExtractEditableField = Exclude<PlanExtractField, "notes">;
@@ -25,8 +25,8 @@ export type PlanExtractModifiedValues = Partial<Record<PlanExtractEditableField,
 export type PlanExtractCurrentValues = Partial<Record<PlanExtractEditableField, string | number | ConstructionMethodId>>;
 
 const fieldOrder: PlanExtractEditableField[] = [
-  "projectName",
   "constructionMethod",
+  "projectName",
   "address",
   "city",
   "state",
@@ -40,6 +40,44 @@ const fieldOrder: PlanExtractEditableField[] = [
   "floors",
   "doorCount",
   "windowCount",
+];
+
+const fieldGroups: Array<{
+  id: string;
+  title: string;
+  description: string;
+  fields: PlanExtractEditableField[];
+}> = [
+  {
+    id: "method",
+    title: "Metodo sugerido",
+    description: "Confirme apenas se a planta deixar o sistema claro.",
+    fields: ["constructionMethod"],
+  },
+  {
+    id: "location",
+    title: "Localizacao",
+    description: "Nome, endereco e UF usados no estudo.",
+    fields: ["projectName", "address", "city", "state", "country"],
+  },
+  {
+    id: "dimensions",
+    title: "Area e dimensoes",
+    description: "Medidas que alimentam geometria e quantitativos.",
+    fields: ["terrainWidthM", "terrainDepthM", "houseWidthM", "houseDepthM", "builtAreaM2", "floorHeightM"],
+  },
+  {
+    id: "rooms",
+    title: "Ambientes",
+    description: "Pavimentos e dados gerais detectados.",
+    fields: ["floors"],
+  },
+  {
+    id: "openings",
+    title: "Portas e janelas",
+    description: "Contagens preliminares para revisar.",
+    fields: ["doorCount", "windowCount"],
+  },
 ];
 
 const numberFields = new Set<PlanExtractEditableField>([
@@ -75,6 +113,24 @@ const fieldLabels: Record<PlanExtractField, string> = {
   notes: "Observacoes detectadas",
 };
 
+const fieldEvidenceAliases: Partial<Record<PlanExtractEditableField, string[]>> = {
+  projectName: ["nome", "projeto"],
+  address: ["endereco", "rua", "logradouro"],
+  city: ["cidade", "municipio"],
+  state: ["estado", "uf"],
+  country: ["pais"],
+  constructionMethod: ["metodo", "sistema", "construtivo"],
+  terrainWidthM: ["terreno", "largura"],
+  terrainDepthM: ["terreno", "profundidade"],
+  houseWidthM: ["casa", "largura", "fachada"],
+  houseDepthM: ["casa", "profundidade"],
+  builtAreaM2: ["area", "construida"],
+  floorHeightM: ["pe-direito", "altura"],
+  floors: ["pavimento", "andar"],
+  doorCount: ["porta"],
+  windowCount: ["janela"],
+};
+
 const confidenceLabels: Record<PlanExtractConfidence, string> = {
   high: "alta",
   medium: "media",
@@ -87,6 +143,22 @@ function confidenceClass(confidence: PlanExtractConfidence) {
     confidence === "medium" && "border-amber-500/25 bg-amber-500/10 text-amber-700",
     confidence === "low" && "border-destructive/25 bg-destructive/10 text-destructive"
   );
+}
+
+function normalizeTextForSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function getPlanExtractFieldEvidence(result: PlanExtractResult, field: PlanExtractEditableField) {
+  const aliases = [fieldLabels[field], field, ...(fieldEvidenceAliases[field] ?? [])].map(normalizeTextForSearch);
+  const candidates = [...(result.extracted.notes ?? []), ...result.assumptions].filter(Boolean);
+  return candidates.find((candidate) => {
+    const normalizedCandidate = normalizeTextForSearch(candidate);
+    return aliases.some((alias) => normalizedCandidate.includes(alias));
+  });
 }
 
 function formatFieldValue(field: PlanExtractField, value: PlanExtractReviewValue) {
@@ -123,6 +195,16 @@ function orderedApplicableFields(result: PlanExtractResult, currentMethod?: Cons
   });
 }
 
+function getGroupedFields(fields: PlanExtractEditableField[]) {
+  const fieldSet = new Set(fields);
+  return fieldGroups
+    .map((group) => ({
+      ...group,
+      fields: group.fields.filter((field) => fieldSet.has(field)),
+    }))
+    .filter((group) => group.fields.length > 0);
+}
+
 type PlanExtractReviewProps = {
   result: PlanExtractResult;
   selectedFields: PlanExtractSelectedFields;
@@ -133,6 +215,7 @@ type PlanExtractReviewProps = {
   onModifiedValuesChange: (values: PlanExtractModifiedValues) => void;
   onApply: () => void;
   onDismiss: () => void;
+  onBackToManual?: () => void;
 };
 
 export function PlanExtractReview({
@@ -145,14 +228,19 @@ export function PlanExtractReview({
   onModifiedValuesChange,
   onApply,
   onDismiss,
+  onBackToManual,
 }: PlanExtractReviewProps) {
   const currentMethod = typeof currentValues.constructionMethod === "string" ? (currentValues.constructionMethod as ConstructionMethodId) : undefined;
   const reviewedMethod =
     typeof modifiedValues.constructionMethod === "string" ? (modifiedValues.constructionMethod as ConstructionMethodId) : result.extracted.constructionMethod;
   const effectiveMethod = selectedFields.constructionMethod ? reviewedMethod ?? currentMethod : currentMethod;
   const fields = orderedApplicableFields(result, effectiveMethod);
+  const groupedFields = getGroupedFields(fields);
   const selectedCount = fields.filter((field) => selectedFields[field]).length;
   const notes = (result.extracted.notes ?? []).filter(Boolean);
+  const uncertainties = [...result.missingInformation, ...result.assumptions].filter(Boolean);
+  const methodConfidence = result.fieldConfidence.constructionMethod ?? result.confidence;
+  const hasUncertainMethod = Boolean(result.extracted.constructionMethod && methodConfidence !== "high");
 
   function updateModifiedValue(
     field: PlanExtractEditableField,
@@ -170,9 +258,9 @@ export function PlanExtractReview({
   }
 
   return (
-    <div className="mt-4 rounded-2xl border bg-background/90 p-4 shadow-sm shadow-foreground/5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+    <div className="mt-4 rounded-lg border bg-background/90 p-4 shadow-sm shadow-foreground/5">
+      <div className="flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-primary" />
             <h3 className="font-semibold">Revisao da importacao</h3>
@@ -181,74 +269,114 @@ export function PlanExtractReview({
             </Badge>
           </div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{result.summary}</p>
+          {hasUncertainMethod ? (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Metodo sugerido com confianca {confidenceLabels[methodConfidence]}; ele fica desmarcado ate voce confirmar.</span>
+            </div>
+          ) : null}
         </div>
-        <Badge variant="secondary">{selectedCount} campos selecionados</Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">{selectedCount} campos selecionados</Badge>
+          <Badge variant="outline">revisao humana obrigatoria</Badge>
+        </div>
       </div>
 
-      {fields.length > 0 ? (
-        <div className="mt-4 divide-y rounded-xl border">
-          {fields.map((field) => {
-            const confidence = result.fieldConfidence[field] ?? result.confidence;
-            const checkboxId = `plan-extract-${field}`;
-            const hasModifiedValue = Object.prototype.hasOwnProperty.call(modifiedValues, field);
-            const reviewValue = hasModifiedValue ? modifiedValues[field] : result.extracted[field];
-            return (
-              <div
-                key={field}
-                className="grid gap-3 p-3 transition-colors hover:bg-muted/45 sm:grid-cols-[auto_1fr_auto]"
-              >
-                <Checkbox
-                  id={checkboxId}
-                  checked={Boolean(selectedFields[field])}
-                  onCheckedChange={(checked) => onSelectedFieldsChange({ ...selectedFields, [field]: checked === true })}
-                  aria-label={`Aplicar ${fieldLabels[field]}`}
-                />
-                <div className="min-w-0 space-y-3">
-                  <label htmlFor={checkboxId} className="block cursor-pointer text-sm font-medium">
-                    {fieldLabels[field]}
-                  </label>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="rounded-xl border bg-muted/25 p-3">
-                      <span className="block text-xs font-medium uppercase tracking-normal text-muted-foreground">Atual</span>
-                      <span className="mt-1 block break-words text-sm text-foreground">{formatCurrentFieldValue(field, currentValues[field])}</span>
-                    </div>
-                    <div className="space-y-2 rounded-xl border bg-background p-3">
-                      <span className="block text-xs font-medium uppercase tracking-normal text-muted-foreground">Extraido / revisado</span>
-                      <PlanExtractFieldEditor
-                        field={field}
-                        value={reviewValue}
-                        onChange={(value, shouldSelect) => updateModifiedValue(field, value, shouldSelect)}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <Badge variant="outline" className={cn("w-fit", confidenceClass(confidence))}>
-                  {confidenceLabels[confidence]}
-                </Badge>
+      {groupedFields.length > 0 ? (
+        <div className="mt-4 space-y-4">
+          {groupedFields.map((group) => (
+            <section key={group.id} className="space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold">{group.title}</h4>
+                <p className="mt-1 text-xs text-muted-foreground">{group.description}</p>
               </div>
-            );
-          })}
+              <div className="grid gap-3 xl:grid-cols-2">
+                {group.fields.map((field) => {
+                  const confidence = result.fieldConfidence[field] ?? result.confidence;
+                  const checkboxId = `plan-extract-${field}`;
+                  const hasModifiedValue = Object.prototype.hasOwnProperty.call(modifiedValues, field);
+                  const reviewValue = hasModifiedValue ? modifiedValues[field] : result.extracted[field];
+                  const evidence = getPlanExtractFieldEvidence(result, field);
+                  return (
+                    <article key={field} className={cn("rounded-lg border bg-card p-3", selectedFields[field] && "border-primary/35 bg-primary/[0.035]")}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <Checkbox
+                            id={checkboxId}
+                            checked={Boolean(selectedFields[field])}
+                            onCheckedChange={(checked) => onSelectedFieldsChange({ ...selectedFields, [field]: checked === true })}
+                            aria-label={`Aplicar ${fieldLabels[field]}`}
+                          />
+                          <div className="min-w-0">
+                            <label htmlFor={checkboxId} className="block cursor-pointer text-sm font-semibold">
+                              {fieldLabels[field]}
+                            </label>
+                            {confidence === "low" ? <p className="mt-1 text-xs text-destructive">Baixa confianca; desmarcado por padrao.</p> : null}
+                            {field === "constructionMethod" && confidence !== "high" ? (
+                              <p className="mt-1 text-xs text-muted-foreground">Sugestao revisavel; nao altera o metodo sozinha.</p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={cn("shrink-0", confidenceClass(confidence))}>
+                          {confidenceLabels[confidence]}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        <div className="rounded-lg border bg-muted/25 p-3">
+                          <span className="block text-xs font-medium uppercase tracking-normal text-muted-foreground">Antes</span>
+                          <span className="mt-1 block break-words text-sm text-foreground">{formatCurrentFieldValue(field, currentValues[field])}</span>
+                        </div>
+                        <div className="space-y-2 rounded-lg border bg-background p-3">
+                          <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-normal text-muted-foreground">
+                            <PencilLine className="h-3.5 w-3.5" />
+                            Depois
+                          </span>
+                          <PlanExtractFieldEditor
+                            field={field}
+                            value={reviewValue}
+                            onChange={(value, shouldSelect) => updateModifiedValue(field, value, shouldSelect)}
+                          />
+                        </div>
+                      </div>
+
+                      {evidence ? (
+                        <p className="mt-3 rounded-lg border bg-muted/25 p-2 text-xs leading-5 text-muted-foreground">
+                          <span className="font-medium text-foreground">Evidencia:</span> {evidence}
+                        </p>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       ) : (
-        <p className="mt-4 rounded-xl border bg-muted/35 p-3 text-sm text-muted-foreground">
+        <p className="mt-4 rounded-lg border bg-muted/35 p-3 text-sm text-muted-foreground">
           Nenhum campo acionavel foi detectado. Voce ainda pode preencher manualmente.
         </p>
       )}
 
-      {(notes.length > 0 || result.assumptions.length > 0 || result.missingInformation.length > 0 || result.warnings.length > 0) && (
-        <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-          {notes.length > 0 && <ExtractList title="Observacoes" items={notes} />}
-          {result.assumptions.length > 0 && <ExtractList title="Premissas" items={result.assumptions} />}
-          {result.missingInformation.length > 0 && <ExtractList title="Faltando" items={result.missingInformation} />}
-          {result.warnings.length > 0 && <ExtractList title="Alertas" items={result.warnings} tone="warning" />}
+      {(notes.length > 0 || uncertainties.length > 0 || result.warnings.length > 0) && (
+        <div className="mt-4 grid gap-3 text-sm lg:grid-cols-3">
+          {notes.length > 0 ? <ExtractList title="Observacoes" items={notes} icon="notes" /> : null}
+          {uncertainties.length > 0 ? <ExtractList title="Incertezas" items={uncertainties} icon="uncertainty" /> : null}
+          {result.warnings.length > 0 ? <ExtractList title="Alertas" items={result.warnings} icon="warning" /> : null}
         </div>
       )}
 
-      <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onDismiss} disabled={isApplying}>
-          Revisar depois
+      <div className="mt-4 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
+        <Button type="button" variant="ghost" onClick={onDismiss} disabled={isApplying}>
+          <XCircle className="h-4 w-4" />
+          Descartar extracao
+        </Button>
+        <Button type="button" variant="outline" onClick={onBackToManual ?? onDismiss} disabled={isApplying}>
+          <RotateCcw className="h-4 w-4" />
+          Voltar para manual
         </Button>
         <Button type="button" onClick={onApply} disabled={isApplying || selectedCount === 0}>
+          <ClipboardCheck className="h-4 w-4" />
           Aplicar campos selecionados
         </Button>
       </div>
@@ -268,7 +396,7 @@ function PlanExtractFieldEditor({
   if (field === "constructionMethod") {
     return (
       <Select value={typeof value === "string" ? value : undefined} onValueChange={(methodId) => onChange(methodId as ConstructionMethodId)}>
-        <SelectTrigger className="h-10 w-full rounded-xl bg-background">
+        <SelectTrigger className="h-10 w-full rounded-lg bg-background">
           <SelectValue placeholder="Escolha o metodo" />
         </SelectTrigger>
         <SelectContent>
@@ -338,11 +466,12 @@ function PlanExtractNumberFieldEditor({
   );
 }
 
-function ExtractList({ title, items, tone }: { title: string; items: string[]; tone?: "warning" }) {
+function ExtractList({ title, items, icon }: { title: string; items: string[]; icon: "notes" | "uncertainty" | "warning" }) {
+  const Icon = icon === "warning" ? AlertTriangle : icon === "uncertainty" ? RotateCcw : ClipboardCheck;
   return (
-    <div className="rounded-xl border bg-muted/25 p-3">
+    <div className="rounded-lg border bg-muted/25 p-3">
       <div className="flex items-center gap-2 font-medium">
-        {tone === "warning" && <AlertTriangle className="h-4 w-4 text-amber-600" />}
+        <Icon className={cn("h-4 w-4", icon === "warning" && "text-amber-600", icon === "uncertainty" && "text-amber-600")} />
         {title}
       </div>
       <ul className="mt-2 space-y-1 text-muted-foreground">

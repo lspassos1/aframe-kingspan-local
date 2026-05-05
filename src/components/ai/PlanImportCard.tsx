@@ -228,6 +228,13 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
     setState("idle");
   }
 
+  function returnToManual() {
+    resetReview();
+    setTimeout(() => {
+      document.getElementById("manual-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   return (
     <div
       data-state={state}
@@ -334,6 +341,7 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
           onModifiedValuesChange={setModifiedValues}
           onApply={applyExtractedFields}
           onDismiss={resetReview}
+          onBackToManual={returnToManual}
         />
       ) : null}
     </div>

@@ -42,12 +42,12 @@ function fieldSelected(selectedFields: PlanExtractSelectedFields, field: keyof P
 }
 
 export function getDefaultPlanExtractSelectedFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId): PlanExtractSelectedFields {
-  const constructionMethodSelected = (result.fieldConfidence.constructionMethod ?? result.confidence) !== "low";
+  const constructionMethodSelected = (result.fieldConfidence.constructionMethod ?? result.confidence) === "high";
   const extractedMethod = constructionMethodSelected ? getCompatibleExtractedMethod(result.extracted.constructionMethod) : undefined;
   const effectiveMethod = extractedMethod ?? currentMethod;
 
   return getPlanExtractApplicableFields(result, effectiveMethod).reduce<PlanExtractSelectedFields>((selected, field) => {
-    selected[field] = (result.fieldConfidence[field] ?? result.confidence) !== "low";
+    selected[field] = field === "constructionMethod" ? constructionMethodSelected : (result.fieldConfidence[field] ?? result.confidence) !== "low";
     return selected;
   }, {});
 }

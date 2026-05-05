@@ -51,8 +51,20 @@ describe("AI plan extract application", () => {
 
     expect(selected.projectName).toBe(false);
     expect(selected.city).toBe(true);
-    expect(selected.constructionMethod).toBe(true);
+    expect(selected.constructionMethod).toBe(false);
     expect(selected.houseDepthM).toBe(true);
+  });
+
+  it("preselects construction method only when the method confidence is high", () => {
+    const selected = getDefaultPlanExtractSelectedFields({
+      ...baseResult,
+      fieldConfidence: {
+        ...baseResult.fieldConfidence,
+        constructionMethod: "high",
+      },
+    });
+
+    expect(selected.constructionMethod).toBe(true);
   });
 
   it("falls back to overall confidence when field confidence is missing", () => {
@@ -82,8 +94,8 @@ describe("AI plan extract application", () => {
       "aframe"
     );
 
-    expect(selected.constructionMethod).toBe(true);
-    expect(selected.houseWidthM).toBe(true);
+    expect(selected.constructionMethod).toBe(false);
+    expect(selected.houseWidthM).toBeUndefined();
     expect(lowMethodSelected.constructionMethod).toBe(false);
     expect(lowMethodSelected.houseWidthM).toBeUndefined();
     expect(lowMethodSelected.houseDepthM).toBe(true);
@@ -112,7 +124,10 @@ describe("AI plan extract application", () => {
 
   it("maps dimensions into non-A-frame method inputs after review", () => {
     const project = cloneProject(defaultProject);
-    const selected = getDefaultPlanExtractSelectedFields(baseResult);
+    const selected = {
+      ...getDefaultPlanExtractSelectedFields(baseResult),
+      constructionMethod: true,
+    };
     const updated = applyPlanExtractToProject(project, project.selectedScenarioId, baseResult, selected);
     const scenario = updated.scenarios[0];
     const masonryInputs = scenario.methodInputs["conventional-masonry"] as Record<string, unknown>;
@@ -190,7 +205,10 @@ describe("AI plan extract application", () => {
       },
     };
 
-    const updated = applyPlanExtractToProject(project, project.selectedScenarioId, result, getDefaultPlanExtractSelectedFields(result));
+    const updated = applyPlanExtractToProject(project, project.selectedScenarioId, result, {
+      ...getDefaultPlanExtractSelectedFields(result),
+      constructionMethod: true,
+    });
     const masonryInputs = updated.scenarios[0].methodInputs["conventional-masonry"] as Record<string, unknown>;
 
     expect(masonryInputs.floors).not.toBe(0);
