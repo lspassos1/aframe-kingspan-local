@@ -77,6 +77,21 @@ const serviceComposition: ServiceComposition = {
   otherCostBRL: 1,
   directUnitCostBRL: 55.4,
   totalLaborHoursPerUnit: 0.45,
+  sinapi: {
+    sourceId: sourceMeta.sourceId,
+    sourceTitle: priceSource.title,
+    code: sourceMeta.sourceCode,
+    description: "Alvenaria de vedacao com bloco ceramico SINAPI",
+    state: sourceMeta.state,
+    city: sourceMeta.city,
+    referenceDate: sourceMeta.referenceDate,
+    regime: "desonerado",
+    priceStatus: "valid",
+    confidence: "high",
+    requiresReview: false,
+    pendingReason: "",
+    totalLaborHoursPerUnit: 0.45,
+  },
 };
 
 const budgetQuantity: BudgetQuantity = {
@@ -143,6 +158,14 @@ describe("budget source export report", () => {
       contingencyBRL: 685.8,
       totalBRL: 8915.4,
       totalLaborHours: 54,
+      unitPriceBRL: 55.4,
+      sinapiCode: sourceMeta.sourceCode,
+      sinapiDescription: "Alvenaria de vedacao com bloco ceramico SINAPI",
+      regime: "desonerado",
+      priceStatus: "valid",
+      priceStatusLabel: "preco valido",
+      reviewStatus: "revisado",
+      humanReviewRequired: false,
       outOfRegion: false,
       structuralCritical: false,
     });
@@ -223,12 +246,18 @@ describe("budget source export report", () => {
       BDI: 1371.6,
       Contingencia: 685.8,
       "H/H total": 54,
+      "Precos SINAPI pendentes": 0,
     });
     expect(rows.serviceLines[0]).toMatchObject({
       Fonte: priceSource.title,
+      Codigo: sourceMeta.sourceCode,
       "Data-base": "2026-05-04",
       Cidade: "Cruz das Almas",
       UF: "Bahia",
+      Regime: "desonerado",
+      "Status do preco": "valid",
+      Revisao: "revisado",
+      "Preco unitario": 55.4,
       Confianca: "high",
       "Fora da regiao": "nao",
       "Critico estrutural": "nao",
@@ -240,6 +269,147 @@ describe("budget source export report", () => {
       Confianca: "high",
       "H/H total": 54,
     });
+  });
+
+  it("marks zeroed SINAPI prices as pending instead of reviewed", () => {
+    const zeroedComposition: ServiceComposition = {
+      ...serviceComposition,
+      directUnitCostBRL: 0,
+      materialCostBRL: 0,
+      laborCostBRL: 0,
+      equipmentCostBRL: 0,
+      thirdPartyCostBRL: 0,
+      otherCostBRL: 0,
+      requiresReview: false,
+      sinapi: {
+        ...serviceComposition.sinapi,
+        priceStatus: "zeroed",
+        requiresReview: true,
+        pendingReason: "Preco oficial veio zerado.",
+      },
+    };
+    const zeroedLine: BudgetServiceLine = {
+      ...serviceLine,
+      materialCostBRL: 0,
+      laborCostBRL: 0,
+      equipmentCostBRL: 0,
+      thirdPartyCostBRL: 0,
+      otherCostBRL: 0,
+      directCostBRL: 0,
+      bdiBRL: 0,
+      contingencyBRL: 0,
+      totalBRL: 0,
+      totalLaborHours: 0,
+      requiresReview: false,
+    };
+    const { project, scenario } = createProjectWithBudget({ composition: zeroedComposition, line: zeroedLine });
+
+    const report = createBudgetSourceExport(project, scenario, "2026-05-04T21:00:00.000Z");
+    const rows = createBudgetSourceWorkbookRows(report);
+
+    expect(report.serviceLines[0]).toMatchObject({
+      priceStatus: "zeroed",
+      priceStatusLabel: "preco zerado",
+      reviewStatus: "pendente",
+      humanReviewRequired: true,
+      requiresReview: true,
+      unitPriceBRL: 0,
+      totalBRL: 0,
+    });
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1, reviewableLineCount: 1 });
+    expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
+    expect(rows.serviceLines[0]).toMatchObject({
+      "Status do preco": "zeroed",
+      "Status do preco label": "preco zerado",
+      Revisao: "pendente",
+      "Preco unitario": 0,
+    });
+  });
+
+  it("keeps composition-only reports preliminary when SINAPI prices are pending", () => {
+    const zeroedComposition: ServiceComposition = {
+      ...serviceComposition,
+      directUnitCostBRL: 0,
+      materialCostBRL: 0,
+      laborCostBRL: 0,
+      equipmentCostBRL: 0,
+      thirdPartyCostBRL: 0,
+      otherCostBRL: 0,
+      requiresReview: false,
+      sinapi: {
+        ...serviceComposition.sinapi,
+        priceStatus: "zeroed",
+        requiresReview: true,
+        pendingReason: "Preco oficial veio zerado.",
+      },
+    };
+    const { project, scenario } = createProjectWithBudget({ composition: zeroedComposition });
+    const compositionOnlyProject: Project = {
+      ...project,
+      budgetAssistant: {
+        ...project.budgetAssistant,
+        budgetServiceLines: [],
+      },
+    };
+
+    const report = createBudgetSourceExport(compositionOnlyProject, scenario, "2026-05-04T21:00:00.000Z");
+
+    expect(report.serviceLines).toEqual([]);
+    expect(report.serviceCompositions[0]).toMatchObject({
+      priceStatus: "zeroed",
+      reviewStatus: "pendente",
+      humanReviewRequired: true,
+      requiresReview: true,
+    });
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1, reviewableLineCount: 0 });
+    expect(report.budgetStatusLabel).toBe("Orcamento preliminar");
+    expect(report.finalBudget).toBe(false);
+  });
+
+  it("does not count manual review lines as pending SINAPI prices", () => {
+    const manualSource: PriceSource = {
+      ...priceSource,
+      id: "source-manual",
+      type: "manual",
+      title: "Cotacao manual",
+      supplier: "Fornecedor local",
+    };
+    const manualComposition: ServiceComposition = {
+      ...serviceComposition,
+      id: "composition-manual",
+      sourceId: manualSource.id,
+      sourceCode: "MANUAL-001",
+      serviceCode: "MANUAL-001",
+      sinapi: undefined,
+      requiresReview: true,
+    };
+    const manualLine: BudgetServiceLine = {
+      ...serviceLine,
+      id: "service-line-manual",
+      compositionId: manualComposition.id,
+      sourceId: manualSource.id,
+      sourceCode: "MANUAL-001",
+      sourceTitle: manualSource.title,
+      requiresReview: true,
+    };
+    const { project, scenario } = createProjectWithBudget({
+      source: manualSource,
+      composition: manualComposition,
+      line: manualLine,
+    });
+
+    const report = createBudgetSourceExport(project, scenario, "2026-05-04T21:00:00.000Z");
+
+    expect(report.serviceLines[0]).toMatchObject({
+      sourceTitle: manualSource.title,
+      sinapiCode: "MANUAL-001",
+      priceStatus: "valid",
+      reviewStatus: "pendente",
+      humanReviewRequired: true,
+      requiresReview: true,
+    });
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 0, reviewableLineCount: 1 });
+    expect(report.warnings).not.toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
   });
 });
 

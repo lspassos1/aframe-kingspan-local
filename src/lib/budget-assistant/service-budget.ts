@@ -118,7 +118,8 @@ function createBudgetServiceLine(input: {
   );
   const bdiBRL = round(directCostBRL * normalizePercent(input.bdiPercent));
   const contingencyBRL = round(directCostBRL * normalizePercent(input.contingencyPercent));
-  const requiresReview = input.composition.requiresReview || isStructuralPreliminary(input.composition, input.technicalProjectApproved);
+  const requiresReview =
+    input.composition.requiresReview || isStructuralPreliminary(input.composition, input.technicalProjectApproved) || hasPendingSinapiPrice(input.composition);
 
   return {
     sourceId: input.composition.sourceId,
@@ -209,7 +210,12 @@ function isStructuralTag(tag: string) {
 
 function createLineNotes(composition: ServiceComposition, requiresReview: boolean) {
   const structuralNote = requiresReview ? "Item sujeito a revisao tecnica antes de orcamento revisado." : "";
-  return [composition.notes, structuralNote].filter(Boolean).join(" ");
+  const sinapiNote = hasPendingSinapiPrice(composition) ? `Preco SINAPI ${composition.sinapi?.priceStatus}; manter linha pendente.` : "";
+  return [composition.notes, sinapiNote, structuralNote].filter(Boolean).join(" ");
+}
+
+function hasPendingSinapiPrice(composition: ServiceComposition) {
+  return Boolean(composition.sinapi && composition.sinapi.priceStatus !== "valid");
 }
 
 function normalizePercent(percent: number) {

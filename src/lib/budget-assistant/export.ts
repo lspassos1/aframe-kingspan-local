@@ -13,6 +13,9 @@ import type {
 
 export type BudgetSourceExportStatus = "preliminary" | "reviewed";
 export type BudgetSourceRegionalStatus = "city" | "state" | "national" | "manual" | "out_of_region";
+export type BudgetSourceReviewStatus = "revisado" | "pendente";
+export type BudgetSourcePriceStatus = NonNullable<ServiceComposition["sinapi"]>["priceStatus"];
+export type BudgetSourceSinapiRegime = NonNullable<ServiceComposition["sinapi"]>["regime"];
 
 export interface BudgetSourceExport {
   generatedAt: string;
@@ -61,6 +64,7 @@ export interface BudgetSourceExportTotals {
   reviewableLineCount: number;
   outOfRegionCompositionCount: number;
   structuralCriticalCount: number;
+  pendingSinapiPriceCount: number;
 }
 
 export interface BudgetSourceExportSource {
@@ -129,6 +133,14 @@ export interface BudgetSourceExportComposition {
   otherCostBRL: number;
   directUnitCostBRL: number;
   totalLaborHoursPerUnit: number;
+  unitPriceBRL: number;
+  sinapiCode: string;
+  sinapiDescription: string;
+  regime: BudgetSourceSinapiRegime;
+  priceStatus: BudgetSourcePriceStatus;
+  priceStatusLabel: string;
+  reviewStatus: BudgetSourceReviewStatus;
+  humanReviewRequired: boolean;
   tags: string[];
   notes: string;
 }
@@ -162,6 +174,14 @@ export interface BudgetSourceExportServiceLine {
   totalBRL: number;
   totalLaborHours: number;
   approvedByUser: boolean;
+  unitPriceBRL: number;
+  sinapiCode: string;
+  sinapiDescription: string;
+  regime: BudgetSourceSinapiRegime;
+  priceStatus: BudgetSourcePriceStatus;
+  priceStatusLabel: string;
+  reviewStatus: BudgetSourceReviewStatus;
+  humanReviewRequired: boolean;
   notes: string;
 }
 
@@ -214,7 +234,12 @@ export function createBudgetSourceExport(project: Project, scenario: Scenario, g
   const pendingPriceItems = viewModel.pendingPriceItems.map(toPendingItem);
   const totals = createTotals(lines, costItems, compositions, pendingPriceItems, viewModel.lowConfidenceCount);
   const budgetStatus: BudgetSourceExportStatus =
-    totals.unpricedCount === 0 && totals.reviewableLineCount === 0 && totals.lowConfidenceCount === 0 ? "reviewed" : "preliminary";
+    totals.unpricedCount === 0 &&
+    totals.reviewableLineCount === 0 &&
+    totals.lowConfidenceCount === 0 &&
+    totals.pendingSinapiPriceCount === 0
+      ? "reviewed"
+      : "preliminary";
 
   return {
     generatedAt,
@@ -270,6 +295,7 @@ export function createBudgetSourceWorkbookRows(report: BudgetSourceExport) {
         "H/H total": report.totals.totalLaborHours,
         "Itens sem preco": report.totals.unpricedCount,
         "Linhas revisaveis": report.totals.reviewableLineCount,
+        "Precos SINAPI pendentes": report.totals.pendingSinapiPriceCount,
       },
     ],
     sources: report.sources.map((source) => ({
@@ -285,17 +311,23 @@ export function createBudgetSourceWorkbookRows(report: BudgetSourceExport) {
     })),
     compositions: report.serviceCompositions.map((composition) => ({
       Fonte: composition.sourceTitle,
-      Codigo: composition.serviceCode,
+      Codigo: composition.sinapiCode || composition.serviceCode,
       Descricao: composition.description,
+      "Descricao SINAPI": composition.sinapiDescription,
       Categoria: composition.category,
       Unidade: composition.unit,
       "Data-base": composition.referenceDate,
       Cidade: composition.city,
       UF: composition.state,
+      Regime: composition.regime,
+      "Status do preco": composition.priceStatus,
+      "Status do preco label": composition.priceStatusLabel,
+      Revisao: composition.reviewStatus,
       Confianca: composition.confidence,
       "Requer revisao": composition.requiresReview ? "sim" : "nao",
       "Fora da regiao": composition.outOfRegion ? "sim" : "nao",
       "Critico estrutural": composition.structuralCritical ? "sim" : "nao",
+      "Preco unitario": composition.unitPriceBRL,
       Material: composition.materialCostBRL,
       "Mao de obra": composition.laborCostBRL,
       Equipamento: composition.equipmentCostBRL,
@@ -307,18 +339,24 @@ export function createBudgetSourceWorkbookRows(report: BudgetSourceExport) {
     })),
     serviceLines: report.serviceLines.map((line) => ({
       Fonte: line.sourceTitle,
-      Codigo: line.sourceCode,
+      Codigo: line.sinapiCode || line.sourceCode,
       Descricao: line.description,
+      "Descricao SINAPI": line.sinapiDescription,
       Categoria: line.category,
       Quantidade: line.quantity,
       Unidade: line.unit,
       "Data-base": line.referenceDate,
       Cidade: line.city,
       UF: line.state,
+      Regime: line.regime,
+      "Status do preco": line.priceStatus,
+      "Status do preco label": line.priceStatusLabel,
+      Revisao: line.reviewStatus,
       Confianca: line.confidence,
       "Requer revisao": line.requiresReview ? "sim" : "nao",
       "Fora da regiao": line.outOfRegion ? "sim" : "nao",
       "Critico estrutural": line.structuralCritical ? "sim" : "nao",
+      "Preco unitario": line.unitPriceBRL,
       Material: line.materialCostBRL,
       "Mao de obra": line.laborCostBRL,
       Equipamento: line.equipmentCostBRL,
@@ -407,6 +445,8 @@ function toExportComposition(
 ): BudgetSourceExportComposition {
   const source = sourcesById.get(composition.sourceId);
   const regionalStatus = getRegionalStatus(scenario, composition);
+  const sinapi = getSinapiExportMetadata(composition);
+  const requiresReview = composition.requiresReview || sinapi.priceStatus !== "valid";
   return {
     id: composition.id,
     sourceId: composition.sourceId,
@@ -417,7 +457,7 @@ function toExportComposition(
     city: composition.city,
     state: normalizeBrazilStateName(composition.state) || composition.state,
     confidence: composition.confidence,
-    requiresReview: composition.requiresReview,
+    requiresReview,
     regionalStatus,
     outOfRegion: regionalStatus === "out_of_region",
     structuralCritical: isStructuralCritical(composition),
@@ -431,6 +471,14 @@ function toExportComposition(
     otherCostBRL: composition.otherCostBRL,
     directUnitCostBRL: composition.directUnitCostBRL,
     totalLaborHoursPerUnit: composition.totalLaborHoursPerUnit,
+    unitPriceBRL: composition.directUnitCostBRL,
+    sinapiCode: sinapi.code,
+    sinapiDescription: sinapi.description,
+    regime: sinapi.regime,
+    priceStatus: sinapi.priceStatus,
+    priceStatusLabel: sinapi.priceStatusLabel,
+    reviewStatus: getReviewStatus(requiresReview),
+    humanReviewRequired: requiresReview,
     tags: composition.tags,
     notes: composition.notes,
   };
@@ -445,6 +493,8 @@ function toExportServiceLine(
   const source = sourcesById.get(line.sourceId);
   const composition = compositionsById.get(line.compositionId);
   const regionalStatus = getRegionalStatus(scenario, line);
+  const sinapi = getSinapiExportMetadata(composition, line);
+  const requiresReview = line.requiresReview || !line.approvedByUser || sinapi.priceStatus !== "valid";
   return {
     id: line.id,
     sourceId: line.sourceId,
@@ -454,7 +504,7 @@ function toExportServiceLine(
     city: line.city,
     state: normalizeBrazilStateName(line.state) || line.state,
     confidence: line.confidence,
-    requiresReview: line.requiresReview,
+    requiresReview,
     regionalStatus,
     outOfRegion: regionalStatus === "out_of_region",
     structuralCritical: composition ? isStructuralCritical(composition) : line.category === "steel",
@@ -474,6 +524,14 @@ function toExportServiceLine(
     totalBRL: line.totalBRL,
     totalLaborHours: line.totalLaborHours,
     approvedByUser: line.approvedByUser,
+    unitPriceBRL: getLineUnitPrice(line, composition),
+    sinapiCode: sinapi.code,
+    sinapiDescription: sinapi.description,
+    regime: sinapi.regime,
+    priceStatus: sinapi.priceStatus,
+    priceStatusLabel: sinapi.priceStatusLabel,
+    reviewStatus: getReviewStatus(requiresReview),
+    humanReviewRequired: requiresReview,
     notes: line.notes,
   };
 }
@@ -501,6 +559,7 @@ function createTotals(
     lines.length > 0 ? lines.filter((line) => line.outOfRegion).length : compositions.filter((composition) => composition.outOfRegion).length;
   const structuralCriticalCount =
     lines.length > 0 ? lines.filter((line) => line.structuralCritical).length : compositions.filter((composition) => composition.structuralCritical).length;
+  const sinapiPriceRows = lines.length > 0 ? lines : compositions;
   return {
     materialCostBRL: sumLines(lines, "materialCostBRL"),
     laborCostBRL: sumLines(lines, "laborCostBRL"),
@@ -518,6 +577,7 @@ function createTotals(
     reviewableLineCount: lines.filter((line) => line.requiresReview || !line.approvedByUser).length + costItems.filter((item) => item.requiresReview).length,
     outOfRegionCompositionCount,
     structuralCriticalCount,
+    pendingSinapiPriceCount: sinapiPriceRows.filter((line) => line.priceStatus !== "valid").length,
   };
 }
 
@@ -584,9 +644,41 @@ function createExportWarnings(totals: BudgetSourceExportTotals) {
     "Este relatorio nao representa orcamento final sem revisao humana.",
     totals.unpricedCount > 0 ? `${totals.unpricedCount} itens ainda nao possuem fonte de preco revisada.` : "",
     totals.reviewableLineCount > 0 ? `${totals.reviewableLineCount} linhas exigem revisao antes de orcamento revisado.` : "",
+    totals.pendingSinapiPriceCount > 0 ? `${totals.pendingSinapiPriceCount} precos SINAPI estao pendentes ou invalidos.` : "",
     totals.outOfRegionCompositionCount > 0 ? `${totals.outOfRegionCompositionCount} composicoes estao fora da cidade/UF do cenario.` : "",
     totals.structuralCriticalCount > 0 ? `${totals.structuralCriticalCount} itens estruturais criticos exigem validacao tecnica.` : "",
   ].filter(Boolean);
+}
+
+function getSinapiExportMetadata(composition: ServiceComposition | undefined, line?: BudgetServiceLine) {
+  const sinapi = composition?.sinapi;
+  const priceStatus: BudgetSourcePriceStatus = sinapi?.priceStatus ?? "valid";
+  return {
+    code: sinapi?.code ?? composition?.serviceCode ?? line?.sourceCode ?? "",
+    description: sinapi?.description ?? composition?.description ?? line?.description ?? "",
+    regime: sinapi?.regime ?? "unknown",
+    priceStatus,
+    priceStatusLabel: getPriceStatusLabel(priceStatus),
+  };
+}
+
+function getLineUnitPrice(line: BudgetServiceLine, composition: ServiceComposition | undefined) {
+  if (composition) return composition.directUnitCostBRL;
+  return line.quantity > 0 ? round(line.directCostBRL / line.quantity) : 0;
+}
+
+function getReviewStatus(requiresReview: boolean): BudgetSourceReviewStatus {
+  return requiresReview ? "pendente" : "revisado";
+}
+
+function getPriceStatusLabel(status: BudgetSourcePriceStatus) {
+  if (status === "valid") return "preco valido";
+  if (status === "zeroed") return "preco zerado";
+  if (status === "missing") return "preco ausente";
+  if (status === "requires_review") return "requer revisao";
+  if (status === "invalid_unit") return "unidade invalida";
+  if (status === "out_of_region") return "fora da UF";
+  return "invalido";
 }
 
 function getRegionalStatus(scenario: Scenario, source: { city: string; state: string }): BudgetSourceRegionalStatus {
