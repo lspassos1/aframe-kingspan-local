@@ -103,7 +103,7 @@ Verifique:
 1. `AI_PLAN_EXTRACT_ENABLED=true`.
 2. `AI_PLAN_EXTRACT_PROVIDER_ORDER=openai`.
 3. `OPENAI_API_KEY` existe no ambiente do servidor.
-4. `AI_OPENAI_MODEL` existe.
+4. `AI_OPENAI_MODEL` está configurado explicitamente, se você quiser controle operacional do modelo. Sem isso, o backend usa o padrão OpenAI atual e o checklist mostra `Modelo: ausente`.
 5. O deployment foi refeito depois da mudança.
 6. O usuário está autenticado, se anônimo estiver desabilitado.
 7. O arquivo é PNG, JPG, WebP ou PDF e respeita `AI_PLAN_EXTRACT_MAX_FILE_MB`.
