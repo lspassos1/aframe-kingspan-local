@@ -76,7 +76,7 @@ IA ligada:
 AI_PLAN_EXTRACT_ENABLED=true
 ```
 
-Mesmo com a flag ligada, upload assistido precisa de `OPENAI_API_KEY`, modelo configurado e limites válidos.
+Mesmo com a flag ligada, upload assistido precisa de `OPENAI_API_KEY` no servidor. Configure `AI_OPENAI_MODEL` explicitamente para controle operacional; se ele estiver ausente, o backend usa o padrão OpenAI atual e o checklist mostra `Modelo: ausente`.
 
 ## Limites Diários
 
@@ -103,13 +103,24 @@ Verifique:
 1. `AI_PLAN_EXTRACT_ENABLED=true`.
 2. `AI_PLAN_EXTRACT_PROVIDER_ORDER=openai`.
 3. `OPENAI_API_KEY` existe no ambiente do servidor.
-4. `AI_OPENAI_MODEL` existe.
+4. `AI_OPENAI_MODEL` está configurado explicitamente, se você quiser controle operacional do modelo. Sem isso, o backend usa o padrão OpenAI atual e o checklist mostra `Modelo: ausente`.
 5. O deployment foi refeito depois da mudança.
 6. O usuário está autenticado, se anônimo estiver desabilitado.
 7. O arquivo é PNG, JPG, WebP ou PDF e respeita `AI_PLAN_EXTRACT_MAX_FILE_MB`.
 8. O limite diário não foi atingido.
 
 Se estiver em Vercel, confira se a variável foi adicionada ao mesmo ambiente do preview/produção que está sendo testado.
+
+No app, abra `Ajuda` e confira o checklist operacional:
+
+- `IA: ativa/desligada`;
+- `Provider: OpenAI`;
+- `Modelo: configurado/ausente`;
+- `Limite diário: disponível`;
+- `SINAPI: base ausente/base importada`;
+- `UF`, `Referência` e `Regime`.
+
+O checklist não exibe segredo. Ele mostra apenas booleans e metadados seguros para diagnosticar configuração.
 
 ## Importar SINAPI
 

@@ -12,7 +12,7 @@ Este diretório documenta o Estudo Construtivo: uma experiência guiada para pr�
 ## Contratos Técnicos
 
 - `AI_PLAN_EXTRACT.md`: configuração, custo, limites e privacidade da extração de planta baixa com OpenAI API.
-- `budget-assistant.md`: contrato técnico para fontes, matches, composições, revisão humana, cache e limites do orçamento assistido.
+- `budget-assistant.md`: contrato técnico do Assistente de orçamento para fontes, matches, composições, revisão humana, cache e limites.
 - `calculation-method.md`: fórmulas principais, incluindo a baseline A-frame.
 - `structural-assumptions.md`: premissas e limites estruturais.
 - `material-assumptions.md`: materiais e quantidades.

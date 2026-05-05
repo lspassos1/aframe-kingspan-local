@@ -1,26 +1,26 @@
 # Login, privacidade e dados pessoais
 
-## Modelo adotado no MVP
+## Modelo adotado
 
-O app usa Clerk para autenticacao. O aplicativo nao armazena senha, hash de senha, token OAuth, refresh token ou credencial social em banco proprio.
+O app usa Clerk para autenticação. O aplicativo não armazena senha, hash de senha, token OAuth, refresh token ou credencial social em banco próprio.
 
 Dados tratados:
 
-- Email e sessao de autenticacao: gerenciados pelo Clerk.
-- Dados de projeto: salvos no LocalStorage do navegador do usuario.
-- Feedback publico: enviado para uma issue privada no GitHub quando `GITHUB_FEEDBACK_TOKEN` estiver configurado.
+- Email e sessão de autenticação: gerenciados pelo Clerk.
+- Dados de projeto: salvos no LocalStorage do navegador do usuário.
+- Feedback público: enviado para uma issue privada no GitHub quando `GITHUB_FEEDBACK_TOKEN` estiver configurado.
 
 ## Dados que o app evita armazenar
 
 - Documento pessoal.
 - Dados de pagamento.
-- Endereco completo obrigatorio.
-- Arquivos de projeto em servidor proprio.
-- Historico de orcamentos pessoais em banco remoto.
+- Endereço completo obrigatório.
+- Arquivos de projeto em servidor próprio.
+- Histórico de orçamentos pessoais em banco remoto.
 
-## Variaveis de ambiente
+## Variáveis de ambiente
 
-Obrigatorias para login:
+Obrigatórias para login:
 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
@@ -29,19 +29,19 @@ Obrigatorias para login:
 - `NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/start`
 - `NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=/start`
 
-Obrigatorias para feedback:
+Obrigatórias para feedback:
 
 - `GITHUB_FEEDBACK_TOKEN`
 - `GITHUB_FEEDBACK_REPO`
 
-O token do GitHub deve ter a menor permissao possivel para criar issues no repositorio privado.
+O token do GitHub deve ter a menor permissão possível para criar issues no repositório privado.
 
 ## Direitos autorais
 
-O video e poster da landing page sao gerados a partir de desenho proprio do app. Nao usar imagens de catalogos Kingspan/KingRoofing sem licenca.
+O vídeo e poster da landing page são gerados a partir de desenho próprio do app. Não usar imagens de catálogos Kingspan/KingRoofing sem licença.
 
-Marcas e nomes de fornecedores podem aparecer apenas como referencia tecnica, catalogo ou cotacao informada pelo usuario.
+Marcas e nomes de fornecedores podem aparecer apenas como referência técnica, catálogo ou cotação informada pelo usuário.
 
-## Limite tecnico
+## Limite técnico
 
-Este MVP nao implementa banco de projetos por usuario. Se o usuario trocar de navegador ou limpar dados locais, o projeto salvo no LocalStorage pode ser perdido, salvo se exportado para JSON.
+Esta entrega não implementa banco de projetos por usuário. Se o usuário trocar de navegador ou limpar dados locais, o projeto salvo no LocalStorage pode ser perdido, salvo se exportado para JSON.

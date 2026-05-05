@@ -26,7 +26,7 @@ Não mostrar na primeira camada:
 - formulário técnico completo;
 - alertas técnicos longos;
 - limitações de método;
-- termos internos como MVP, placeholder ou Budget Assistant.
+- termos internos como nome de módulo, siglas de produto ou placeholder.
 
 ## Modo IA
 

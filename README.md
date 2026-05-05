@@ -96,7 +96,7 @@ Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 - [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md): variáveis locais, Vercel, OpenAI API e SINAPI.
 - [docs/sinapi-integration.md](docs/sinapi-integration.md): regras da base SINAPI controlada.
 - [docs/AI_PLAN_EXTRACT.md](docs/AI_PLAN_EXTRACT.md): contrato técnico da extração de planta por IA.
-- [docs/budget-assistant.md](docs/budget-assistant.md): orçamento assistido e revisão humana.
+- [docs/budget-assistant.md](docs/budget-assistant.md): Assistente de orçamento e revisão humana.
 
 ## Limitações
 
