@@ -81,6 +81,29 @@ describe("price base importer", () => {
     ).toMatchObject({ importedRows: 0, serviceCompositions: [] });
   });
 
+  it("parses Brazilian dot-thousand monetary values without shrinking totals", () => {
+    const rows = parsePriceBaseCsv(
+      [
+        "codigo,descricao,unidade,preco_total,material,mao_obra,equipamento",
+        "SINAPI-999,Servico com milhar,m2,1.234,1.000,200,34",
+      ].join("\n")
+    );
+
+    const result = importPriceBaseRows({
+      rows,
+      mapping: defaultPriceBaseColumnMapping,
+      source,
+      defaultConstructionMethod: "conventional-masonry",
+    });
+
+    expect(result.serviceCompositions[0]).toMatchObject({
+      materialCostBRL: 1000,
+      laborCostBRL: 200,
+      equipmentCostBRL: 34,
+      directUnitCostBRL: 1234,
+    });
+  });
+
   it("keeps incomplete JSON rows importable but pending human review", () => {
     const rows = parsePriceBaseJson(JSON.stringify([{ codigo: "COMP-1", descricao: "Servico sem preco", unidade: "m2", etapa: "civil" }]));
     const lowReliabilitySource = createImportedPriceSource({
