@@ -24,4 +24,15 @@ describe("operational environment status", () => {
     });
     expect(JSON.stringify(status)).not.toContain("sk-secret-value");
   });
+
+  it("falls back to defaults when limits are invalid or non-positive", () => {
+    const defaultStatus = createOperationalEnvironmentStatus({});
+    const status = createOperationalEnvironmentStatus({
+      AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "0",
+      AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP: "-1",
+      AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT: "abc",
+    });
+
+    expect(status.dailyLimitLabel).toBe(defaultStatus.dailyLimitLabel);
+  });
 });

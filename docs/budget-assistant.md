@@ -89,7 +89,7 @@ A extração de planta e o matching assistido devem respeitar os mesmos princíp
 - manter limite diário por usuário/IP/global;
 - usar cache por hash do arquivo/modelo quando aplicável;
 - não consumir quota quando houver cache hit válido;
-- invalidar cache por versao quando prompt, schema ou provider mudarem;
+- invalidar cache por versão quando prompt, schema ou provider mudarem;
 - nunca registrar conteúdo bruto de planta ou cotação em logs.
 
 ## Validação automatizada

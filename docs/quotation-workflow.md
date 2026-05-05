@@ -2,7 +2,7 @@
 
 1. Ajuste lote, endereço, painel, geometria e cenário.
 2. Abra `Materiais` e revise quantidades.
-3. Abra `Estrutura A-frame` quando o método ativo for A-frame e revise perfis preliminares.
+3. Se o método ativo for A-frame, abra `Estrutura A-frame` e revise perfis preliminares; caso contrário, pule esta etapa.
 4. Abra `Cotação`.
 5. Envie os textos separados para fornecedor de painéis, fornecedor de aço, fabricante metálico e orçamento geral.
 6. Atualize preços manualmente em `Materiais`, `Estrutura A-frame`, `Orçamento` ou `Premissas`.

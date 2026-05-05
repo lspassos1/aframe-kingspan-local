@@ -18,8 +18,8 @@ export interface OperationalChecklistItem {
   tone: OperationalChecklistTone;
 }
 
-function resolveSelectedScenario(project: Project): Scenario {
-  return project.scenarios.find((scenario) => scenario.id === project.selectedScenarioId) ?? project.scenarios[0];
+function resolveSelectedScenario(project: Project): Scenario | null {
+  return project.scenarios.find((scenario) => scenario.id === project.selectedScenarioId) ?? project.scenarios[0] ?? null;
 }
 
 function hasSinapiRegimeMetadata(project: Project) {
@@ -33,7 +33,7 @@ function hasSinapiRegimeMetadata(project: Project) {
 export function createOperationalChecklist(
   environment: OperationalEnvironmentStatus,
   project: Project,
-  scenario: Scenario = resolveSelectedScenario(project)
+  scenario: Scenario | null = resolveSelectedScenario(project)
 ): OperationalChecklistItem[] {
   const sinapiSources = project.budgetAssistant.priceSources.filter((source) => source.type === "sinapi");
   const hasSinapiCompositions = project.budgetAssistant.serviceCompositions.some((composition) =>
@@ -41,7 +41,7 @@ export function createOperationalChecklist(
   );
   const hasSinapiBase = sinapiSources.length > 0 || hasSinapiCompositions;
   const aiOperational = environment.aiPlanExtractEnabled && environment.openAiApiKeyConfigured;
-  const scenarioState = scenario.location.state.trim();
+  const scenarioState = scenario?.location.state.trim() ?? "";
   const hasSinapiReference = sinapiSources.some((source) => source.referenceDate.trim());
   const hasRegime = hasSinapiRegimeMetadata(project);
 
