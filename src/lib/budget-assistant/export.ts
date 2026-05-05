@@ -554,10 +554,16 @@ function createTotals(
   lowConfidenceCount: number
 ): BudgetSourceExportTotals {
   const costItemTotal = costItems.reduce((sum, item) => sum + item.totalBRL, 0);
-  const outOfRegionCompositionCount =
-    lines.length > 0 ? lines.filter((line) => line.outOfRegion).length : compositions.filter((composition) => composition.outOfRegion).length;
-  const structuralCriticalCount =
-    lines.length > 0 ? lines.filter((line) => line.structuralCritical).length : compositions.filter((composition) => composition.structuralCritical).length;
+  const regionalRowsByKey = new Map<string, { outOfRegion: boolean; structuralCritical: boolean }>();
+  for (const composition of compositions) {
+    setMergedRegionalRow(regionalRowsByKey, composition);
+  }
+  for (const line of lines) {
+    setMergedRegionalRow(regionalRowsByKey, line);
+  }
+  const regionalRows = [...regionalRowsByKey.values()];
+  const outOfRegionCompositionCount = regionalRows.filter((row) => row.outOfRegion).length;
+  const structuralCriticalCount = regionalRows.filter((row) => row.structuralCritical).length;
   const sinapiPriceRowsByKey = new Map<string, { priceStatus: BudgetSourcePriceStatus }>();
   for (const composition of compositions) {
     setWorstSinapiPriceRow(sinapiPriceRowsByKey, composition);
@@ -585,6 +591,18 @@ function createTotals(
     structuralCriticalCount,
     pendingSinapiPriceCount: sinapiPriceRows.filter((line) => line.priceStatus !== "valid").length,
   };
+}
+
+function setMergedRegionalRow(
+  rowsByKey: Map<string, { outOfRegion: boolean; structuralCritical: boolean }>,
+  row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode" | "regime" | "outOfRegion" | "structuralCritical">
+) {
+  const key = createSinapiPriceRowKey(row);
+  const existing = rowsByKey.get(key);
+  rowsByKey.set(key, {
+    outOfRegion: Boolean(existing?.outOfRegion || row.outOfRegion),
+    structuralCritical: Boolean(existing?.structuralCritical || row.structuralCritical),
+  });
 }
 
 function setWorstSinapiPriceRow(

@@ -372,6 +372,10 @@ describe("budget source export report", () => {
       id: "composition-pending-only",
       serviceCode: "SINAPI-PENDING",
       sourceCode: "SINAPI-PENDING",
+      state: "Sao Paulo",
+      city: "Sao Paulo",
+      category: "steel",
+      tags: ["estrutura"],
       directUnitCostBRL: 0,
       materialCostBRL: 0,
       laborCostBRL: 0,
@@ -393,8 +397,10 @@ describe("budget source export report", () => {
 
     expect(report.serviceLines).toHaveLength(1);
     expect(report.serviceCompositions).toHaveLength(2);
-    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1 });
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1, outOfRegionCompositionCount: 1, structuralCriticalCount: 1 });
     expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
+    expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("fora da cidade/UF")]));
+    expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("itens estruturais criticos")]));
   });
 
   it("preserves pending SINAPI status when deduplicating line and composition rows", () => {

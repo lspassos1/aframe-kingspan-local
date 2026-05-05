@@ -106,6 +106,23 @@ export default function ExportPage() {
     }
   };
 
+  const prepareRequiredLibrary = async (kind?: ExportLibraryKind) => {
+    if (!kind || exportLibraryStatus[kind] === "ready") return;
+    setExportLibraryStatus((current) => ({ ...current, [kind]: "loading" }));
+    try {
+      if (kind === "spreadsheet") {
+        await prepareSpreadsheetExportLibrary();
+      } else {
+        await preparePdfExportLibrary();
+      }
+      setExportLibraryStatus((current) => ({ ...current, [kind]: "ready" }));
+    } catch (error) {
+      setExportLibraryStatus((current) => ({ ...current, [kind]: "failed" }));
+      throw error;
+    }
+  };
+
+
   const actions = [
     {
       title: "Projeto JSON",
@@ -212,7 +229,7 @@ export default function ExportPage() {
         {actions.map((item) => {
           const Icon = item.icon;
           const libraryStatus = item.requiredLibrary ? exportLibraryStatus[item.requiredLibrary] : "ready";
-          const disabled = isExporting || libraryStatus !== "ready";
+          const disabled = isExporting || libraryStatus === "loading";
           return (
             <Card className="rounded-md shadow-none" key={item.title}>
               <CardHeader>
@@ -223,9 +240,18 @@ export default function ExportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
-                <Button className="w-full" onClick={() => void handleExportAction(item.action)} disabled={disabled}>
+                <Button
+                  className="w-full"
+                  onClick={() =>
+                    void handleExportAction(async () => {
+                      await prepareRequiredLibrary(item.requiredLibrary);
+                      await item.action();
+                    })
+                  }
+                  disabled={disabled}
+                >
                   <Download className="mr-2 h-4 w-4" />
-                  {libraryStatus === "loading" ? "Preparando..." : libraryStatus === "failed" ? "Indisponivel" : item.label}
+                  {libraryStatus === "loading" ? "Preparando..." : libraryStatus === "failed" ? "Tentar novamente" : item.label}
                 </Button>
               </CardContent>
             </Card>
