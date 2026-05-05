@@ -55,6 +55,21 @@ describe("budget assistant reviewed-budget validation", () => {
     );
   });
 
+  it("ignores unlinked cost items when validating a reviewed budget", () => {
+    const unlinkedCostItem: CostItem = {
+      ...costItem,
+      id: "cost-item-unlinked",
+      sourceId: "missing-source",
+    };
+    const data = createBudgetAssistantData({
+      costSources: [source],
+      costItems: [costItem, unlinkedCostItem],
+      matches: [approvedMatch],
+    });
+
+    expect(validateBudgetAssistantDataForReviewedBudget(data)).toEqual([]);
+  });
+
   it("flags matches that still need human review before entering a reviewed budget", () => {
     const pendingMatch: BudgetMatch = {
       ...approvedMatch,

@@ -140,6 +140,23 @@ describe("direct service budget calculation", () => {
     expect(budget.skippedLinks.map((item) => item.reason)).toEqual(["not-approved", "unit-incompatible"]);
   });
 
+  it("skips approved links pointing to quantities from another scenario", () => {
+    const foreignQuantity: BudgetQuantity = { ...quantity, id: "quantity-foreign", scenarioId: "scenario-b" };
+    const budget = calculateDirectServiceBudget({
+      scenarioId: quantity.scenarioId,
+      quantities: [foreignQuantity],
+      serviceCompositions: [composition],
+      links: [{ id: "link-foreign-scenario", quantityId: foreignQuantity.id, compositionId: composition.id, approvedByUser: true }],
+    });
+
+    expect(budget.lines).toHaveLength(0);
+    expect(budget.skippedLinks).toEqual([
+      expect.objectContaining({
+        reason: "scenario-incompatible",
+      }),
+    ]);
+  });
+
   it("keeps structural service lines reviewable until technical project approval", () => {
     const structuralComposition: ServiceComposition = {
       ...composition,

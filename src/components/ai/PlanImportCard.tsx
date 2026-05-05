@@ -119,8 +119,9 @@ export function PlanImportCard() {
         return;
       }
 
+      const currentProject = useProjectStore.getState().project;
       setResult(parsed.data);
-      setSelectedFields(getDefaultPlanExtractSelectedFields(parsed.data));
+      setSelectedFields(getDefaultPlanExtractSelectedFields(parsed.data, getActiveScenario(currentProject).constructionMethod));
       setModifiedValues({});
       setProviderMeta({
         provider: payload?.provider,

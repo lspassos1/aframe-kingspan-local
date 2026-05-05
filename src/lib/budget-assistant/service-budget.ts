@@ -16,6 +16,7 @@ export type DirectServiceBudgetSkipReason =
   | "not-approved"
   | "quantity-missing"
   | "composition-missing"
+  | "scenario-incompatible"
   | "method-incompatible"
   | "unit-incompatible";
 
@@ -60,7 +61,7 @@ export function calculateDirectServiceBudget(input: DirectServiceBudgetInput): D
   for (const link of input.links) {
     const quantity = quantitiesById.get(link.quantityId);
     const composition = compositionsById.get(link.compositionId);
-    const skipReason = getSkipReason(link, quantity, composition);
+    const skipReason = getSkipReason(input.scenarioId, link, quantity, composition);
     if (skipReason) {
       skippedLinks.push({ link, reason: skipReason, message: createSkipMessage(link, skipReason) });
       continue;
@@ -153,6 +154,7 @@ function createBudgetServiceLine(input: {
 }
 
 function getSkipReason(
+  scenarioId: string,
   link: ServiceBudgetCompositionLink,
   quantity: BudgetQuantity | undefined,
   composition: ServiceComposition | undefined
@@ -160,6 +162,7 @@ function getSkipReason(
   if (!link.approvedByUser) return "not-approved";
   if (!quantity) return "quantity-missing";
   if (!composition) return "composition-missing";
+  if (quantity.scenarioId !== scenarioId) return "scenario-incompatible";
   if (quantity.constructionMethod !== composition.constructionMethod) return "method-incompatible";
   if (quantity.unit !== composition.unit) return "unit-incompatible";
   return null;
@@ -169,6 +172,7 @@ function createSkipMessage(link: ServiceBudgetCompositionLink, reason: DirectSer
   if (reason === "not-approved") return `Vinculo "${link.id}" ainda nao foi aprovado.`;
   if (reason === "quantity-missing") return `Vinculo "${link.id}" aponta para quantitativo inexistente.`;
   if (reason === "composition-missing") return `Vinculo "${link.id}" aponta para composicao inexistente.`;
+  if (reason === "scenario-incompatible") return `Vinculo "${link.id}" aponta para quantitativo de outro cenario.`;
   if (reason === "method-incompatible") return `Vinculo "${link.id}" possui metodo construtivo incompativel.`;
   return `Vinculo "${link.id}" possui unidade incompativel.`;
 }

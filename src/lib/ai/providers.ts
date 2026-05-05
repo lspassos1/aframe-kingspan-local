@@ -63,6 +63,12 @@ const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyE
   },
 };
 
+function getBooleanEnv(env: AiPlanExtractEnv, key: string, fallback = false) {
+  const value = env[key];
+  if (value === undefined) return fallback;
+  return value.toLowerCase() === "true";
+}
+
 export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.env) {
   const configuredOrder = env.AI_PLAN_EXTRACT_PROVIDER_ORDER?.split(",").map((provider) => provider.trim()).filter(Boolean) ?? [];
   const order = configuredOrder.length > 0 ? configuredOrder : defaultProviderOrder;
@@ -70,9 +76,9 @@ export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.en
   return supportedOrder.length > 0 ? supportedOrder : defaultProviderOrder;
 }
 
-function getProviderSupportedMimeTypes(id: AiPlanExtractProviderId, model: string, defaults: (typeof providerDefaults)[AiPlanExtractProviderId]) {
+function getProviderSupportedMimeTypes(id: AiPlanExtractProviderId, env: AiPlanExtractEnv, defaults: (typeof providerDefaults)[AiPlanExtractProviderId]) {
   if (id !== "groq") return defaults.supports;
-  return model.toLowerCase().includes("vision") ? defaults.supports : [];
+  return getBooleanEnv(env, "AI_GROQ_VISION_ENABLED", false) ? defaults.supports : [];
 }
 
 export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.env): AiPlanExtractProviderConfig[] {
@@ -87,7 +93,7 @@ export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.
       baseUrl,
       apiKey,
       configured: Boolean(model && baseUrl && apiKey),
-      supports: getProviderSupportedMimeTypes(id, model, defaults),
+      supports: getProviderSupportedMimeTypes(id, env, defaults),
     };
   });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { constructionMethodDefinitions, type ConstructionMethodId } from "@/lib/construction-methods";
-import { getPlanExtractApplicableFields, type PlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
+import {
+  getPlanExtractApplicableFields,
+  getPlanExtractNumberFieldMin,
+  normalizePlanExtractNumberField,
+  type PlanExtractSelectedFields,
+} from "@/lib/ai/apply-plan-extract";
 import type { PlanExtractConfidence, PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 
 type PlanExtractField = keyof PlanExtractResult["extracted"];
@@ -107,8 +113,8 @@ function formatCurrentFieldValue(field: PlanExtractEditableField, value: PlanExt
   return formatFieldValue(field, value) || "Nao informado";
 }
 
-function orderedApplicableFields(result: PlanExtractResult) {
-  const applicable = new Set(getPlanExtractApplicableFields(result));
+function orderedApplicableFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId) {
+  const applicable = new Set(getPlanExtractApplicableFields(result, currentMethod));
   return fieldOrder.filter((field) => {
     if (!applicable.has(field)) return false;
     const value = result.extracted[field];
@@ -140,19 +146,27 @@ export function PlanExtractReview({
   onApply,
   onDismiss,
 }: PlanExtractReviewProps) {
-  const fields = orderedApplicableFields(result);
+  const currentMethod = typeof currentValues.constructionMethod === "string" ? (currentValues.constructionMethod as ConstructionMethodId) : undefined;
+  const reviewedMethod =
+    typeof modifiedValues.constructionMethod === "string" ? (modifiedValues.constructionMethod as ConstructionMethodId) : result.extracted.constructionMethod;
+  const effectiveMethod = selectedFields.constructionMethod ? reviewedMethod ?? currentMethod : currentMethod;
+  const fields = orderedApplicableFields(result, effectiveMethod);
   const selectedCount = fields.filter((field) => selectedFields[field]).length;
   const notes = (result.extracted.notes ?? []).filter(Boolean);
 
-  function updateModifiedValue(field: PlanExtractEditableField, value: string | number | ConstructionMethodId | undefined) {
+  function updateModifiedValue(
+    field: PlanExtractEditableField,
+    value: string | number | ConstructionMethodId | undefined,
+    shouldSelect = value !== undefined && value !== ""
+  ) {
     const nextValues: PlanExtractModifiedValues = { ...modifiedValues };
-    if (value === undefined || value === "") {
+    if (value === undefined) {
       delete nextValues[field];
     } else {
       nextValues[field] = value;
     }
     onModifiedValuesChange(nextValues);
-    onSelectedFieldsChange({ ...selectedFields, [field]: true });
+    onSelectedFieldsChange({ ...selectedFields, [field]: shouldSelect });
   }
 
   return (
@@ -200,7 +214,11 @@ export function PlanExtractReview({
                     </div>
                     <div className="space-y-2 rounded-xl border bg-background p-3">
                       <span className="block text-xs font-medium uppercase tracking-normal text-muted-foreground">Extraido / revisado</span>
-                      <PlanExtractFieldEditor field={field} value={reviewValue} onChange={(value) => updateModifiedValue(field, value)} />
+                      <PlanExtractFieldEditor
+                        field={field}
+                        value={reviewValue}
+                        onChange={(value, shouldSelect) => updateModifiedValue(field, value, shouldSelect)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -245,7 +263,7 @@ function PlanExtractFieldEditor({
 }: {
   field: PlanExtractEditableField;
   value: PlanExtractReviewValue;
-  onChange: (value: string | number | ConstructionMethodId | undefined) => void;
+  onChange: (value: string | number | ConstructionMethodId | undefined, shouldSelect?: boolean) => void;
 }) {
   if (field === "constructionMethod") {
     return (
@@ -265,25 +283,8 @@ function PlanExtractFieldEditor({
   }
 
   if (numberFields.has(field)) {
-    return (
-      <Input
-        type="number"
-        min={field === "doorCount" || field === "windowCount" ? 0 : 0.01}
-        step={integerFields.has(field) ? 1 : 0.01}
-        value={typeof value === "number" ? String(value) : ""}
-        onChange={(event) => {
-          const rawValue = event.target.value.trim();
-          if (!rawValue) {
-            onChange(undefined);
-            return;
-          }
-          const nextValue = Number(rawValue);
-          if (Number.isFinite(nextValue)) {
-            onChange(integerFields.has(field) ? Math.round(nextValue) : nextValue);
-          }
-        }}
-      />
-    );
+    const minimum = getPlanExtractNumberFieldMin(field) ?? (field === "doorCount" || field === "windowCount" ? 0 : 0.01);
+    return <PlanExtractNumberFieldEditor key={`${field}-${typeof value === "number" || typeof value === "string" ? value : ""}`} field={field} value={value} minimum={minimum} onChange={onChange} />;
   }
 
   return (
@@ -293,6 +294,45 @@ function PlanExtractFieldEditor({
       onChange={(event) => {
         const nextValue = event.target.value;
         onChange(nextValue.trim().length > 0 ? nextValue : undefined);
+      }}
+    />
+  );
+}
+
+function PlanExtractNumberFieldEditor({
+  field,
+  value,
+  minimum,
+  onChange,
+}: {
+  field: PlanExtractEditableField;
+  value: PlanExtractReviewValue;
+  minimum: number;
+  onChange: (value: string | number | undefined, shouldSelect?: boolean) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(typeof value === "number" || typeof value === "string" ? String(value) : "");
+
+  return (
+    <Input
+      type="number"
+      min={minimum}
+      step={integerFields.has(field) ? 1 : 0.01}
+      value={draftValue}
+      onChange={(event) => {
+        const rawValue = event.target.value.trim();
+        setDraftValue(rawValue);
+        if (!rawValue) {
+          onChange("", false);
+          return;
+        }
+
+        const normalizedValue = normalizePlanExtractNumberField(field, Number(rawValue));
+        if (normalizedValue !== undefined) {
+          if (integerFields.has(field)) setDraftValue(String(normalizedValue));
+          onChange(normalizedValue, true);
+        } else {
+          onChange(rawValue, false);
+        }
       }}
     />
   );
