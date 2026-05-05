@@ -111,6 +111,17 @@ Verifique:
 
 Se estiver em Vercel, confira se a variável foi adicionada ao mesmo ambiente do preview/produção que está sendo testado.
 
+No app, abra `Ajuda` e confira o checklist operacional:
+
+- `IA: ativa/desligada`;
+- `Provider: OpenAI`;
+- `Modelo: configurado/ausente`;
+- `Limite diário: disponível`;
+- `SINAPI: base ausente/base importada`;
+- `UF`, `Referência` e `Regime`.
+
+O checklist não exibe segredo. Ele mostra apenas booleans e metadados seguros para diagnosticar configuração.
+
 ## Importar SINAPI
 
 Não há crawler. Importe arquivo oficial, ZIP oficial, CSV/XLSX/JSON ou base normalizada equivalente.

@@ -26,19 +26,19 @@ import { isBrazilCityInState, isBrazilState, normalizeBrazilStateName } from "@/
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 
 const confidenceOptions: Array<{ value: BudgetConfidenceLevel; label: string }> = [
-  { value: "unverified", label: "Sem revisao" },
+  { value: "unverified", label: "Sem revisão" },
   { value: "low", label: "Baixa" },
-  { value: "medium", label: "Media" },
+  { value: "medium", label: "Média" },
   { value: "high", label: "Alta" },
 ];
 
 const sourceTypeOptions: Array<{ value: PriceSourceType; label: string }> = [
   { value: "manual", label: "Manual" },
-  { value: "supplier_quote", label: "Cotacao fornecedor" },
+  { value: "supplier_quote", label: "Cotação de fornecedor" },
   { value: "sinapi", label: "SINAPI" },
   { value: "tcpo", label: "TCPO" },
-  { value: "historical", label: "Historico" },
-  { value: "web_reference", label: "Referencia web" },
+  { value: "historical", label: "Histórico" },
+  { value: "web_reference", label: "Referência web" },
 ];
 
 interface SourceLocationFormState {
@@ -179,10 +179,10 @@ export default function BudgetAssistantPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">Assistente de orcamento</p>
-          <h1 className="text-3xl font-semibold tracking-normal">Orcamento assistido</h1>
+          <p className="text-sm text-muted-foreground">Assistente de orçamento</p>
+          <h1 className="text-3xl font-semibold tracking-normal">Orçamento assistido</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Quantitativos do cenario atual, fontes cadastradas, precos pendentes e confianca. Nenhum preco e criado automaticamente.
+            Quantitativos do cenário atual, fontes cadastradas, preços pendentes e confiança. Nenhum preço é criado automaticamente.
           </p>
         </div>
         <Badge variant="outline" className="w-fit text-sm">
@@ -192,8 +192,8 @@ export default function BudgetAssistantPage() {
 
       <section className="grid gap-4 md:grid-cols-4">
         <Metric icon={<FileCheck2 className="h-4 w-4" />} label="Quantitativos" value={viewModel.quantityItems.length} />
-        <Metric icon={<CircleAlert className="h-4 w-4" />} label="Sem preco" value={viewModel.unpricedCount} />
-        <Metric icon={<BadgeDollarSign className="h-4 w-4" />} label="Baixa confianca" value={viewModel.lowConfidenceCount} />
+        <Metric icon={<CircleAlert className="h-4 w-4" />} label="Sem preço" value={viewModel.unpricedCount} />
+        <Metric icon={<BadgeDollarSign className="h-4 w-4" />} label="Baixa confiança" value={viewModel.lowConfidenceCount} />
         <Metric icon={<Link2 className="h-4 w-4" />} label="Fontes" value={viewModel.costSources.length} />
       </section>
 
@@ -201,23 +201,23 @@ export default function BudgetAssistantPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Filtro regional de precos
+            Filtro regional de preços
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm font-medium">
-                {scenario.location.city || "Cidade nao informada"}
+                {scenario.location.city || "Cidade não informada"}
                 {scenarioState ? `/${scenarioState}` : ""}
               </p>
-              <p className="text-xs text-muted-foreground">Prioridade: cidade, UF, base nacional e fallback manual revisavel.</p>
+              <p className="text-xs text-muted-foreground">Prioridade: cidade, UF, base nacional e fallback manual revisável.</p>
             </div>
-            <Badge variant={viewModel.applicableCostSources.length > 0 ? "outline" : "secondary"}>{viewModel.applicableCostSources.length} fontes aplicaveis</Badge>
+            <Badge variant={viewModel.applicableCostSources.length > 0 ? "outline" : "secondary"}>{viewModel.applicableCostSources.length} fontes aplicáveis</Badge>
           </div>
           {!scenarioHasValidRegion ? (
             <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              Informe cidade e estado no cenario para aplicar filtro regional de precos.
+              Informe cidade e estado no cenário para aplicar filtro regional de preços.
             </p>
           ) : null}
           {viewModel.regionalFallbackWarnings.map((warning) => (
@@ -227,7 +227,7 @@ export default function BudgetAssistantPage() {
           ))}
           {viewModel.applicableCostSources.length === 0 ? (
             <p className="rounded-md border p-3 text-sm text-muted-foreground">
-              Nenhuma fonte compativel com a regiao do cenario. Cadastre uma fonte local, estadual, nacional ou manual revisavel antes de vincular precos.
+              Nenhuma fonte compatível com a região do cenário. Cadastre uma fonte local, estadual, nacional ou manual revisável antes de vincular preços.
             </p>
           ) : (
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -264,14 +264,14 @@ export default function BudgetAssistantPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Link2 className="h-5 w-5" />
-              Cadastrar fonte de preco
+              Cadastrar fonte de preço
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAddSource} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="source-title">Nome da fonte</Label>
-                <Input id="source-title" value={sourceTitle} onChange={(event) => setSourceTitle(event.target.value)} placeholder="Tabela, fornecedor ou cotacao" />
+                <Input id="source-title" value={sourceTitle} onChange={(event) => setSourceTitle(event.target.value)} placeholder="Tabela, fornecedor ou cotação" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="source-type">Tipo</Label>
@@ -290,10 +290,10 @@ export default function BudgetAssistantPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="source-supplier">Fornecedor</Label>
-                <Input id="source-supplier" value={sourceSupplier} onChange={(event) => setSourceSupplier(event.target.value)} placeholder="Empresa ou responsavel" />
+                <Input id="source-supplier" value={sourceSupplier} onChange={(event) => setSourceSupplier(event.target.value)} placeholder="Empresa ou responsável" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="source-date">Data de referencia</Label>
+                <Label htmlFor="source-date">Data de referência</Label>
                 <Input id="source-date" type="date" value={sourceDate} onChange={(event) => setSourceDate(event.target.value)} />
               </div>
               <BrazilLocationSelectFields
@@ -304,11 +304,11 @@ export default function BudgetAssistantPage() {
                 cityValue={sourceCity}
                 onStateChange={handleSourceStateChange}
                 onCityChange={handleSourceCityChange}
-                stateError={sourceStateIsValid ? undefined : "Estado obrigatorio"}
-                cityError={sourceCityIsValid ? undefined : "Cidade obrigatoria"}
+                stateError={sourceStateIsValid ? undefined : "Estado obrigatório"}
+                cityError={sourceCityIsValid ? undefined : "Cidade obrigatória"}
               />
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="source-notes">Observacoes</Label>
+                <Label htmlFor="source-notes">Observações</Label>
                 <Textarea id="source-notes" value={sourceNotes} onChange={(event) => setSourceNotes(event.target.value)} />
               </div>
               <div className="md:col-span-2">
@@ -324,7 +324,7 @@ export default function BudgetAssistantPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
-              Vincular preco manual
+              Vincular preço manual
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -359,22 +359,22 @@ export default function BudgetAssistantPage() {
                   </SelectContent>
                 </Select>
                 {viewModel.costSources.length > 0 && viewModel.applicableCostSources.length === 0 ? (
-                  <p className="text-xs text-destructive">As fontes cadastradas nao correspondem a regiao do cenario.</p>
+                  <p className="text-xs text-destructive">As fontes cadastradas não correspondem à região do cenário.</p>
                 ) : null}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="item-description">Descricao do item</Label>
+                <Label htmlFor="item-description">Descrição do item</Label>
                 <Input id="item-description" value={itemDescription} onChange={(event) => setItemDescription(event.target.value)} />
               </div>
               <ReadOnlyField label="Categoria" value={selectedQuantity?.category ?? "-"} />
               <ReadOnlyField label="Unidade" value={selectedQuantity?.unit ?? "-"} />
               <ReadOnlyField label="Quantidade" value={selectedQuantity ? formatCompactNumber(selectedQuantity.quantity) : "-"} />
               <div className="space-y-2">
-                <Label htmlFor="unit-price">Preco unitario</Label>
+                <Label htmlFor="unit-price">Preço unitário</Label>
                 <Input id="unit-price" inputMode="decimal" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} placeholder="0,00" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confidence">Confianca</Label>
+                <Label htmlFor="confidence">Confiança</Label>
                 <Select value={confidence} onValueChange={(value) => setConfidence(value as BudgetConfidenceLevel)}>
                   <SelectTrigger id="confidence" className="h-10 w-full">
                     <SelectValue />
@@ -394,7 +394,7 @@ export default function BudgetAssistantPage() {
               </div>
               <div className="md:col-span-2">
                 <Button type="submit" disabled={!canAddManualPrice}>
-                  Vincular preco
+                  Vincular preço
                 </Button>
               </div>
             </form>
@@ -412,15 +412,15 @@ export default function BudgetAssistantPage() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-medium">{suggestedMatches.length} sugestoes pendentes</p>
-              <p className="text-xs text-muted-foreground">Sugestoes usam apenas itens de preco ja cadastrados e sempre ficam pendentes de revisao humana.</p>
+              <p className="text-sm font-medium">{suggestedMatches.length} sugestões pendentes</p>
+              <p className="text-xs text-muted-foreground">Sugestões usam apenas itens de preço já cadastrados e sempre ficam pendentes de revisão humana.</p>
             </div>
             <Button
               type="button"
               onClick={handleSuggestMatches}
               disabled={!scenarioHasValidRegion || availableCostItems.length === 0 || viewModel.pendingPriceItems.length === 0}
             >
-              Gerar sugestoes
+              Gerar sugestões
             </Button>
           </div>
           {suggestedMatches.length === 0 ? null : (
@@ -433,10 +433,10 @@ export default function BudgetAssistantPage() {
                   <div key={match.id} className="rounded-md border p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="font-medium">{quantityItem?.description ?? "Quantitativo nao encontrado"}</p>
-                        <p className="mt-1 text-sm text-muted-foreground">{costItem?.description ?? "Item de preco nao encontrado"}</p>
+                        <p className="font-medium">{quantityItem?.description ?? "Quantitativo não encontrado"}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{costItem?.description ?? "Item de preço não encontrado"}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {source?.title ?? "Fonte removida"} | {match.unitCompatible ? "unidade compativel" : "unidade divergente"}
+                          {source?.title ?? "Fonte removida"} | {match.unitCompatible ? "unidade compatível" : "unidade divergente"}
                         </p>
                       </div>
                       <Badge variant={match.confidence === "high" || match.confidence === "medium" ? "outline" : "secondary"}>{match.confidence}</Badge>
@@ -470,7 +470,7 @@ export default function BudgetAssistantPage() {
             <Table className="min-w-[880px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[340px]">Descricao</TableHead>
+                  <TableHead className="w-[340px]">Descrição</TableHead>
                   <TableHead className="w-28">Categoria</TableHead>
                   <TableHead className="w-24 text-right">Qtd.</TableHead>
                   <TableHead className="w-20">Un.</TableHead>
@@ -491,7 +491,7 @@ export default function BudgetAssistantPage() {
                     <TableCell className="align-top text-right">{formatCurrency(item.estimatedTotalBRL)}</TableCell>
                     <TableCell className="align-top">
                       <Badge variant={item.requiresPriceSource ? "secondary" : "outline"}>
-                        {item.requiresPriceSource ? "sem fonte revisada" : "parametro"}
+                        {item.requiresPriceSource ? "sem fonte revisada" : "parâmetro"}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -526,7 +526,7 @@ export default function BudgetAssistantPage() {
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-2">
                           <Badge variant="outline">{source.reliability}</Badge>
-                          <Badge variant={regionalSource ? "outline" : "secondary"}>{regionalSource?.label ?? "fora da regiao"}</Badge>
+                          <Badge variant={regionalSource ? "outline" : "secondary"}>{regionalSource?.label ?? "fora da região"}</Badge>
                         </div>
                       </div>
                     </div>
@@ -540,12 +540,12 @@ export default function BudgetAssistantPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <WalletCards className="h-5 w-5" />
-                Relatorio de revisao
+                Relatório de revisão
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {viewModel.costItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Itens com preco manual aparecem aqui com fonte, data, unidade e confianca.</p>
+                <p className="text-sm text-muted-foreground">Itens com preço manual aparecem aqui com fonte, data, unidade e confiança.</p>
               ) : (
                 viewModel.costItems.map((item) => {
                   const source = sourceById.get(item.sourceId);
