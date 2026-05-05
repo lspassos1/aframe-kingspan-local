@@ -284,6 +284,58 @@ describe("SINAPI quantity matching", () => {
     expect(result.candidates[0].composition.id).toBe("sinapi-second");
   });
 
+  it("preserves candidates that are outside the OpenAI prompt window", async () => {
+    const secondQuantity: BudgetQuantity = {
+      ...quantity,
+      id: "quantity-second-wall-area",
+      description: "Area de parede em alvenaria ceramica",
+    };
+    const serviceCompositions = Array.from({ length: 12 }, (_, index) =>
+      createSinapiComposition({
+        id: `sinapi-candidate-${index + 1}`,
+        description: `Alvenaria de vedacao candidato ${index + 1}`,
+      })
+    );
+    const candidates = findSinapiQuantityMatchCandidates({
+      quantities: [quantity, secondQuantity],
+      serviceCompositions,
+      location: { city: "Cruz das Almas", state: "BA" },
+      referenceDate: "2026-05",
+      regime: "desonerado",
+      maxCandidatesPerQuantity: 12,
+    });
+    const candidateIds = new Set(candidates.map((candidate) => candidate.candidateId));
+
+    expect(candidates).toHaveLength(24);
+
+    const fetcher = async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { messages: Array<{ content: string }> };
+      const prompt = JSON.parse(body.messages[1].content) as { candidates: Array<{ id: string }> };
+      expect(prompt.candidates).toHaveLength(10);
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                candidates: [{ id: prompt.candidates[1].id, confidence: "medium", reason: "Mais aderente.", pending: "Revisar." }],
+              }),
+            },
+          },
+        ],
+      });
+    };
+
+    const result = await rankSinapiQuantityCandidatesWithOpenAi(candidates, {
+      apiKey: "openai-test-key",
+      model: "gpt-4o-mini",
+      fetcher,
+      maxCandidates: 10,
+    });
+
+    expect(result.candidates).toHaveLength(candidates.length);
+    expect(new Set(result.candidates.map((candidate) => candidate.candidateId))).toEqual(candidateIds);
+  });
+
   it("rejects invalid OpenAI JSON with a clear error", async () => {
     const candidates = findSinapiQuantityMatchCandidates({
       quantities: [quantity],

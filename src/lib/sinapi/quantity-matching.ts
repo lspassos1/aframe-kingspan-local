@@ -238,8 +238,10 @@ export async function rankSinapiQuantityCandidatesWithOpenAi(
   candidates: SinapiQuantityMatchCandidate[],
   options: SinapiOpenAiRerankOptions
 ): Promise<SinapiAiCandidateRankingResult> {
-  const limitedCandidates = candidates.slice(0, clampCandidateLimit(options.maxCandidates ?? maxAiCandidates));
-  if (limitedCandidates.length === 0) {
+  const promptLimit = clampCandidateLimit(options.maxCandidates ?? maxAiCandidates);
+  const promptCandidates = candidates.slice(0, promptLimit);
+  const untouchedCandidates = candidates.slice(promptLimit);
+  if (promptCandidates.length === 0) {
     return { candidates: [], decisions: [], rejectedIds: [] };
   }
   if (!options.apiKey.trim()) {
@@ -268,7 +270,7 @@ export async function rankSinapiQuantityCandidatesWithOpenAi(
             schema: {
               candidates: [{ id: "string", confidence: "high|medium|low|unverified", reason: "string", pending: "string" }],
             },
-            candidates: limitedCandidates.map(toAiCandidatePayload),
+            candidates: promptCandidates.map(toAiCandidatePayload),
           }),
         },
       ],
@@ -290,7 +292,12 @@ export async function rankSinapiQuantityCandidatesWithOpenAi(
     throw new Error("OpenAI retornou JSON invalido para ranking SINAPI.");
   }
 
-  return applySinapiAiCandidateRanking(limitedCandidates, parsedContent, options.maxCandidates);
+  const ranking = applySinapiAiCandidateRanking(promptCandidates, parsedContent, promptLimit);
+
+  return {
+    ...ranking,
+    candidates: [...ranking.candidates, ...untouchedCandidates],
+  };
 }
 
 function createAiCandidateLookup(candidates: SinapiQuantityMatchCandidate[]) {
