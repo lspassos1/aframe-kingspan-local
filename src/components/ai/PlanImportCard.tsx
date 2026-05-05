@@ -205,11 +205,11 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
     if (file) void uploadFile(file);
   }
 
-  function applyExtractedFields() {
+  function applyExtractedFields(nextSelectedFields = selectedFields, nextModifiedValues = modifiedValues) {
     if (!result) return;
     const current = useProjectStore.getState().project;
-    const reviewedResult = mergeModifiedValues(result, modifiedValues);
-    const updatedProject = applyPlanExtractToProject(current, current.selectedScenarioId, reviewedResult, selectedFields);
+    const reviewedResult = mergeModifiedValues(result, nextModifiedValues);
+    const updatedProject = applyPlanExtractToProject(current, current.selectedScenarioId, reviewedResult, nextSelectedFields);
     setProject(updatedProject);
     setModifiedValues({});
     setState("applied");
@@ -226,6 +226,13 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
     setProviderMeta({});
     setMessage("");
     setState("idle");
+  }
+
+  function returnToManual() {
+    resetReview();
+    setTimeout(() => {
+      document.getElementById("manual-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   }
 
   return (
@@ -334,6 +341,7 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
           onModifiedValuesChange={setModifiedValues}
           onApply={applyExtractedFields}
           onDismiss={resetReview}
+          onBackToManual={returnToManual}
         />
       ) : null}
     </div>
