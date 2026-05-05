@@ -63,7 +63,7 @@ export function createStartAssistantViewModel({
         ? "Envie uma planta, preencha medidas simples ou use um exemplo. Você revisa tudo antes de gerar orçamento e 3D."
         : "A etapa de método construtivo vem depois da planta ou das medidas iniciais.",
     options,
-    showPlanImport: mode === "ai" && planExtractEnabled,
+    showPlanImport: mode === "ai",
     showManualForm: mode === "manual" || mode === "ai",
     showAiDisabledNotice: mode === "ai" && !planExtractEnabled,
     shouldRunExample: mode === "example",

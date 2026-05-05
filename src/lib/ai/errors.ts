@@ -10,7 +10,7 @@ export class AiPlanExtractError extends Error {
 }
 
 export class AiProviderUnavailableError extends AiPlanExtractError {
-  constructor(message = "Nenhum provider de IA esta configurado para extracao de planta.") {
+  constructor(message = "OpenAI API nao esta configurada para extracao de planta.") {
     super(message, "ai-provider-unavailable", 503);
     this.name = "AiProviderUnavailableError";
   }
