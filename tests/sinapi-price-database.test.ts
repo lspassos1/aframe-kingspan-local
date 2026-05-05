@@ -7,6 +7,7 @@ import {
   mapSinapiCompositionToServiceComposition,
   normalizeSinapiRows,
   searchSinapiCompositions,
+  sinapiImportLimits,
   validateSinapiSource,
   type SinapiSource,
 } from "@/lib/sinapi";
@@ -140,6 +141,24 @@ describe("SINAPI controlled price database", () => {
     expect(result.compositions.map((composition) => composition.code)).toEqual(["SINAPI-401", "SINAPI-402"]);
   });
 
+  it("rejects ZIP archives with too many entries before expanding all files", async () => {
+    const zip = new JSZip();
+    for (let index = 0; index <= sinapiImportLimits.maxZipEntries; index += 1) {
+      zip.file(`sinapi-${index}.csv`, [csvHeader, `SINAPI-ZIP-${index},Servico ${index},m2,10,6,4,0,0.1,2026-05,BA,desonerado,civil,,alvenaria`].join("\n"));
+    }
+    const data = await zip.generateAsync({ type: "arraybuffer" });
+
+    await expect(
+      importSinapiPriceBase({
+        fileName: "sinapi-too-many-files.zip",
+        data,
+        source,
+        defaultConstructionMethod: "conventional-masonry",
+        expectedState: "BA",
+      })
+    ).rejects.toThrow(/limite atual/);
+  });
+
   it("classifies missing price, invalid unit, out-of-region and missing source metadata", async () => {
     const missingPrice = await importSinapiPriceBase({
       rows: [{ codigo: "SINAPI-501", descricao: "Servico sem preco", unidade: "m2", uf: "BA", data_base: "2026-05", regime: "desonerado" }],
@@ -170,6 +189,12 @@ describe("SINAPI controlled price database", () => {
       source: { id: "sinapi-missing-metadata", title: "SINAPI sem metadados" },
       defaultConstructionMethod: "conventional-masonry",
     });
+    const invalidBreakdown = await importSinapiPriceBase({
+      rows: [{ codigo: "SINAPI-505", descricao: "Servico contraditorio", unidade: "m2", preco_total: 50, material: 80, mao_obra: 20, uf: "BA", data_base: "2026-05", regime: "desonerado" }],
+      source,
+      defaultConstructionMethod: "conventional-masonry",
+      expectedState: "BA",
+    });
 
     expect(missingPrice.compositions[0]).toMatchObject({ priceStatus: "missing", requiresReview: true });
     expect(invalidUnit.compositions[0]).toMatchObject({ priceStatus: "invalid_unit", unit: "lot", requiresReview: true });
@@ -177,6 +202,12 @@ describe("SINAPI controlled price database", () => {
     expect(invalidRowState.compositions[0]).toMatchObject({ state: "XX", priceStatus: "requires_review", requiresReview: true });
     expect(invalidRowState.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid-state" })]));
     expect(missingMetadata.compositions[0]).toMatchObject({ priceStatus: "requires_review", regime: "unknown", requiresReview: true });
+    expect(invalidBreakdown.compositions[0]).toMatchObject({
+      priceStatus: "invalid",
+      directUnitCostBRL: 100,
+      requiresReview: true,
+    });
+    expect(invalidBreakdown.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid-row", status: "invalid" })]));
     expect(missingMetadata.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "missing-state" }),

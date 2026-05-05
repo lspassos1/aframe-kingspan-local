@@ -188,6 +188,12 @@ const validMaterialUnits = new Set<MaterialUnit>(["un", "m", "m2", "m3", "kg", "
 const supportedFileExtensions = new Set(["csv", "xlsx", "xls", "json"]);
 const allStatuses: SinapiPriceStatus[] = ["valid", "zeroed", "missing", "requires_review", "invalid_unit", "out_of_region", "invalid"];
 
+export const sinapiImportLimits = {
+  maxUploadBytes: 50 * 1024 * 1024,
+  maxZipEntries: 25,
+  maxExtractedFileBytes: 30 * 1024 * 1024,
+} as const;
+
 export async function importSinapiPriceBase(input: SinapiPriceBaseImportInput): Promise<SinapiPriceBaseImportResult> {
   const rows = input.rows ?? (await parseSinapiRowsFromFile(input.fileName ?? input.source.uploadedFileName ?? "sinapi.csv", input.data));
   const source = validateSinapiSource({
@@ -297,15 +303,36 @@ export function normalizeSinapiRows(
       rowIssues.push({ code: "zeroed-price", rowNumber, status: "zeroed", message: `Linha ${rowNumber}: preço zero fica pendente de revisão.` });
     }
 
+    const compositionUnit = unit ?? "lot";
+    const rawMaterialCostBRL = priceParts.materialCostBRL;
+    const rawLaborCostBRL = priceParts.laborCostBRL;
+    const rawEquipmentCostBRL = priceParts.equipmentCostBRL;
+    const rawComponentTotal = roundCurrency(rawMaterialCostBRL + rawLaborCostBRL + rawEquipmentCostBRL);
+    const rawDirectUnitCostBRL = priceParts.totalUnitPriceBRL ?? rawComponentTotal;
+    const hasInvalidBreakdown =
+      rawDirectUnitCostBRL < 0 ||
+      rawMaterialCostBRL < 0 ||
+      rawLaborCostBRL < 0 ||
+      rawEquipmentCostBRL < 0 ||
+      rawDirectUnitCostBRL + 0.01 < rawComponentTotal;
+
+    if (hasInvalidBreakdown) {
+      rowIssues.push({
+        code: "invalid-row",
+        rowNumber,
+        status: "invalid",
+        message: `Linha ${rowNumber}: total incompatível com a soma dos componentes.`,
+      });
+    }
+
+    const materialCostBRL = hasInvalidBreakdown ? Math.max(0, rawMaterialCostBRL) : rawMaterialCostBRL;
+    const laborCostBRL = hasInvalidBreakdown ? Math.max(0, rawLaborCostBRL) : rawLaborCostBRL;
+    const equipmentCostBRL = hasInvalidBreakdown ? Math.max(0, rawEquipmentCostBRL) : rawEquipmentCostBRL;
+    const componentTotal = roundCurrency(materialCostBRL + laborCostBRL + equipmentCostBRL);
+    const directUnitCostBRL = hasInvalidBreakdown ? Math.max(0, componentTotal) : rawDirectUnitCostBRL;
     const priceStatus = resolvePriceStatus(rowIssues);
     const requiresReview = priceStatus !== "valid" || options.source.reliability !== "high";
     const confidence: BudgetConfidenceLevel = requiresReview ? "unverified" : "high";
-    const compositionUnit = unit ?? "lot";
-    const materialCostBRL = priceParts.materialCostBRL;
-    const laborCostBRL = priceParts.laborCostBRL;
-    const equipmentCostBRL = priceParts.equipmentCostBRL;
-    const componentTotal = roundCurrency(materialCostBRL + laborCostBRL + equipmentCostBRL);
-    const directUnitCostBRL = priceParts.totalUnitPriceBRL ?? componentTotal;
     const otherCostBRL = roundCurrency(Math.max(0, directUnitCostBRL - componentTotal));
     const category = inferMaterialCategory(getMappedText(row, mapping, "stage"), description);
     const tags = createTags(getMappedText(row, mapping, "stage"), getMappedText(row, mapping, "tags"), description);
@@ -445,6 +472,7 @@ export function mapSinapiCompositionToServiceComposition(composition: SinapiComp
 
 export async function parseSinapiRowsFromFile(fileName: string, data: string | ArrayBuffer | undefined): Promise<SinapiRawRow[]> {
   if (data === undefined) return [];
+  assertByteLength(getDataByteLength(data), sinapiImportLimits.maxUploadBytes, `Arquivo ${fileName}`);
   const extension = getFileExtension(fileName);
 
   if (extension === "zip") return parseSinapiZip(data);
@@ -472,18 +500,28 @@ function mapSinapiSourceToPriceSource(source: SinapiSource): PriceSource {
 
 async function parseSinapiZip(data: string | ArrayBuffer): Promise<SinapiRawRow[]> {
   const zip = await JSZip.loadAsync(toArrayBuffer(data));
-  const entries = Object.values(zip.files).filter((file) => !file.dir && supportedFileExtensions.has(getFileExtension(file.name)));
-  const parsed = await Promise.all(
-    entries.map(async (entry) => {
-      const extension = getFileExtension(entry.name);
-      if (extension === "xlsx" || extension === "xls") return parseSinapiXlsx(await entry.async("arraybuffer"));
-      const content = await entry.async("text");
-      if (extension === "json") return parseSinapiJson(content);
-      return parseSinapiCsv(content);
-    })
-  );
+  const fileEntries = Object.values(zip.files).filter((file) => !file.dir);
+  if (fileEntries.length > sinapiImportLimits.maxZipEntries) {
+    throw new Error(`ZIP SINAPI tem ${fileEntries.length} arquivos; limite atual: ${sinapiImportLimits.maxZipEntries}.`);
+  }
 
-  return parsed.flat();
+  const rows: SinapiRawRow[] = [];
+  const entries = fileEntries.filter((file) => supportedFileExtensions.has(getFileExtension(file.name)));
+  for (const entry of entries) {
+    const extension = getFileExtension(entry.name);
+    if (extension === "xlsx" || extension === "xls") {
+      const dataBuffer = await entry.async("arraybuffer");
+      assertByteLength(dataBuffer.byteLength, sinapiImportLimits.maxExtractedFileBytes, `Arquivo ${entry.name} dentro do ZIP`);
+      rows.push(...parseSinapiXlsx(dataBuffer));
+      continue;
+    }
+
+    const content = await entry.async("text");
+    assertByteLength(getDataByteLength(content), sinapiImportLimits.maxExtractedFileBytes, `Arquivo ${entry.name} dentro do ZIP`);
+    rows.push(...(extension === "json" ? parseSinapiJson(content) : parseSinapiCsv(content)));
+  }
+
+  return rows;
 }
 
 function parseSinapiCsv(content: string) {
@@ -760,6 +798,19 @@ function toColumnList(value: string | string[]) {
 
 function getFileExtension(fileName: string) {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function getDataByteLength(data: string | ArrayBuffer) {
+  return typeof data === "string" ? new TextEncoder().encode(data).byteLength : data.byteLength;
+}
+
+function assertByteLength(actualBytes: number, maxBytes: number, label: string) {
+  if (actualBytes <= maxBytes) return;
+  throw new Error(`${label} excede o limite de ${formatBytes(maxBytes)} para importação SINAPI.`);
+}
+
+function formatBytes(bytes: number) {
+  return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
 
 function toArrayBuffer(data: string | ArrayBuffer): ArrayBuffer {

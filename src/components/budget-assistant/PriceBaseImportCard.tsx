@@ -32,6 +32,7 @@ import { isBrazilCityInState, isBrazilState, normalizeBrazilStateName } from "@/
 import {
   importSinapiPriceBase,
   parseSinapiRowsFromFile,
+  sinapiImportLimits,
   type SinapiColumnMapping,
   type SinapiImportIssue,
   type SinapiPriceStatus,
@@ -132,6 +133,9 @@ export function PriceBaseImportCard({
 
     try {
       const extension = getFileExtension(file.name);
+      if ((sourceType === "sinapi" || extension === "zip") && file.size > sinapiImportLimits.maxUploadBytes) {
+        throw new Error(`Arquivo excede o limite de ${Math.round(sinapiImportLimits.maxUploadBytes / 1024 / 1024)} MB para importacao SINAPI.`);
+      }
       const fileData = extension === "xlsx" || extension === "xls" || extension === "zip" ? await file.arrayBuffer() : await file.text();
       const parsedRows =
         sourceType === "sinapi" || extension === "zip"
