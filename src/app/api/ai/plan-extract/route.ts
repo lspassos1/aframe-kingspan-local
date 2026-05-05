@@ -5,7 +5,7 @@ import { extractPlanWithProviderChain } from "@/lib/ai/providers";
 import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders } from "@/lib/ai/rate-limit";
 import { createMemoryPlanExtractCacheStore, createPlanExtractCacheKey, getPlanExtractCacheTtlSeconds } from "@/lib/ai/plan-extract-cache";
 import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtractFile } from "@/lib/ai/plan-extract-request";
-import { AiPlanExtractError, AiProviderChainError } from "@/lib/ai/errors";
+import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 
 export const runtime = "nodejs";
 
@@ -14,9 +14,15 @@ function jsonResponse(body: Record<string, unknown>, init?: ResponseInit) {
 }
 
 function getErrorMessage(error: unknown) {
+  if (error instanceof AiProviderUnavailableError) {
+    return {
+      message: "OpenAI API nao esta configurada no servidor. Defina OPENAI_API_KEY e AI_OPENAI_MODEL para habilitar a extracao.",
+      code: error.code,
+    };
+  }
   if (error instanceof AiProviderChainError) {
     return {
-      message: "Nao foi possivel extrair a planta com os providers configurados.",
+      message: "Nao foi possivel extrair a planta com OpenAI neste momento.",
       providers: error.providerErrors,
     };
   }

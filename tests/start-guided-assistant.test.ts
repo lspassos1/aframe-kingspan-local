@@ -48,7 +48,7 @@ describe("createStartAssistantViewModel", () => {
   it("falls back to manual flow when AI extraction is disabled", () => {
     const viewModel = createStartAssistantViewModel({ mode: "ai", planExtractEnabled: false });
 
-    expect(viewModel.showPlanImport).toBe(false);
+    expect(viewModel.showPlanImport).toBe(true);
     expect(viewModel.showManualForm).toBe(true);
     expect(viewModel.showAiDisabledNotice).toBe(true);
     expect(viewModel.options.find((option) => option.id === "ai")?.disabledReason).toBe("IA desligada");
@@ -88,7 +88,7 @@ describe("StartGuidedAssistant", () => {
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: false, initialMode: "ai" }));
 
     expect(html).toContain("A leitura por IA está desligada");
-    expect(html).not.toContain('data-testid="plan-import"');
+    expect(html).toContain('data-testid="plan-import"');
     expect(html).toContain('data-testid="manual-form"');
   });
 });

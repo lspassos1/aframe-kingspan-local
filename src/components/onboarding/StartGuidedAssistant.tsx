@@ -111,7 +111,7 @@ export function StartGuidedAssistant({
             <h2 className="text-xl font-semibold tracking-normal">Planta baixa</h2>
             <p className="mt-1 text-sm text-muted-foreground">Nenhum dado extraído é aplicado sem revisão.</p>
           </div>
-          <PlanImportCard />
+          <PlanImportCard planExtractEnabled={planExtractEnabled} />
         </section>
       ) : null}
 
