@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, type InputHTMLAttributes, type ReactNode } 
 import { useRouter } from "next/navigation";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, ChevronDown, MapPinned, RotateCcw, Triangle } from "lucide-react";
+import { ArrowRight, ChevronDown, MapPinned, Triangle } from "lucide-react";
 import { defaultProject } from "@/data/defaultProject";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -473,25 +473,6 @@ export function StartProjectForm() {
     router.push("/dashboard");
   };
 
-  const useExampleProject = () => {
-    const example = defaultProject.scenarios[0];
-    const values: StartProjectFormValues = {
-      projectName: defaultProject.name,
-      address: example.location.address,
-      city: example.location.city,
-      state: example.location.state,
-      country: example.location.country,
-      terrainWidth: example.terrain.width,
-      terrainDepth: example.terrain.depth,
-      panelProductId: example.panelProductId,
-      panelLength: example.aFrame.panelLength,
-      baseAngleDeg: example.aFrame.baseAngleDeg,
-      houseDepth: example.aFrame.houseDepth,
-    };
-    form.reset(values);
-    applyValues(values);
-  };
-
   return (
     <div className="space-y-5">
       <ConstructionMethodSelector selectedMethod={selectedMethod} onSelect={selectConstructionMethod} />
@@ -610,11 +591,7 @@ export function StartProjectForm() {
               <NumberInput id="houseDepth" label="Profundidade da casa (m)" error={form.formState.errors.houseDepth?.message} {...form.register("houseDepth")} />
             </section>
 
-            <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:justify-between">
-              <Button type="button" variant="outline" onClick={useExampleProject}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Usar projeto exemplo
-              </Button>
+            <div className="flex justify-end border-t pt-5">
               <Button type="submit" disabled={!form.formState.isValid}>
                 Abrir modelo 3D
                 <ArrowRight className="ml-2 h-4 w-4" />

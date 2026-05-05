@@ -23,6 +23,11 @@ describe("root shell route selection", () => {
     expect(shouldUsePublicShell("/sign-up", true, true)).toBe(true);
   });
 
+  it("keeps start in the public shell before onboarding so method navigation is not shown first", () => {
+    expect(shouldUsePublicShell("/start", true, false)).toBe(true);
+    expect(shouldUsePublicShell("/start", true, true)).toBe(true);
+  });
+
   it("keeps nested auth routes public without matching similar prefixes", () => {
     expect(shouldUsePublicShell("/sign-in/sso-callback", true, true)).toBe(true);
     expect(shouldUsePublicShell("/sign-up/verify", true, true)).toBe(true);
@@ -37,9 +42,9 @@ describe("root shell route selection", () => {
     expect(shouldUsePublicShell("/feedback/", true, true)).toBe(false);
   });
 
-  it("allows feedback and start to render in the app shell before onboarding", () => {
-    expect(canUseAppShellBeforeOnboarding("/start")).toBe(true);
+  it("allows feedback to render in the app shell before onboarding", () => {
     expect(canUseAppShellBeforeOnboarding("/feedback/")).toBe(true);
+    expect(canUseAppShellBeforeOnboarding("/start")).toBe(false);
     expect(canUseAppShellBeforeOnboarding("/dashboard")).toBe(false);
   });
 });
