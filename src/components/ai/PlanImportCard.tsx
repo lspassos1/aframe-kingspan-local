@@ -222,6 +222,7 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
     setResult(null);
     setSelectedFields({});
     setModifiedValues({});
+    setProviderMeta({});
     setMessage("");
     setState("idle");
   }
