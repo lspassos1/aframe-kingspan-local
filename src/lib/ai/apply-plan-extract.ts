@@ -42,7 +42,11 @@ function fieldSelected(selectedFields: PlanExtractSelectedFields, field: keyof P
 }
 
 export function getDefaultPlanExtractSelectedFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId): PlanExtractSelectedFields {
-  return getPlanExtractApplicableFields(result, currentMethod).reduce<PlanExtractSelectedFields>((selected, field) => {
+  const constructionMethodSelected = (result.fieldConfidence.constructionMethod ?? result.confidence) !== "low";
+  const extractedMethod = constructionMethodSelected ? getCompatibleExtractedMethod(result.extracted.constructionMethod) : undefined;
+  const effectiveMethod = extractedMethod ?? currentMethod;
+
+  return getPlanExtractApplicableFields(result, effectiveMethod).reduce<PlanExtractSelectedFields>((selected, field) => {
     selected[field] = (result.fieldConfidence[field] ?? result.confidence) !== "low";
     return selected;
   }, {});
@@ -136,7 +140,7 @@ export function applyPlanExtractToProject(project: Project, scenarioId: string, 
 }
 
 export function getPlanExtractApplicableFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId) {
-  const method = getCompatibleExtractedMethod(result.extracted.constructionMethod) ?? currentMethod;
+  const method = currentMethod ?? getCompatibleExtractedMethod(result.extracted.constructionMethod);
   return (Object.keys(result.extracted) as Array<keyof PlanExtractResult["extracted"]>).filter((field) => {
     if (result.extracted[field] === undefined) return false;
     if (field === "notes") return false;

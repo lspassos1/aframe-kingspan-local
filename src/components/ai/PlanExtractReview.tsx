@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -146,7 +147,10 @@ export function PlanExtractReview({
   onDismiss,
 }: PlanExtractReviewProps) {
   const currentMethod = typeof currentValues.constructionMethod === "string" ? (currentValues.constructionMethod as ConstructionMethodId) : undefined;
-  const fields = orderedApplicableFields(result, currentMethod);
+  const reviewedMethod =
+    typeof modifiedValues.constructionMethod === "string" ? (modifiedValues.constructionMethod as ConstructionMethodId) : result.extracted.constructionMethod;
+  const effectiveMethod = selectedFields.constructionMethod ? reviewedMethod ?? currentMethod : currentMethod;
+  const fields = orderedApplicableFields(result, effectiveMethod);
   const selectedCount = fields.filter((field) => selectedFields[field]).length;
   const notes = (result.extracted.notes ?? []).filter(Boolean);
 
@@ -272,24 +276,7 @@ function PlanExtractFieldEditor({
 
   if (numberFields.has(field)) {
     const minimum = getPlanExtractNumberFieldMin(field) ?? (field === "doorCount" || field === "windowCount" ? 0 : 0.01);
-    return (
-      <Input
-        type="number"
-        min={minimum}
-        step={integerFields.has(field) ? 1 : 0.01}
-        value={typeof value === "number" ? String(value) : ""}
-        onChange={(event) => {
-          const rawValue = event.target.value.trim();
-          if (!rawValue) {
-            onChange(undefined);
-            return;
-          }
-          const nextValue = Number(rawValue);
-          const normalizedValue = normalizePlanExtractNumberField(field, nextValue);
-          onChange(normalizedValue);
-        }}
-      />
-    );
+    return <PlanExtractNumberFieldEditor key={`${field}-${typeof value === "number" ? value : ""}`} field={field} value={value} minimum={minimum} onChange={onChange} />;
   }
 
   return (
@@ -299,6 +286,40 @@ function PlanExtractFieldEditor({
       onChange={(event) => {
         const nextValue = event.target.value;
         onChange(nextValue.trim().length > 0 ? nextValue : undefined);
+      }}
+    />
+  );
+}
+
+function PlanExtractNumberFieldEditor({
+  field,
+  value,
+  minimum,
+  onChange,
+}: {
+  field: PlanExtractEditableField;
+  value: PlanExtractReviewValue;
+  minimum: number;
+  onChange: (value: number | undefined) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(typeof value === "number" ? String(value) : "");
+
+  return (
+    <Input
+      type="number"
+      min={minimum}
+      step={integerFields.has(field) ? 1 : 0.01}
+      value={draftValue}
+      onChange={(event) => {
+        const rawValue = event.target.value.trim();
+        setDraftValue(rawValue);
+        if (!rawValue) {
+          onChange(undefined);
+          return;
+        }
+
+        const normalizedValue = normalizePlanExtractNumberField(field, Number(rawValue));
+        if (normalizedValue !== undefined) onChange(normalizedValue);
       }}
     />
   );

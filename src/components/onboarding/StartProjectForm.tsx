@@ -238,6 +238,34 @@ export function StartProjectForm() {
     [project.panelProducts, watched.panelProductId]
   );
   const lengthOptions = useMemo(() => getPanelLengthOptions(selectedPanel), [selectedPanel]);
+  const hasFreshStoreValues = useMemo(() => {
+    const baseline = defaultProject.scenarios[0];
+    return (
+      project.name !== defaultProject.name ||
+      scenario.location.address !== baseline.location.address ||
+      scenario.location.city !== baseline.location.city ||
+      scenario.location.state !== baseline.location.state ||
+      scenario.location.country !== baseline.location.country ||
+      scenario.terrain.width !== baseline.terrain.width ||
+      scenario.terrain.depth !== baseline.terrain.depth ||
+      scenario.panelProductId !== baseline.panelProductId ||
+      scenario.aFrame.panelLength !== baseline.aFrame.panelLength ||
+      scenario.aFrame.baseAngleDeg !== baseline.aFrame.baseAngleDeg ||
+      scenario.aFrame.houseDepth !== baseline.aFrame.houseDepth
+    );
+  }, [
+    project.name,
+    scenario.aFrame.baseAngleDeg,
+    scenario.aFrame.houseDepth,
+    scenario.aFrame.panelLength,
+    scenario.location.address,
+    scenario.location.city,
+    scenario.location.country,
+    scenario.location.state,
+    scenario.panelProductId,
+    scenario.terrain.depth,
+    scenario.terrain.width,
+  ]);
   const geometry = calculateAFrameGeometry(
     { ...scenario.terrain, width: Number(watched.terrainWidth ?? scenario.terrain.width), depth: Number(watched.terrainDepth ?? scenario.terrain.depth) },
     {
@@ -250,8 +278,9 @@ export function StartProjectForm() {
 
   useEffect(() => {
     if (!requiresFreshInput) return;
-    if (!manualFormStoreSyncInitializedRef.current) {
-      manualFormStoreSyncInitializedRef.current = true;
+    const isFirstSync = !manualFormStoreSyncInitializedRef.current;
+    manualFormStoreSyncInitializedRef.current = true;
+    if (isFirstSync && !hasFreshStoreValues) {
       return;
     }
 
@@ -271,6 +300,7 @@ export function StartProjectForm() {
     void form.trigger();
   }, [
     form,
+    hasFreshStoreValues,
     project.name,
     requiresFreshInput,
     scenario.aFrame.baseAngleDeg,

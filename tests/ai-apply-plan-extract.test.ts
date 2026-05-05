@@ -69,6 +69,26 @@ describe("AI plan extract application", () => {
     expect(selected.houseDepthM).toBe(false);
   });
 
+  it("uses the extracted method for default selections only when the method field is selected", () => {
+    const selected = getDefaultPlanExtractSelectedFields(baseResult, "aframe");
+    const lowMethodSelected = getDefaultPlanExtractSelectedFields(
+      {
+        ...baseResult,
+        fieldConfidence: {
+          ...baseResult.fieldConfidence,
+          constructionMethod: "low",
+        },
+      },
+      "aframe"
+    );
+
+    expect(selected.constructionMethod).toBe(true);
+    expect(selected.houseWidthM).toBe(true);
+    expect(lowMethodSelected.constructionMethod).toBe(false);
+    expect(lowMethodSelected.houseWidthM).toBeUndefined();
+    expect(lowMethodSelected.houseDepthM).toBe(true);
+  });
+
   it("keeps unselected project data untouched", () => {
     const project = cloneProject(defaultProject);
     const selected: PlanExtractSelectedFields = {
@@ -197,6 +217,14 @@ describe("AI plan extract application", () => {
     expect(fields).toContain("houseDepthM");
     expect(fields).not.toContain("houseWidthM");
     expect(fields).not.toContain("builtAreaM2");
+    expect(fields).not.toContain("floors");
+  });
+
+  it("lets the caller override extracted method applicability with the method being applied", () => {
+    const fields = getPlanExtractApplicableFields(baseResult, "aframe");
+
+    expect(fields).toContain("houseDepthM");
+    expect(fields).not.toContain("houseWidthM");
     expect(fields).not.toContain("floors");
   });
 });
