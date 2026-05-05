@@ -647,7 +647,7 @@ function createExportWarnings(totals: BudgetSourceExportTotals) {
 
 function getSinapiExportMetadata(composition: ServiceComposition | undefined, line?: BudgetServiceLine) {
   const sinapi = composition?.sinapi;
-  const priceStatus: BudgetSourcePriceStatus = sinapi?.priceStatus ?? (composition?.requiresReview || line?.requiresReview ? "requires_review" : "valid");
+  const priceStatus: BudgetSourcePriceStatus = sinapi?.priceStatus ?? "valid";
   return {
     code: sinapi?.code ?? composition?.serviceCode ?? line?.sourceCode ?? "",
     description: sinapi?.description ?? composition?.description ?? line?.description ?? "",

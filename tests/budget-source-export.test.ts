@@ -325,6 +325,52 @@ describe("budget source export report", () => {
       "Preco unitario": 0,
     });
   });
+
+  it("does not count manual review lines as pending SINAPI prices", () => {
+    const manualSource: PriceSource = {
+      ...priceSource,
+      id: "source-manual",
+      type: "manual",
+      title: "Cotacao manual",
+      supplier: "Fornecedor local",
+    };
+    const manualComposition: ServiceComposition = {
+      ...serviceComposition,
+      id: "composition-manual",
+      sourceId: manualSource.id,
+      sourceCode: "MANUAL-001",
+      serviceCode: "MANUAL-001",
+      sinapi: undefined,
+      requiresReview: true,
+    };
+    const manualLine: BudgetServiceLine = {
+      ...serviceLine,
+      id: "service-line-manual",
+      compositionId: manualComposition.id,
+      sourceId: manualSource.id,
+      sourceCode: "MANUAL-001",
+      sourceTitle: manualSource.title,
+      requiresReview: true,
+    };
+    const { project, scenario } = createProjectWithBudget({
+      source: manualSource,
+      composition: manualComposition,
+      line: manualLine,
+    });
+
+    const report = createBudgetSourceExport(project, scenario, "2026-05-04T21:00:00.000Z");
+
+    expect(report.serviceLines[0]).toMatchObject({
+      sourceTitle: manualSource.title,
+      sinapiCode: "MANUAL-001",
+      priceStatus: "valid",
+      reviewStatus: "pendente",
+      humanReviewRequired: true,
+      requiresReview: true,
+    });
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 0, reviewableLineCount: 1 });
+    expect(report.warnings).not.toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
+  });
 });
 
 function createProjectWithBudget(overrides?: {
