@@ -26,7 +26,9 @@ import type { Project } from "@/types/project";
 
 export default function ExportPage() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isExportingRef = useRef(false);
   const [exportError, setExportError] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const project = useProjectStore((state) => state.project);
   const importProject = useProjectStore((state) => state.importProject);
   const resetProject = useProjectStore((state) => state.resetProject);
@@ -46,12 +48,18 @@ export default function ExportPage() {
   };
 
   const handleExportAction = async (action: () => void | Promise<void>) => {
+    if (isExportingRef.current) return;
+    isExportingRef.current = true;
+    setIsExporting(true);
     setExportError("");
     try {
       await action();
     } catch (error) {
       console.error("Falha ao exportar arquivo:", error);
       setExportError("Nao foi possivel gerar o arquivo. Tente novamente.");
+    } finally {
+      isExportingRef.current = false;
+      setIsExporting(false);
     }
   };
 
@@ -164,7 +172,7 @@ export default function ExportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
-                <Button className="w-full" onClick={() => void handleExportAction(item.action)}>
+                <Button className="w-full" onClick={() => void handleExportAction(item.action)} disabled={isExporting}>
                   <Download className="mr-2 h-4 w-4" />
                   {item.label}
                 </Button>
