@@ -1,21 +1,37 @@
-# AI plan extraction
+# Extração De Planta Com OpenAI API
 
-Este documento cobre a configuração da extração assistida de planta baixa. A feature é opcional, server-side e deve ficar desligada por padrão em ambientes sem provider configurado.
+Este documento cobre a configuração técnica da extração assistida de planta baixa. A feature é opcional, server-side e desligada por padrão em ambientes sem OpenAI configurado.
 
 ## Objetivo
 
-O fluxo ajuda a ler uma imagem ou PDF de planta baixa e retornar um JSON preliminar com campos como método construtivo sugerido, cidade/estado, dimensões do lote, dimensões da casa, pavimentos, pé-direito, portas, janelas, observações, incertezas e alertas.
+O fluxo lê imagem ou PDF de planta baixa e retorna JSON preliminar com campos como cidade/UF, dimensões do lote, dimensões da casa, pavimentos, pé-direito, portas, janelas, observações, incertezas e alertas.
 
-O resultado deve sempre passar por revisão humana antes de ser aplicado ao projeto. A extração não substitui projeto arquitetônico, projeto estrutural, ART/RRT, aprovação municipal, sondagem, orçamento formal ou validação técnica de fornecedor.
+O resultado sempre passa por revisão humana antes de ser aplicado ao projeto. A extração não substitui projeto arquitetônico, projeto estrutural, ART/RRT, aprovação municipal, sondagem, orçamento formal ou validação técnica de fornecedor.
 
-## Variaveis de ambiente
+## Provider Oficial
 
-Copie `.env.example` para `.env.local` no desenvolvimento local. Em Vercel, configure as mesmas variaveis como Environment Variables do projeto.
+Nesta entrega, o provider oficial é somente OpenAI API.
+
+```txt
+AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
+OPENAI_API_KEY=...
+AI_OPENAI_MODEL=gpt-4o-mini
+```
+
+A abstração interna de providers pode existir por compatibilidade, mas a configuração documentada, os testes novos e a UI operacional não devem exigir Gemini, Groq, OpenRouter ou endpoint genérico.
+
+`OPENAI_API_KEY` deve ser lida apenas no servidor. Nunca use `NEXT_PUBLIC_OPENAI_API_KEY`; variáveis com prefixo `NEXT_PUBLIC_` entram no bundle do navegador.
+
+## Variáveis De Ambiente
+
+Copie `.env.example` para `.env.local` no desenvolvimento local. Em Vercel, configure as mesmas variáveis em Project Settings > Environment Variables.
 
 Obrigatórias para habilitar:
 
 - `AI_PLAN_EXTRACT_ENABLED=true`
-- ao menos um provider com chave e modelo configurados
+- `AI_PLAN_EXTRACT_PROVIDER_ORDER=openai`
+- `OPENAI_API_KEY`
+- `AI_OPENAI_MODEL=gpt-4o-mini`
 - `AI_RATE_LIMIT_SALT` com valor forte e único em produção
 
 Limites e segurança:
@@ -27,66 +43,59 @@ Limites e segurança:
 - `AI_ALLOW_ANONYMOUS_PLAN_EXTRACT`: manter `false` em produção salvo decisão explícita.
 - `AI_RATE_LIMIT_FAIL_OPEN`: manter `false` em produção.
 - `AI_RATE_LIMIT_REDIS_TIMEOUT_MS`: timeout para Upstash Redis REST.
-- `AI_TRUST_PROXY_IP_HEADERS`: usar `true` somente quando a aplicação está atrás de proxy confiável que controla `x-forwarded-for`/`x-real-ip`.
-- `AI_PLAN_EXTRACT_CACHE_TTL_HOURS`: tempo de cache por hash do arquivo/modelo. Padrão: `24`.
-- `AI_PLAN_EXTRACT_CACHE_VERSION`: versão manual para invalidar cache quando prompt, schema ou provider mudarem.
-- `AI_GROQ_VISION_ENABLED`: habilita Groq para PNG/JPG/WebP somente após confirmar suporte visual do modelo configurado.
+- `AI_TRUST_PROXY_IP_HEADERS`: usar `true` somente atrás de proxy confiável.
+- `AI_PLAN_EXTRACT_CACHE_TTL_HOURS`: cache por hash de arquivo/modelo. Padrão: `24`.
+- `AI_PLAN_EXTRACT_CACHE_VERSION`: versão manual para invalidar cache quando prompt, schema ou modelo mudarem.
 
 Armazenamento opcional de rate limit:
 
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 
-Sem Upstash, o desenvolvimento pode usar memória local. Em produção, configure Upstash ou outro storage equivalente antes de abrir a feature.
+Sem Upstash, o desenvolvimento pode usar memória local. Em produção, configure storage persistente antes de abrir a feature.
 
-## Providers
+## Regras De Segurança
 
-Ordem de tentativa:
+- Não expor chave no frontend.
+- Não expor chave em logs.
+- Não retornar chave em resposta de API.
+- Não colocar chave hardcoded no código.
+- Validar JSON com schema antes de usar.
+- Usar IA apenas sob demanda.
+- Respeitar limite diário.
+- Usar cache por hash de arquivo quando aplicável.
 
-```txt
-AI_PLAN_EXTRACT_PROVIDER_ORDER=openai,openrouter,groq,generic
-```
+## O Que A IA Pode Fazer
 
-Providers suportados:
+- Ler planta baixa em PDF/imagem quando o modelo configurado suportar visão/documento.
+- Extrair campos preliminares da planta.
+- Explicar pendências e incertezas.
+- Sugerir vínculos entre quantitativos e composições existentes em fluxos específicos.
 
-- OpenAI: `OPENAI_API_KEY`, `AI_OPENAI_MODEL`.
-- OpenRouter: `OPENROUTER_API_KEY`, `AI_OPENROUTER_MODEL`.
-- Groq: `GROQ_API_KEY`, `AI_GROQ_MODEL`.
-- Generico OpenAI-compatible: `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`.
+## O Que A IA Nunca Faz
 
-O provider genérico precisa aceitar o mesmo formato de `chat/completions` usado no app. Antes de usar em produção, valide manualmente com uma planta simples e confira se o JSON retorna dentro do schema.
+- Inventar preço.
+- Criar composição SINAPI.
+- Inventar H/H, consumo, perda ou BDI.
+- Aprovar orçamento.
+- Substituir revisão humana.
+- Aplicar método construtivo incerto automaticamente.
 
-Groq deve ser usado com cuidado para imagens. Ele não é tratado como provider válido para PDF neste fluxo. Para PNG/JPG/WebP, defina `AI_GROQ_VISION_ENABLED=true` somente depois de confirmar que o modelo configurado suporta entrada visual.
+## Fluxo Esperado
 
-## Privacidade e custo
-
-Ao usar a extração, a planta enviada pelo usuário é encaminhada ao provider configurado. Isso pode incluir desenho arquitetônico, endereço, medidas e outras informações sensíveis.
-
-Antes de habilitar em produção:
-
-- confirme contrato, termos e retenção de dados do provider escolhido;
-- informe o usuário de que a planta será processada por terceiros;
-- mantenha `AI_PLAN_EXTRACT_MAX_FILE_MB` baixo para controlar custo;
-- mantenha limites diários pequenos no início;
-- monitore erros e uso por provider;
-- não registre conteúdo bruto da planta em logs.
-
-O app deve registrar apenas metadados operacionais seguros, como provider usado, modelo, status, tokens quando disponíveis, escopo do rate limit e erro técnico resumido.
-
-## Fluxo esperado
-
-1. Usuário autenticado envia PNG, JPG, WebP ou PDF; se `AI_ALLOW_ANONYMOUS_PLAN_EXTRACT=true`, usuário anônimo também pode enviar usando limite por IP.
+1. Usuário autenticado envia PNG, JPG, WebP ou PDF; se `AI_ALLOW_ANONYMOUS_PLAN_EXTRACT=true`, anônimos usam limite por IP.
 2. O servidor valida tipo e tamanho.
-3. O rate limit consome quota diária por usuário/IP/global.
-4. O provider chain tenta os providers configurados na ordem definida.
-5. O retorno é validado por Zod como `PlanExtractResult`.
-6. A UI mostra campos, confiança, incertezas e alertas.
-7. O usuário escolhe quais campos aplicar.
-8. Dados de baixa confiança ficam desmarcados por padrão.
+3. O cache por hash é consultado antes de consumir quota.
+4. Em cache miss, o rate limit consome quota diária por usuário/IP/global.
+5. OpenAI processa o arquivo.
+6. O retorno é validado por Zod como `PlanExtractResult`.
+7. A UI mostra campos, confiança, incertezas e alertas.
+8. O usuário escolhe quais campos aplicar.
+9. Dados de baixa confiança ficam desmarcados por padrão.
 
 Nenhum dado extraído deve entrar no projeto sem ação do usuário.
 
-## Deploy local
+## Deploy Local
 
 ```bash
 cp .env.example .env.local
@@ -94,7 +103,7 @@ npm install
 npm run dev
 ```
 
-Para testar sem custo, mantenha `AI_PLAN_EXTRACT_ENABLED=false`. Para testar com provider real, configure apenas um provider por vez e use limites pequenos:
+Para testar sem custo, mantenha `AI_PLAN_EXTRACT_ENABLED=false`. Para testar com OpenAI real, configure limites pequenos:
 
 ```txt
 AI_PLAN_EXTRACT_ENABLED=true
@@ -105,16 +114,19 @@ OPENAI_API_KEY=...
 AI_OPENAI_MODEL=gpt-4o-mini
 ```
 
+Assinatura ChatGPT não configura automaticamente a API do app. A chave precisa vir da plataforma OpenAI e ficar somente em `.env.local` ou nas variáveis server-side da Vercel.
+
 ## Deploy Vercel
 
 1. Configure Clerk e GitHub feedback como nas demais variáveis do projeto.
-2. Configure as variáveis `AI_*` no ambiente desejado.
+2. Configure as variáveis `AI_*` e `OPENAI_API_KEY` no ambiente desejado.
 3. Configure `AI_RATE_LIMIT_SALT` com valor forte e secreto.
-4. Configure Upstash Redis REST para produção.
-5. Mantenha `AI_PLAN_EXTRACT_ENABLED=false` até validar preview.
-6. Habilite primeiro em Preview, depois em Production.
+4. Configure storage persistente de rate limit para produção.
+5. Faça redeploy após alterar variáveis server-side.
+6. Mantenha `AI_PLAN_EXTRACT_ENABLED=false` até validar preview.
+7. Habilite primeiro em Preview, depois em Production.
 
-## Validação antes de liberar
+## Validação Antes De Liberar
 
 Rode:
 
@@ -130,9 +142,10 @@ Valide manualmente:
 - tipo não suportado deve falhar;
 - arquivo acima do limite deve falhar;
 - usuário sem login deve falhar quando anônimo estiver desabilitado;
-- retorno inválido do provider deve falhar sem aplicar dados;
+- resposta JSON inválida deve falhar sem aplicar dados;
+- cache hit deve retornar resultado sem consumir quota;
 - campos extraídos aparecem para revisão antes de aplicar.
 
-## Limites técnicos
+## Limites Técnicos
 
 A extração é heurística e pode errar leitura de cotas, escala, ambientes, pavimentos e aberturas. Use como pré-preenchimento e checklist de revisão, nunca como verdade técnica.
