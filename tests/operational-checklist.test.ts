@@ -95,4 +95,22 @@ describe("operational checklist", () => {
 
     expect(getStatus(checklist, "state")).toBe("ausente");
   });
+
+  it("keeps a safe UF status when legacy location state is null", () => {
+    const projectWithNullState = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          location: {
+            ...defaultProject.scenarios[0].location,
+            state: null,
+          },
+        },
+      ],
+    } as unknown as Project;
+    const checklist = createOperationalChecklist(disabledEnvironment, projectWithNullState);
+
+    expect(getStatus(checklist, "state")).toBe("ausente");
+  });
 });

@@ -215,9 +215,8 @@ export function createBudgetSourceExport(project: Project, scenario: Scenario, g
   const serviceLines = assistant.budgetServiceLines.filter(
     (line) => line.scenarioId === scenario.id && line.constructionMethod === scenario.constructionMethod
   );
-  const usedCompositionIds = new Set(serviceLines.map((line) => line.compositionId));
   const methodCompositions = assistant.serviceCompositions.filter(
-    (composition) => composition.constructionMethod === scenario.constructionMethod && (serviceLines.length === 0 || usedCompositionIds.has(composition.id))
+    (composition) => composition.constructionMethod === scenario.constructionMethod
   );
   const sourceIds = new Set([
     ...viewModel.costItems.map((item) => item.sourceId),
@@ -559,7 +558,14 @@ function createTotals(
     lines.length > 0 ? lines.filter((line) => line.outOfRegion).length : compositions.filter((composition) => composition.outOfRegion).length;
   const structuralCriticalCount =
     lines.length > 0 ? lines.filter((line) => line.structuralCritical).length : compositions.filter((composition) => composition.structuralCritical).length;
-  const sinapiPriceRows = lines.length > 0 ? lines : compositions;
+  const sinapiPriceRowsByKey = new Map<string, { priceStatus: BudgetSourcePriceStatus }>();
+  for (const composition of compositions) {
+    sinapiPriceRowsByKey.set(createSinapiPriceRowKey(composition), composition);
+  }
+  for (const line of lines) {
+    sinapiPriceRowsByKey.set(createSinapiPriceRowKey(line), line);
+  }
+  const sinapiPriceRows = [...sinapiPriceRowsByKey.values()];
   return {
     materialCostBRL: sumLines(lines, "materialCostBRL"),
     laborCostBRL: sumLines(lines, "laborCostBRL"),
@@ -579,6 +585,10 @@ function createTotals(
     structuralCriticalCount,
     pendingSinapiPriceCount: sinapiPriceRows.filter((line) => line.priceStatus !== "valid").length,
   };
+}
+
+function createSinapiPriceRowKey(row: Pick<BudgetSourceExportComposition | BudgetSourceExportServiceLine, "sourceId" | "sourceCode" | "sinapiCode">) {
+  return `${row.sourceId}::${row.sinapiCode || row.sourceCode}`;
 }
 
 function createLaborHoursByRole(

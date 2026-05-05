@@ -10,6 +10,19 @@ import { formatCurrency, slugify } from "@/lib/format";
 type XlsxModule = typeof import("xlsx");
 type JsPdfConstructor = typeof import("jspdf")["default"];
 
+let xlsxModule: XlsxModule | null = null;
+let xlsxModulePromise: Promise<XlsxModule> | null = null;
+let jsPdfConstructor: JsPdfConstructor | null = null;
+let jsPdfPromise: Promise<JsPdfConstructor> | null = null;
+
+export function areExportLibrariesReady() {
+  return Boolean(xlsxModule && jsPdfConstructor);
+}
+
+export async function prepareExportLibraries() {
+  await Promise.all([loadXlsx(), loadJsPdf()]);
+}
+
 export function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -25,7 +38,7 @@ export function exportProjectJson(project: Project) {
 }
 
 export async function exportMaterialsCsv(projectName: string, materials: MaterialLine[], methodName: string) {
-  const XLSX = await loadXlsx();
+  const XLSX = xlsxModule ?? (await loadXlsx());
   const rows = materials.map((line) => ({
     metodo: methodName,
     codigo: line.code,
@@ -47,7 +60,7 @@ export async function exportMaterialsCsv(projectName: string, materials: Materia
 }
 
 export async function exportMaterialsXlsx(projectName: string, materials: MaterialLine[], methodName: string) {
-  const XLSX = await loadXlsx();
+  const XLSX = xlsxModule ?? (await loadXlsx());
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(
     materials.map((line) => ({
@@ -81,7 +94,7 @@ export function exportBudgetSourceJson(project: Project, scenario: Scenario) {
 }
 
 export async function exportBudgetSourceXlsx(project: Project, scenario: Scenario) {
-  const XLSX = await loadXlsx();
+  const XLSX = xlsxModule ?? (await loadXlsx());
   const report = createBudgetSourceExport(project, scenario);
   const rows = createBudgetSourceWorkbookRows(report);
   const workbook = XLSX.utils.book_new();
@@ -95,7 +108,7 @@ export async function exportBudgetSourceXlsx(project: Project, scenario: Scenari
 }
 
 export async function exportBudgetSourcePdf(project: Project, scenario: Scenario) {
-  const jsPDF = await loadJsPdf();
+  const jsPDF = jsPdfConstructor ?? (await loadJsPdf());
   const report = createBudgetSourceExport(project, scenario);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setFont("helvetica", "bold");
@@ -156,7 +169,7 @@ export async function exportBudgetSourcePdf(project: Project, scenario: Scenario
 }
 
 export async function exportReportPdf(project: Project, scenario: Scenario, materials: MaterialLine[], budget: BudgetSummary) {
-  const jsPDF = await loadJsPdf();
+  const jsPDF = jsPdfConstructor ?? (await loadJsPdf());
   const summary = generateScenarioTechnicalSummary(project, scenario);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   doc.setFont("helvetica", "bold");
@@ -231,7 +244,7 @@ function svgToPngDataUrl(svg: string, width = 720, height = 480): Promise<string
 }
 
 export async function exportTechnicalPdf(project: Project, scenario: Scenario) {
-  const jsPDF = await loadJsPdf();
+  const jsPDF = jsPdfConstructor ?? (await loadJsPdf());
 
   if (scenario.constructionMethod !== "aframe") {
     const summary = generateScenarioTechnicalSummary(project, scenario);
@@ -269,10 +282,19 @@ export async function exportTechnicalPdf(project: Project, scenario: Scenario) {
 }
 
 async function loadXlsx(): Promise<XlsxModule> {
-  return import("xlsx");
+  if (xlsxModule) return xlsxModule;
+  xlsxModulePromise ??= import("xlsx").then((module) => {
+    xlsxModule = module;
+    return module;
+  });
+  return xlsxModulePromise;
 }
 
 async function loadJsPdf(): Promise<JsPdfConstructor> {
-  const jsPdfModule = await import("jspdf");
-  return jsPdfModule.default;
+  if (jsPdfConstructor) return jsPdfConstructor;
+  jsPdfPromise ??= import("jspdf").then((module) => {
+    jsPdfConstructor = module.default;
+    return module.default;
+  });
+  return jsPdfPromise;
 }

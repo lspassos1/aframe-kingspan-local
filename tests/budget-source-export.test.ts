@@ -366,6 +366,37 @@ describe("budget source export report", () => {
     expect(report.finalBudget).toBe(false);
   });
 
+  it("counts pending SINAPI composition rows even when reviewed service lines exist", () => {
+    const pendingComposition: ServiceComposition = {
+      ...serviceComposition,
+      id: "composition-pending-only",
+      serviceCode: "SINAPI-PENDING",
+      sourceCode: "SINAPI-PENDING",
+      directUnitCostBRL: 0,
+      materialCostBRL: 0,
+      laborCostBRL: 0,
+      equipmentCostBRL: 0,
+      thirdPartyCostBRL: 0,
+      otherCostBRL: 0,
+      requiresReview: false,
+      sinapi: {
+        ...serviceComposition.sinapi,
+        code: "SINAPI-PENDING",
+        priceStatus: "missing",
+        requiresReview: true,
+        pendingReason: "Preco oficial ausente.",
+      },
+    };
+    const { project, scenario } = createProjectWithBudget({ extraCompositions: [pendingComposition] });
+
+    const report = createBudgetSourceExport(project, scenario, "2026-05-04T21:00:00.000Z");
+
+    expect(report.serviceLines).toHaveLength(1);
+    expect(report.serviceCompositions).toHaveLength(2);
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1 });
+    expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
+  });
+
   it("does not count manual review lines as pending SINAPI prices", () => {
     const manualSource: PriceSource = {
       ...priceSource,
@@ -416,6 +447,7 @@ describe("budget source export report", () => {
 function createProjectWithBudget(overrides?: {
   source?: PriceSource;
   composition?: ServiceComposition;
+  extraCompositions?: ServiceComposition[];
   line?: BudgetServiceLine;
 }): { project: Project; scenario: Scenario } {
   const methodDefinition = getConstructionMethodDefinition("conventional-masonry");
@@ -437,6 +469,7 @@ function createProjectWithBudget(overrides?: {
   const source = overrides?.source ?? priceSource;
   const composition = overrides?.composition ?? serviceComposition;
   const line = overrides?.line ?? serviceLine;
+  const extraCompositions = overrides?.extraCompositions ?? [];
 
   const project = normalizeProject({
     ...defaultProject,
@@ -446,7 +479,7 @@ function createProjectWithBudget(overrides?: {
       ...defaultProject.budgetAssistant,
       costSources: [source],
       priceSources: [source],
-      serviceCompositions: [composition],
+      serviceCompositions: [composition, ...extraCompositions],
       budgetQuantities: [budgetQuantity],
       budgetServiceLines: [line],
     },

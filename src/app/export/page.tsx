@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Download, FileJson, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,8 @@ import {
   exportReportPdf,
   exportRfqText,
   exportTechnicalPdf,
+  areExportLibrariesReady,
+  prepareExportLibraries,
 } from "@/lib/export/files";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import type { Project } from "@/types/project";
@@ -29,6 +31,7 @@ export default function ExportPage() {
   const isExportingRef = useRef(false);
   const [exportError, setExportError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [exportLibrariesReady, setExportLibrariesReady] = useState(areExportLibrariesReady);
   const project = useProjectStore((state) => state.project);
   const importProject = useProjectStore((state) => state.importProject);
   const resetProject = useProjectStore((state) => state.resetProject);
@@ -37,6 +40,22 @@ export default function ExportPage() {
   const materials = calculateScenarioMaterials(project, scenario);
   const budget = calculateScenarioBudget(project, scenario);
   const requests = generateScenarioQuotationRequests(project, scenario);
+
+  useEffect(() => {
+    let cancelled = false;
+    prepareExportLibraries()
+      .then(() => {
+        if (!cancelled) setExportLibrariesReady(true);
+      })
+      .catch((error) => {
+        console.error("Falha ao preparar exportadores:", error);
+        if (!cancelled) setExportError("Nao foi possivel preparar os exportadores. Recarregue a pagina e tente novamente.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -76,6 +95,7 @@ export default function ExportPage() {
       description: "Planilha editavel da lista de materiais e acessorios.",
       icon: FileSpreadsheet,
       action: () => exportMaterialsXlsx(project.name, materials, methodDefinition.name),
+      requiresPreparedLibrary: true,
       label: "Baixar XLSX",
     },
     {
@@ -83,6 +103,7 @@ export default function ExportPage() {
       description: "CSV simples para importar em planilhas ou ERPs.",
       icon: FileSpreadsheet,
       action: () => exportMaterialsCsv(project.name, materials, methodDefinition.name),
+      requiresPreparedLibrary: true,
       label: "Baixar CSV",
     },
     {
@@ -90,6 +111,7 @@ export default function ExportPage() {
       description: "Resumo com metodo construtivo, status preliminar, materiais, orcamento e avisos.",
       icon: FileText,
       action: () => exportReportPdf(project, scenario, materials, budget),
+      requiresPreparedLibrary: true,
       label: "Baixar PDF",
     },
     {
@@ -97,6 +119,7 @@ export default function ExportPage() {
       description: "Planilha com fontes, data-base, cidade/UF, confianca, HH, BDI, contingencia e pendencias.",
       icon: FileSpreadsheet,
       action: () => exportBudgetSourceXlsx(project, scenario),
+      requiresPreparedLibrary: true,
       label: "Baixar XLSX",
     },
     {
@@ -111,6 +134,7 @@ export default function ExportPage() {
       description: "Relatorio preliminar com separacao de custos, fontes e avisos de revisao humana.",
       icon: FileText,
       action: () => exportBudgetSourcePdf(project, scenario),
+      requiresPreparedLibrary: true,
       label: "Baixar PDF",
     },
     {
@@ -118,6 +142,7 @@ export default function ExportPage() {
       description: "PDF tecnico preliminar; A-frame inclui desenhos, demais metodos incluem resumo tecnico.",
       icon: FileText,
       action: () => exportTechnicalPdf(project, scenario),
+      requiresPreparedLibrary: true,
       label: "Baixar PDF tecnico",
     },
     {
@@ -162,6 +187,7 @@ export default function ExportPage() {
         </Card>
         {actions.map((item) => {
           const Icon = item.icon;
+          const disabled = isExporting || (item.requiresPreparedLibrary === true && !exportLibrariesReady);
           return (
             <Card className="rounded-md shadow-none" key={item.title}>
               <CardHeader>
@@ -172,9 +198,9 @@ export default function ExportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
-                <Button className="w-full" onClick={() => void handleExportAction(item.action)} disabled={isExporting}>
+                <Button className="w-full" onClick={() => void handleExportAction(item.action)} disabled={disabled}>
                   <Download className="mr-2 h-4 w-4" />
-                  {item.label}
+                  {item.requiresPreparedLibrary === true && !exportLibrariesReady ? "Preparando..." : item.label}
                 </Button>
               </CardContent>
             </Card>
