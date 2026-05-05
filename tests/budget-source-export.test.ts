@@ -366,7 +366,7 @@ describe("budget source export report", () => {
     expect(report.finalBudget).toBe(false);
   });
 
-  it("counts pending SINAPI composition rows even when reviewed service lines exist", () => {
+  it("ignores unused pending SINAPI composition rows when reviewed service lines exist", () => {
     const pendingComposition: ServiceComposition = {
       ...serviceComposition,
       id: "composition-pending-only",
@@ -396,17 +396,17 @@ describe("budget source export report", () => {
     const report = createBudgetSourceExport(project, scenario, "2026-05-04T21:00:00.000Z");
 
     expect(report.serviceLines).toHaveLength(1);
-    expect(report.serviceCompositions).toHaveLength(2);
-    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1, outOfRegionCompositionCount: 1, structuralCriticalCount: 1 });
-    expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
-    expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("fora da cidade/UF")]));
-    expect(report.warnings).toEqual(expect.arrayContaining([expect.stringContaining("itens estruturais criticos")]));
+    expect(report.serviceCompositions).toHaveLength(1);
+    expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 0, outOfRegionCompositionCount: 0, structuralCriticalCount: 0 });
+    expect(report.warnings).not.toEqual(expect.arrayContaining([expect.stringContaining("precos SINAPI estao pendentes")]));
+    expect(report.warnings).not.toEqual(expect.arrayContaining([expect.stringContaining("fora da cidade/UF")]));
+    expect(report.warnings).not.toEqual(expect.arrayContaining([expect.stringContaining("itens estruturais criticos")]));
   });
 
   it("preserves pending SINAPI status when deduplicating line and composition rows", () => {
     const pendingSameCodeComposition: ServiceComposition = {
       ...serviceComposition,
-      id: "composition-pending-same-code",
+      id: serviceComposition.id,
       requiresReview: false,
       sinapi: {
         ...serviceComposition.sinapi,
@@ -415,10 +415,12 @@ describe("budget source export report", () => {
         pendingReason: "Preco oficial ausente.",
       },
     };
-    const { project, scenario } = createProjectWithBudget({ extraCompositions: [pendingSameCodeComposition] });
+    const { project, scenario } = createProjectWithBudget({ composition: pendingSameCodeComposition });
 
     const report = createBudgetSourceExport(project, scenario, "2026-05-04T21:00:00.000Z");
 
+    expect(report.serviceLines).toHaveLength(1);
+    expect(report.serviceCompositions).toHaveLength(1);
     expect(report.totals).toMatchObject({ pendingSinapiPriceCount: 1 });
     expect(report.budgetStatusLabel).toBe("Orcamento preliminar");
   });

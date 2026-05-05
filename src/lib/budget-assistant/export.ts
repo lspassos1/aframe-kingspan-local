@@ -215,8 +215,11 @@ export function createBudgetSourceExport(project: Project, scenario: Scenario, g
   const serviceLines = assistant.budgetServiceLines.filter(
     (line) => line.scenarioId === scenario.id && line.constructionMethod === scenario.constructionMethod
   );
+  const usedCompositionIds = new Set(serviceLines.map((line) => line.compositionId));
   const methodCompositions = assistant.serviceCompositions.filter(
-    (composition) => composition.constructionMethod === scenario.constructionMethod
+    (composition) =>
+      composition.constructionMethod === scenario.constructionMethod &&
+      (serviceLines.length === 0 || usedCompositionIds.has(composition.id))
   );
   const sourceIds = new Set([
     ...viewModel.costItems.map((item) => item.sourceId),

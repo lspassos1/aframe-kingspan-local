@@ -60,7 +60,7 @@ export default function ExportPage() {
         console.error("Falha ao preparar exportadores de planilha:", error);
         if (!cancelled) {
           setExportLibraryStatus((current) => ({ ...current, spreadsheet: "failed" }));
-          setExportError("Nao foi possivel preparar exportadores de planilha. Recarregue a pagina e tente novamente.");
+          setExportError("Nao foi possivel preparar exportadores de planilha. Clique em Tentar novamente.");
         }
       });
 
@@ -72,7 +72,7 @@ export default function ExportPage() {
         console.error("Falha ao preparar exportadores PDF:", error);
         if (!cancelled) {
           setExportLibraryStatus((current) => ({ ...current, pdf: "failed" }));
-          setExportError("Nao foi possivel preparar exportadores PDF. Recarregue a pagina e tente novamente.");
+          setExportError("Nao foi possivel preparar exportadores PDF. Clique em Tentar novamente.");
         }
       });
 
@@ -106,8 +106,7 @@ export default function ExportPage() {
     }
   };
 
-  const prepareRequiredLibrary = async (kind?: ExportLibraryKind) => {
-    if (!kind || exportLibraryStatus[kind] === "ready") return;
+  const prepareRequiredLibrary = async (kind: ExportLibraryKind) => {
     setExportLibraryStatus((current) => ({ ...current, [kind]: "loading" }));
     try {
       if (kind === "spreadsheet") {
@@ -122,6 +121,20 @@ export default function ExportPage() {
     }
   };
 
+  const runExportAction = (
+    action: () => void | Promise<void>,
+    requiredLibrary: ExportLibraryKind | undefined,
+    libraryStatus: ExportLibraryStatus
+  ) => {
+    if (!requiredLibrary || libraryStatus === "ready") {
+      void handleExportAction(action);
+      return;
+    }
+    void handleExportAction(async () => {
+      await prepareRequiredLibrary(requiredLibrary);
+      await action();
+    });
+  };
 
   const actions = [
     {
@@ -242,12 +255,7 @@ export default function ExportPage() {
                 <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
                 <Button
                   className="w-full"
-                  onClick={() =>
-                    void handleExportAction(async () => {
-                      await prepareRequiredLibrary(item.requiredLibrary);
-                      await item.action();
-                    })
-                  }
+                  onClick={() => runExportAction(item.action, item.requiredLibrary, libraryStatus)}
                   disabled={disabled}
                 >
                   <Download className="mr-2 h-4 w-4" />
