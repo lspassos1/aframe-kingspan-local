@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BudgetGroupCard, MetricCard, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { calculateBudget } from "@/lib/calculations/budget";
 import { estimateRadierFoundation } from "@/lib/calculations/foundation";
@@ -399,40 +400,19 @@ export default function BudgetPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">Orcamento</p>
-        <h1 className="text-3xl font-semibold tracking-normal">Estimativa separada por categoria</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Pacote de paineis, frete, estrutura metalica, civil, fachadas, mao de obra e custos tecnicos ficam separados.
-        </p>
-      </div>
+    <PageFrame>
+      <PageHeader
+        eyebrow="Orçamento"
+        title="Estimativa separada por categoria"
+        description="Pacote de painéis, frete, estrutura metálica, civil, fachadas, mão de obra e custos técnicos ficam separados."
+        status={<StatusPill tone="warning">Preliminar</StatusPill>}
+      />
 
       <section className="grid gap-4 md:grid-cols-4">
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total estimado</p>
-            <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.totalEstimatedCostBRL)}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Custo/m2 total</p>
-            <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.costPerTotalM2)}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Custo/m2 util</p>
-            <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.costPerUsefulM2)}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-md shadow-none">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Radier c/ fibras</p>
-            <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.foundationCostBRL)}</p>
-          </CardContent>
-        </Card>
+        <MetricCard label="Total estimado" value={formatCurrency(budget.totalEstimatedCostBRL)} detail="Orçamento preliminar" tone="warning" />
+        <MetricCard label="Custo/m2 total" value={formatCurrency(budget.costPerTotalM2)} detail="Área total de referência" />
+        <MetricCard label="Custo/m2 útil" value={formatCurrency(budget.costPerUsefulM2)} detail="Área útil estimada" />
+        <MetricCard label="Radier c/ fibras" value={formatCurrency(budget.foundationCostBRL)} detail="Premissa editável" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -541,7 +521,7 @@ export default function BudgetPage() {
 
         <Card className="rounded-md shadow-none">
           <CardHeader>
-            <CardTitle>Placeholders editaveis</CardTitle>
+            <CardTitle>Valores complementares editáveis</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             {[
@@ -572,14 +552,13 @@ export default function BudgetPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-md shadow-none xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Composicao do radier</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Detalhamento da fundacao incluida no orcamento: memoria de calculo, materiais, mao de obra e equipamento.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <BudgetGroupCard
+          title="Composição do radier"
+          description="Detalhamento da fundação incluída no orçamento: memória de cálculo, materiais, mão de obra e equipamento."
+          status={<StatusPill tone="warning" icon={false}>Revisar</StatusPill>}
+          className="xl:col-span-2"
+          contentClassName="space-y-5"
+        >
             <div className="grid gap-3 md:grid-cols-4">
               <div className="rounded-md border bg-muted/20 p-3">
                 <p className="text-xs text-muted-foreground">Total radier</p>
@@ -653,8 +632,7 @@ export default function BudgetPage() {
             <p className="text-xs text-muted-foreground">
               O calculo usa a pegada da casa com folga perimetral. Nao inclui sondagem, armaduras especificas, drenagem definitiva, aterramento estrutural, impermeabilizacao detalhada ou projeto executivo.
             </p>
-          </CardContent>
-        </Card>
+        </BudgetGroupCard>
 
         <Card className="rounded-md shadow-none xl:col-span-2">
           <CardHeader>
@@ -699,6 +677,6 @@ export default function BudgetPage() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+    </PageFrame>
   );
 }

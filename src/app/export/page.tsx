@@ -1,9 +1,9 @@
 "use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Download, FileJson, FileSpreadsheet, FileText, Upload } from "lucide-react";
+import { Download, FileJson, FileSpreadsheet, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ActionCard, FileDropzone, FormSection, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
 import {
   calculateScenarioBudget,
   calculateScenarioMaterials,
@@ -209,50 +209,43 @@ export default function ExportPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">Exportar</p>
-        <h1 className="text-3xl font-semibold tracking-normal">Salvar, carregar e gerar arquivos</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Os arquivos do projeto ficam no navegador. Login e autenticacao ficam no Clerk; este app nao armazena senhas.
-        </p>
+    <PageFrame>
+      <PageHeader
+        eyebrow="Exportar"
+        title="Salvar, carregar e gerar arquivos"
+        description="Os arquivos do projeto ficam no navegador. Login e autenticação ficam no Clerk; este app não armazena senhas."
+        status={<StatusPill tone="warning">Preliminar</StatusPill>}
+      />
         {exportError ? (
           <p className="mt-3 text-sm text-destructive" role="alert">
             {exportError}
           </p>
         ) : null}
-      </div>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Importar projeto</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <FormSection title="Importar projeto" description="Carregue um JSON exportado anteriormente.">
             <input ref={inputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImport} />
-            <Button className="w-full" variant="outline" onClick={() => inputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" />
-              Importar JSON
-            </Button>
-            <Button className="w-full" variant="destructive" onClick={resetProject}>
+            <FileDropzone
+              title="Importar JSON"
+              description="Selecione um arquivo de projeto salvo."
+              actionLabel="Escolher arquivo"
+              onClick={() => inputRef.current?.click()}
+            />
+            <Button className="mt-3 w-full" variant="destructive" onClick={resetProject}>
               Resetar para default
             </Button>
-          </CardContent>
-        </Card>
+        </FormSection>
         {actions.map((item) => {
           const Icon = item.icon;
           const libraryStatus = item.requiredLibrary ? exportLibraryStatus[item.requiredLibrary] : "ready";
           const disabled = isExporting || libraryStatus === "loading";
           return (
-            <Card className="rounded-md shadow-none" key={item.title}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon className="h-5 w-5" />
-                  {item.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="min-h-12 text-sm text-muted-foreground">{item.description}</p>
+            <ActionCard
+              key={item.title}
+              icon={Icon}
+              title={item.title}
+              description={item.description}
+              footer={
                 <Button
                   className="w-full"
                   onClick={() => runExportAction(item.action, item.requiredLibrary, libraryStatus)}
@@ -261,11 +254,11 @@ export default function ExportPage() {
                   <Download className="mr-2 h-4 w-4" />
                   {libraryStatus === "loading" ? "Preparando..." : libraryStatus === "failed" ? "Tentar novamente" : item.label}
                 </Button>
-              </CardContent>
-            </Card>
+              }
+            />
           );
         })}
       </section>
-    </div>
+    </PageFrame>
   );
 }

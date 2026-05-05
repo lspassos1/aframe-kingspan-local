@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   ClipboardList,
   FolderOpen,
   Home,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AdvancedDisclosure, EmptyState, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
 import { MetricCard } from "@/components/shared/MetricCard";
 import { getSavedProjectSummary, useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
@@ -151,20 +151,23 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium text-muted-foreground">Dashboard</p>
-            <Badge variant="outline">{method.name}</Badge>
-            <Badge variant={activeProjectSaved ? "default" : "outline"}>{activeProjectSaved ? "Salvo" : "Nao salvo"}</Badge>
-          </div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-balance">{project.name}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+    <PageFrame>
+      <PageHeader
+        eyebrow="Dashboard"
+        title={project.name}
+        status={
+          <>
+            <StatusPill tone="info" icon={false}>{method.name}</StatusPill>
+            <StatusPill tone={activeProjectSaved ? "success" : "warning"}>{activeProjectSaved ? "Salvo" : "Não salvo"}</StatusPill>
+          </>
+        }
+        description={
+          <>
             {[scenario.location.city, scenario.location.state].filter(Boolean).join(", ") || "Local nao informado"} | {scenario.name}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+          </>
+        }
+        actions={
+          <>
           <Button variant="outline" onClick={saveCurrentProject}>
             <Save className="mr-2 h-4 w-4" />
             Salvar
@@ -177,8 +180,9 @@ export default function DashboardPage() {
             <ClipboardList className="mr-2 h-4 w-4" />
             {detailsOpen ? "Ocultar detalhes" : "Ver detalhes"}
           </Button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Area principal" value={formatArea(area)} detail={usefulArea ? `${formatArea(usefulArea)} de area util/liquida` : "Area preliminar"} icon={<Home className="h-5 w-5" />} />
@@ -227,20 +231,16 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <details className="group rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
-        <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <div className="min-w-0 flex-1">
-            <h2 className="font-semibold">Alertas tecnicos</h2>
-            <p className="text-sm text-muted-foreground">
-              {warnings.length === 0 ? "Nenhum alerta critico no cenario atual." : `${warnings.length} alerta${warnings.length === 1 ? "" : "s"} disponivel${warnings.length === 1 ? "" : "s"} para revisao.`}
-            </p>
-          </div>
-          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-        </summary>
-        <div className="border-t p-4">
+      <AdvancedDisclosure
+        icon={AlertCircle}
+        title="Alertas técnicos"
+        description={
+          warnings.length === 0 ? "Nenhum alerta crítico no cenário atual." : `${warnings.length} alerta${warnings.length === 1 ? "" : "s"} disponível${warnings.length === 1 ? "" : "s"} para revisão.`
+        }
+        badge={<StatusPill tone={warnings.length === 0 ? "success" : "warning"} icon={false}>{warnings.length}</StatusPill>}
+      >
           {warnings.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Sem alertas criticos no cenario atual.</p>
+            <EmptyState title="Sem alertas críticos" description="Nenhum alerta crítico no cenário atual." />
           ) : (
             <div className="grid gap-2 md:grid-cols-2">
               {warnings.map((warning) => (
@@ -250,8 +250,7 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
-      </details>
+      </AdvancedDisclosure>
 
       {detailsOpen && (
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -322,9 +321,7 @@ export default function DashboardPage() {
         </div>
         <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
           {savedSummaries.length === 0 ? (
-            <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-              Nenhum projeto salvo ainda. Use Salvar para manter este estudo no navegador.
-            </div>
+            <EmptyState title="Nenhum projeto salvo" description="Use Salvar para manter este estudo no navegador." />
           ) : (
             savedSummaries.map((item) => (
               <article key={item.id} className="rounded-xl border bg-background/75 p-4 transition-colors hover:bg-muted/35">
@@ -363,7 +360,7 @@ export default function DashboardPage() {
           )}
         </div>
       </section>
-    </div>
+    </PageFrame>
   );
 }
 

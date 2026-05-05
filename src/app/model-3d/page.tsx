@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import { PageFrame, PageHeader, PendingState, StatusPill } from "@/components/shared/design-system";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 
@@ -23,30 +24,24 @@ export default function Model3DPage() {
   const layers = useMemo(() => methodDefinition.generate3DLayers?.({ project, scenario }) ?? [], [methodDefinition, project, scenario]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">Modelo 3D</p>
-        <h1 className="text-3xl font-semibold tracking-normal">Visualizacao interativa</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <PageFrame>
+      <PageHeader
+        eyebrow="Modelo 3D"
+        title="Visualização interativa"
+        status={<StatusPill tone="info" icon={false}>{methodDefinition.name}</StatusPill>}
+        description={
+          <>
           {isAFrame
             ? "Terreno editavel, recuos, paineis trapezoidais, estrutura interna, tercas, pavimento superior opcional, zonas mortas, areas uteis e cotas principais."
             : "Modelo volumetrico simplificado por camadas para leitura preliminar do metodo construtivo selecionado."}
-        </p>
-      </div>
+          </>
+        }
+      />
       {isAFrame ? <AFrameViewer project={project} scenario={scenario} /> : <GenericConstructionViewer scenario={scenario} title={methodDefinition.name} layers={layers} />}
-    </div>
+    </PageFrame>
   );
 }
 
 function ViewerLoading() {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-      className="grid min-h-[480px] place-items-center rounded-md border bg-muted/20 text-sm text-muted-foreground"
-    >
-      Carregando visualizacao 3D...
-    </div>
-  );
+  return <PendingState title="Carregando visualização 3D..." className="min-h-[480px]" />;
 }

@@ -5,6 +5,7 @@ import { BadgeDollarSign, CircleAlert, FileCheck2, Link2, MapPin, Plus, WalletCa
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState, FormSection, MetricCard, PageFrame, PageHeader, SourceBadge, ConfidenceBadge, StatusPill } from "@/components/shared/design-system";
 import { PriceBaseImportCard } from "@/components/budget-assistant/PriceBaseImportCard";
 import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
@@ -176,25 +177,19 @@ export default function BudgetAssistantPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">Assistente de orçamento</p>
-          <h1 className="text-3xl font-semibold tracking-normal">Orçamento assistido</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Quantitativos do cenário atual, fontes cadastradas, preços pendentes e confiança. Nenhum preço é criado automaticamente.
-          </p>
-        </div>
-        <Badge variant="outline" className="w-fit text-sm">
-          {viewModel.methodName}
-        </Badge>
-      </div>
+    <PageFrame>
+      <PageHeader
+        eyebrow="Assistente de orçamento"
+        title="Fontes, preços e revisão"
+        description="Quantitativos do cenário atual, fontes cadastradas, preços pendentes e confiança. Nenhum preço é criado automaticamente."
+        status={<StatusPill tone="info" icon={false}>{viewModel.methodName}</StatusPill>}
+      />
 
       <section className="grid gap-4 md:grid-cols-4">
-        <Metric icon={<FileCheck2 className="h-4 w-4" />} label="Quantitativos" value={viewModel.quantityItems.length} />
-        <Metric icon={<CircleAlert className="h-4 w-4" />} label="Sem preço" value={viewModel.unpricedCount} />
-        <Metric icon={<BadgeDollarSign className="h-4 w-4" />} label="Baixa confiança" value={viewModel.lowConfidenceCount} />
-        <Metric icon={<Link2 className="h-4 w-4" />} label="Fontes" value={viewModel.costSources.length} />
+        <MetricCard icon={<FileCheck2 className="h-4 w-4" />} label="Quantitativos" value={viewModel.quantityItems.length} detail="Itens do cenário" />
+        <MetricCard icon={<CircleAlert className="h-4 w-4" />} label="Sem preço" value={viewModel.unpricedCount} detail="Pendentes de fonte" tone={viewModel.unpricedCount > 0 ? "warning" : "success"} />
+        <MetricCard icon={<BadgeDollarSign className="h-4 w-4" />} label="Baixa confiança" value={viewModel.lowConfidenceCount} detail="Revisão necessária" tone={viewModel.lowConfidenceCount > 0 ? "warning" : "neutral"} />
+        <MetricCard icon={<Link2 className="h-4 w-4" />} label="Fontes" value={viewModel.costSources.length} detail="Cadastradas/importadas" />
       </section>
 
       <Card className="rounded-md shadow-none">
@@ -240,7 +235,7 @@ export default function BudgetAssistantPage() {
                         {source.supplier} | {formatDate(source.referenceDate)}
                       </p>
                     </div>
-                    <Badge variant={scope === "manual" ? "secondary" : "outline"}>{label}</Badge>
+                    <SourceBadge muted={scope === "manual"}>{label}</SourceBadge>
                   </div>
                 </div>
               ))}
@@ -260,14 +255,15 @@ export default function BudgetAssistantPage() {
       />
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <FormSection
+          title={
+            <span className="flex items-center gap-2">
               <Link2 className="h-5 w-5" />
               Cadastrar fonte de preço
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </span>
+          }
+          description="Fonte, região e data de referência ficam explícitas antes do vínculo."
+        >
             <form onSubmit={handleAddSource} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="source-title">Nome da fonte</Label>
@@ -317,17 +313,17 @@ export default function BudgetAssistantPage() {
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+        </FormSection>
 
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <FormSection
+          title={
+            <span className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
               Vincular preço manual
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </span>
+          }
+          description="Preço manual sempre nasce como item revisável com fonte e confiança."
+        >
             <form onSubmit={handleAddManualPrice} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="quantity-item">Quantitativo</Label>
@@ -398,8 +394,7 @@ export default function BudgetAssistantPage() {
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+        </FormSection>
       </section>
 
       <Card className="rounded-md shadow-none">
@@ -439,7 +434,7 @@ export default function BudgetAssistantPage() {
                           {source?.title ?? "Fonte removida"} | {match.unitCompatible ? "unidade compatível" : "unidade divergente"}
                         </p>
                       </div>
-                      <Badge variant={match.confidence === "high" || match.confidence === "medium" ? "outline" : "secondary"}>{match.confidence}</Badge>
+                      <ConfidenceBadge level={match.confidence} />
                     </div>
                     <p className="mt-3 text-xs text-muted-foreground">{match.reason}</p>
                     <div className="mt-3 flex gap-2">
@@ -511,7 +506,7 @@ export default function BudgetAssistantPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {viewModel.costSources.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma fonte cadastrada para este projeto.</p>
+                <EmptyState title="Nenhuma fonte cadastrada" description="Cadastre uma fonte local, estadual, nacional ou manual revisável antes de aprovar preços." />
               ) : (
                 viewModel.costSources.map((source) => {
                   const regionalSource = applicableSourceById.get(source.id);
@@ -526,7 +521,7 @@ export default function BudgetAssistantPage() {
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-2">
                           <Badge variant="outline">{source.reliability}</Badge>
-                          <Badge variant={regionalSource ? "outline" : "secondary"}>{regionalSource?.label ?? "fora da região"}</Badge>
+                          <SourceBadge muted={!regionalSource}>{regionalSource?.label ?? "fora da região"}</SourceBadge>
                         </div>
                       </div>
                     </div>
@@ -545,7 +540,7 @@ export default function BudgetAssistantPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {viewModel.costItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Itens com preço manual aparecem aqui com fonte, data, unidade e confiança.</p>
+                <EmptyState title="Sem itens revisados" description="Itens com preço manual aparecem aqui com fonte, data, unidade e confiança." />
               ) : (
                 viewModel.costItems.map((item) => {
                   const source = sourceById.get(item.sourceId);
@@ -559,7 +554,7 @@ export default function BudgetAssistantPage() {
                             {source ? formatDate(source.referenceDate) : "sem data"}
                           </p>
                         </div>
-                        <Badge variant={item.confidence === "low" || item.confidence === "unverified" ? "secondary" : "outline"}>{item.confidence}</Badge>
+                        <ConfidenceBadge level={item.confidence} />
                       </div>
                       <p className="mt-2 text-sm font-medium">{formatCurrency(item.total)}</p>
                     </div>
@@ -570,21 +565,7 @@ export default function BudgetAssistantPage() {
           </Card>
         </div>
       </section>
-    </div>
-  );
-}
-
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return (
-    <Card className="rounded-md shadow-none">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {icon}
-          {label}
-        </div>
-        <p className="mt-2 text-2xl font-semibold">{value}</p>
-      </CardContent>
-    </Card>
+    </PageFrame>
   );
 }
 
