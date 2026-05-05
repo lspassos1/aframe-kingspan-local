@@ -19,6 +19,12 @@ export type StartAssistantViewModel = {
   shouldRunExample: boolean;
 };
 
+export function normalizeStartAssistantModeParam(value: string | string[] | undefined): StartAssistantMode {
+  const mode = Array.isArray(value) ? value[0] : value;
+
+  return mode === "ai" || mode === "manual" || mode === "example" ? mode : "choose";
+}
+
 export function createStartAssistantViewModel({
   mode,
   planExtractEnabled,

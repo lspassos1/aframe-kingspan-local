@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { createStartAssistantViewModel } from "@/lib/onboarding/start-guided-assistant";
+import { createStartAssistantViewModel, normalizeStartAssistantModeParam } from "@/lib/onboarding/start-guided-assistant";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -26,6 +26,13 @@ vi.mock("@/components/onboarding/StartProjectForm", () => ({
 import { StartGuidedAssistant } from "@/components/onboarding/StartGuidedAssistant";
 
 describe("createStartAssistantViewModel", () => {
+  it("normalizes optional start mode query params", () => {
+    expect(normalizeStartAssistantModeParam("ai")).toBe("ai");
+    expect(normalizeStartAssistantModeParam(["manual", "ai"])).toBe("manual");
+    expect(normalizeStartAssistantModeParam("unknown")).toBe("choose");
+    expect(normalizeStartAssistantModeParam(undefined)).toBe("choose");
+  });
+
   it("keeps the first layer focused on the three entry modes", () => {
     const viewModel = createStartAssistantViewModel({ mode: "choose", planExtractEnabled: true });
 
