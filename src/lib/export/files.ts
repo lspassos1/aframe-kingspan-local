@@ -132,8 +132,10 @@ export function exportBudgetSourcePdf(project: Project, scenario: Scenario) {
   const rows = report.serviceLines.length > 0 ? report.serviceLines : report.serviceCompositions;
   rows.slice(0, 26).forEach((line, index) => {
     const total = "totalBRL" in line ? line.totalBRL : line.directUnitCostBRL;
+    const quantity = "quantity" in line ? ` | Qtd ${line.quantity} ${line.unit}` : ` | Un. ${line.unit}`;
+    const laborHours = "totalLaborHours" in line ? line.totalLaborHours : line.totalLaborHoursPerUnit;
     doc.text(
-      `${line.sourceCode} | ${line.description} | ${line.referenceDate} | ${line.confidence} | ${formatCurrency(total)}`,
+      `${line.sinapiCode || line.sourceCode} | ${line.description}${quantity} | ${line.state} ${line.referenceDate} ${line.regime} | ${line.priceStatus} | ${line.sourceTitle} | H/H ${laborHours} | ${line.reviewStatus} | ${formatCurrency(total)}`,
       12,
       24 + index * 7,
       { maxWidth: 185 }

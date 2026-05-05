@@ -176,4 +176,52 @@ describe("direct service budget calculation", () => {
     expect(budget.lines[0].requiresReview).toBe(true);
     expect(budget.lines[0].notes).toContain("revisao tecnica");
   });
+
+  it("keeps approved lines with zeroed SINAPI prices pending", () => {
+    const zeroedComposition: ServiceComposition = {
+      ...composition,
+      id: "composition-zeroed-sinapi",
+      directUnitCostBRL: 0,
+      materialCostBRL: 0,
+      laborCostBRL: 0,
+      equipmentCostBRL: 0,
+      thirdPartyCostBRL: 0,
+      otherCostBRL: 0,
+      inputs: [],
+      laborRoles: [],
+      wasteRules: [],
+      totalLaborHoursPerUnit: 0,
+      requiresReview: false,
+      sinapi: {
+        sourceId: sourceMeta.sourceId,
+        sourceTitle: "SINAPI BA maio 2026",
+        code: sourceMeta.sourceCode,
+        description: composition.description,
+        state: sourceMeta.state,
+        city: sourceMeta.city,
+        referenceDate: sourceMeta.referenceDate,
+        regime: "desonerado",
+        priceStatus: "zeroed",
+        confidence: "unverified",
+        requiresReview: true,
+        pendingReason: "Preco oficial veio zerado.",
+        totalLaborHoursPerUnit: 0,
+      },
+    };
+
+    const budget = calculateDirectServiceBudget({
+      scenarioId: quantity.scenarioId,
+      quantities: [quantity],
+      serviceCompositions: [zeroedComposition],
+      links: [{ id: "link-zeroed", quantityId: quantity.id, compositionId: zeroedComposition.id, approvedByUser: true }],
+    });
+
+    expect(budget.lines[0]).toMatchObject({
+      directCostBRL: 0,
+      totalBRL: 0,
+      requiresReview: true,
+      approvedByUser: true,
+    });
+    expect(budget.lines[0].notes).toContain("Preco SINAPI zeroed");
+  });
 });
