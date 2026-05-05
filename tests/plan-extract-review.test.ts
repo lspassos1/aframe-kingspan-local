@@ -1,7 +1,13 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { PlanExtractReview, getPlanExtractFieldEvidence, type PlanExtractCurrentValues } from "@/components/ai/PlanExtractReview";
+import {
+  PlanExtractReview,
+  getPlanExtractFieldEvidence,
+  isInvalidPlanExtractNumericDraft,
+  prunePlanExtractReviewState,
+  type PlanExtractCurrentValues,
+} from "@/components/ai/PlanExtractReview";
 import { getDefaultPlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
 import type { PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 
@@ -107,9 +113,45 @@ describe("PlanExtractReview", () => {
   });
 
   it("finds field evidence only when extraction notes or assumptions reference the field", () => {
-    expect(getPlanExtractFieldEvidence(reviewResult, "city")).toBe("Cidade: Salvador aparece no carimbo.");
-    expect(getPlanExtractFieldEvidence(reviewResult, "builtAreaM2")).toBe("Area construida calculada por largura x profundidade.");
+    const resultWithOpeningEvidence: PlanExtractResult = {
+      ...reviewResult,
+      extracted: {
+        ...reviewResult.extracted,
+        notes: [...(reviewResult.extracted.notes ?? []), "2 portas no pavimento terreo.", "4 janelas na fachada."],
+      },
+    };
+
+    expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "city")).toBe("Cidade: Salvador aparece no carimbo.");
+    expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "builtAreaM2")).toBe("Area construida calculada por largura x profundidade.");
+    expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "doorCount")).toBe("2 portas no pavimento terreo.");
+    expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "windowCount")).toBe("4 janelas na fachada.");
     expect(getPlanExtractFieldEvidence(reviewResult, "terrainWidthM")).toBeUndefined();
     expect(getPlanExtractFieldEvidence(reviewResult, "windowCount")).toBeUndefined();
+  });
+
+  it("prunes hidden selected fields before applying a changed method scope", () => {
+    const pruned = prunePlanExtractReviewState({
+      fields: ["constructionMethod", "houseDepthM"],
+      selectedFields: {
+        constructionMethod: true,
+        houseDepthM: true,
+        houseWidthM: true,
+        doorCount: true,
+      },
+      modifiedValues: {
+        houseDepthM: 12,
+        houseWidthM: 8,
+        doorCount: 3,
+      },
+    });
+
+    expect(pruned.selectedFields).toEqual({ constructionMethod: true, houseDepthM: true });
+    expect(pruned.modifiedValues).toEqual({ houseDepthM: 12 });
+  });
+
+  it("blocks numeric fields with invalid draft sentinels from being reselected", () => {
+    expect(isInvalidPlanExtractNumericDraft("houseWidthM", "abc")).toBe(true);
+    expect(isInvalidPlanExtractNumericDraft("houseWidthM", 8)).toBe(false);
+    expect(isInvalidPlanExtractNumericDraft("city", "Salvador")).toBe(false);
   });
 });

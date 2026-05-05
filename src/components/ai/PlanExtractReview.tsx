@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 type PlanExtractField = keyof PlanExtractResult["extracted"];
 type PlanExtractEditableField = Exclude<PlanExtractField, "notes">;
-type PlanExtractReviewValue = string | number | ConstructionMethodId | string[] | undefined;
+export type PlanExtractReviewValue = string | number | ConstructionMethodId | string[] | undefined;
 
 export type PlanExtractModifiedValues = Partial<Record<PlanExtractEditableField, string | number | ConstructionMethodId>>;
 export type PlanExtractCurrentValues = Partial<Record<PlanExtractEditableField, string | number | ConstructionMethodId>>;
@@ -126,9 +126,9 @@ const fieldEvidencePhrases: Partial<Record<PlanExtractEditableField, string[][]>
   houseDepthM: [["profundidade", "casa"]],
   builtAreaM2: [["area", "construida"]],
   floorHeightM: [["pe", "direito"], ["altura"]],
-  floors: [["pavimento"], ["andar"]],
-  doorCount: [["porta"]],
-  windowCount: [["janela"]],
+  floors: [["pavimento"], ["pavimentos"], ["andar"], ["andares"]],
+  doorCount: [["porta"], ["portas"]],
+  windowCount: [["janela"], ["janelas"]],
 };
 
 const confidenceLabels: Record<PlanExtractConfidence, string> = {
@@ -159,6 +159,30 @@ function tokenizeEvidence(value: string) {
 function candidateHasPhrase(candidateTokens: string[], phrase: string[]) {
   const phraseTokens = phrase.flatMap(tokenizeEvidence);
   return phraseTokens.length > 0 && phraseTokens.every((token) => candidateTokens.includes(token));
+}
+
+export function isInvalidPlanExtractNumericDraft(field: PlanExtractEditableField, value: PlanExtractReviewValue) {
+  return numberFields.has(field) && value !== undefined && typeof value !== "number";
+}
+
+export function prunePlanExtractReviewState({
+  fields,
+  selectedFields,
+  modifiedValues,
+}: {
+  fields: PlanExtractEditableField[];
+  selectedFields: PlanExtractSelectedFields;
+  modifiedValues: PlanExtractModifiedValues;
+}) {
+  const fieldSet = new Set<PlanExtractField>(fields);
+  const nextSelectedFields = Object.fromEntries(
+    Object.entries(selectedFields).filter(([field]) => fieldSet.has(field as PlanExtractField))
+  ) as PlanExtractSelectedFields;
+  const nextModifiedValues = Object.fromEntries(
+    Object.entries(modifiedValues).filter(([field]) => fieldSet.has(field as PlanExtractField))
+  ) as PlanExtractModifiedValues;
+
+  return { selectedFields: nextSelectedFields, modifiedValues: nextModifiedValues };
 }
 
 export function getPlanExtractFieldEvidence(result: PlanExtractResult, field: PlanExtractEditableField) {
@@ -222,7 +246,7 @@ type PlanExtractReviewProps = {
   isApplying?: boolean;
   onSelectedFieldsChange: (fields: PlanExtractSelectedFields) => void;
   onModifiedValuesChange: (values: PlanExtractModifiedValues) => void;
-  onApply: () => void;
+  onApply: (selectedFields?: PlanExtractSelectedFields, modifiedValues?: PlanExtractModifiedValues) => void;
   onDismiss: () => void;
   onBackToManual?: () => void;
 };
@@ -266,6 +290,13 @@ export function PlanExtractReview({
     onSelectedFieldsChange({ ...selectedFields, [field]: shouldSelect });
   }
 
+  function applyVisibleFields() {
+    const prunedState = prunePlanExtractReviewState({ fields, selectedFields, modifiedValues });
+    onSelectedFieldsChange(prunedState.selectedFields);
+    onModifiedValuesChange(prunedState.modifiedValues);
+    onApply(prunedState.selectedFields, prunedState.modifiedValues);
+  }
+
   return (
     <div className="mt-4 rounded-lg border bg-background/90 p-4 shadow-sm shadow-foreground/5">
       <div className="flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
@@ -306,6 +337,7 @@ export function PlanExtractReview({
                   const hasModifiedValue = Object.prototype.hasOwnProperty.call(modifiedValues, field);
                   const reviewValue = hasModifiedValue ? modifiedValues[field] : result.extracted[field];
                   const evidence = getPlanExtractFieldEvidence(result, field);
+                  const selectionDisabled = isInvalidPlanExtractNumericDraft(field, reviewValue);
                   return (
                     <article key={field} className={cn("rounded-lg border bg-card p-3", selectedFields[field] && "border-primary/35 bg-primary/[0.035]")}>
                       <div className="flex items-start justify-between gap-3">
@@ -313,6 +345,7 @@ export function PlanExtractReview({
                           <Checkbox
                             id={checkboxId}
                             checked={Boolean(selectedFields[field])}
+                            disabled={selectionDisabled}
                             onCheckedChange={(checked) => onSelectedFieldsChange({ ...selectedFields, [field]: checked === true })}
                             aria-label={`Aplicar ${fieldLabels[field]}`}
                           />
@@ -324,6 +357,7 @@ export function PlanExtractReview({
                             {field === "constructionMethod" && confidence !== "high" ? (
                               <p className="mt-1 text-xs text-muted-foreground">Sugestao revisavel; nao altera o metodo sozinha.</p>
                             ) : null}
+                            {selectionDisabled ? <p className="mt-1 text-xs text-destructive">Corrija o numero para aplicar este campo.</p> : null}
                           </div>
                         </div>
                         <Badge variant="outline" className={cn("shrink-0", confidenceClass(confidence))}>
@@ -384,7 +418,7 @@ export function PlanExtractReview({
           <RotateCcw className="h-4 w-4" />
           Voltar para manual
         </Button>
-        <Button type="button" onClick={onApply} disabled={isApplying || selectedCount === 0}>
+        <Button type="button" onClick={applyVisibleFields} disabled={isApplying || selectedCount === 0}>
           <ClipboardCheck className="h-4 w-4" />
           Aplicar campos selecionados
         </Button>
