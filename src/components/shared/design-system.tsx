@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import { AlertCircle, CheckCircle2, ChevronDown, Clock3, FileUp, Info, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Clock3, FileUp, Info, MessageSquareText, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type VisualIcon = ComponentType<{ className?: string }>;
@@ -429,6 +429,98 @@ export function BudgetGroupCard({
       </div>
       <div className={cn("p-5", contentClassName)}>{children}</div>
     </section>
+  );
+}
+
+export function ReviewCard({
+  title,
+  description,
+  status,
+  selected,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  status?: ReactNode;
+  selected?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <article
+      data-slot="review-card"
+      data-selected={selected ? "true" : undefined}
+      className={cn("rounded-2xl border bg-card/88 p-4 shadow-sm shadow-foreground/5", selected && "border-primary/35 bg-primary/[0.035]", className)}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold tracking-normal">{title}</h3>
+          {description ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p> : null}
+        </div>
+        {status ? <div className="shrink-0">{status}</div> : null}
+      </div>
+      <div className="mt-4">{children}</div>
+    </article>
+  );
+}
+
+export function EvidenceCard({
+  title = "Evidência",
+  evidence,
+  source,
+  pending,
+  className,
+}: {
+  title?: ReactNode;
+  evidence?: ReactNode;
+  source?: ReactNode;
+  pending?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div data-slot="evidence-card" className={cn("rounded-xl border bg-muted/25 p-3 text-sm leading-6", className)}>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-medium text-foreground">{title}</p>
+        {source ? <SourceBadge>{source}</SourceBadge> : null}
+      </div>
+      {evidence ? <p className="mt-1 text-muted-foreground">{evidence}</p> : null}
+      {pending ? <p className="mt-2 text-amber-800">{pending}</p> : null}
+    </div>
+  );
+}
+
+export function QuestionCard({
+  question,
+  reason,
+  required,
+  children,
+  className,
+}: {
+  question: ReactNode;
+  reason?: ReactNode;
+  required?: boolean;
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <article data-slot="question-card" className={cn("rounded-2xl border border-amber-200 bg-amber-50/75 p-4 text-amber-950", className)}>
+      <div className="flex items-start gap-3">
+        <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold tracking-normal">{question}</h3>
+            {required ? (
+              <StatusPill tone="warning" icon={false}>
+                antes do orçamento
+              </StatusPill>
+            ) : null}
+          </div>
+          {reason ? <p className="mt-1 text-sm leading-6 text-amber-900/85">{reason}</p> : null}
+          {children ? <div className="mt-3">{children}</div> : null}
+        </div>
+      </div>
+    </article>
   );
 }
 
