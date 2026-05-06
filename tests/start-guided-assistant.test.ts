@@ -3,6 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { createStartAssistantViewModel, normalizeStartAssistantModeParam } from "@/lib/onboarding/start-guided-assistant";
 
+const planImportCardProps = vi.hoisted(() => ({
+  latest: undefined as { onManualFallback?: () => void } | undefined,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
@@ -16,7 +20,10 @@ vi.mock("@/lib/store/project-store", () => ({
 }));
 
 vi.mock("@/components/ai/PlanImportCard", () => ({
-  PlanImportCard: () => createElement("div", { "data-testid": "plan-import" }, "Enviar planta baixa"),
+  PlanImportCard: (props: { onManualFallback?: () => void }) => {
+    planImportCardProps.latest = props;
+    return createElement("div", { "data-testid": "plan-import" }, "Enviar planta baixa");
+  },
 }));
 
 vi.mock("@/components/onboarding/StartProjectForm", () => ({
@@ -92,10 +99,12 @@ describe("StartGuidedAssistant", () => {
   });
 
   it("renders upload with operational status and a manual fallback in AI mode", () => {
+    planImportCardProps.latest = undefined;
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true, initialMode: "ai" }));
 
     expect(html).toContain('data-testid="plan-import"');
     expect(html).not.toContain('data-testid="manual-form"');
+    expect(typeof planImportCardProps.latest?.onManualFallback).toBe("function");
     expect(html).toContain("Status da IA");
     expect(html).toContain("OpenAI API");
     expect(html).toContain("Limite diário");

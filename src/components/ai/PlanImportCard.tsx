@@ -25,6 +25,7 @@ type PlanExtractApiPayload = {
 
 type PlanImportCardProps = {
   planExtractEnabled?: boolean;
+  onManualFallback?: () => void;
 };
 
 function getActiveScenario(project: Project): Scenario {
@@ -88,7 +89,7 @@ function waitForNextPaint() {
   });
 }
 
-export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProps) {
+export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: PlanImportCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const project = useProjectStore((state) => state.project);
   const setProject = useProjectStore((state) => state.setProject);
@@ -111,6 +112,16 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
   const canUpload = planExtractEnabled && !isBusy;
   const currentValues = getCurrentPlanExtractValues(project);
   const showReview = (state === "review-ready" || state === "cache-hit") && result;
+
+  function openManualFallback() {
+    if (onManualFallback) {
+      onManualFallback();
+      return;
+    }
+    setTimeout(() => {
+      document.getElementById("manual-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
 
   async function uploadFile(file: File) {
     if (!planExtractEnabled) return;
@@ -214,9 +225,7 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
     setModifiedValues({});
     setState("applied");
     setMessage("Campos aplicados. Revise os dados antes de continuar.");
-    setTimeout(() => {
-      document.getElementById("manual-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+    openManualFallback();
   }
 
   function resetReview() {
@@ -230,9 +239,7 @@ export function PlanImportCard({ planExtractEnabled = true }: PlanImportCardProp
 
   function returnToManual() {
     resetReview();
-    setTimeout(() => {
-      document.getElementById("manual-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+    openManualFallback();
   }
 
   return (

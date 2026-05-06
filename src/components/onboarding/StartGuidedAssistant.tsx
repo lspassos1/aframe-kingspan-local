@@ -82,6 +82,13 @@ export function StartGuidedAssistant({
     setMode(nextMode);
   }
 
+  function openManualCompletion() {
+    setMode("manual");
+    setTimeout(() => {
+      document.getElementById("manual-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   const currentStepIndex = mode === "choose" ? 0 : 1;
 
   if (mode === "choose") {
@@ -185,7 +192,7 @@ export function StartGuidedAssistant({
               description="Arraste ou selecione um arquivo. O app mostra cache, limite, análise e revisão antes de aplicar qualquer dado."
               action={<StatusPill tone="pending">Revisão obrigatória</StatusPill>}
             />
-            <PlanImportCard planExtractEnabled={planExtractEnabled} />
+            <PlanImportCard planExtractEnabled={planExtractEnabled} onManualFallback={openManualCompletion} />
           </div>
 
           <StickySummary title="Status da IA" description="Somente metadados seguros aparecem nesta tela. A chave da OpenAI fica no servidor.">
