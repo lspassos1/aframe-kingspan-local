@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { ConstructionMethodSelector } from "@/components/onboarding/ConstructionMethodSelector";
+import { ManualTakeoffStepper } from "@/components/onboarding/ManualTakeoffStepper";
+import { AdvancedDisclosure, InlineHelp, StatusPill } from "@/components/shared/design-system";
 import { getConstructionMethodDefinition, getScenarioMethodInputs, type ConstructionMethodId } from "@/lib/construction-methods";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
@@ -475,9 +477,17 @@ export function StartProjectForm() {
 
   return (
     <div className="space-y-5">
-      <ConstructionMethodSelector selectedMethod={selectedMethod} onSelect={selectConstructionMethod} />
+      <ManualTakeoffStepper />
 
-      {selectedMethod === "aframe" ? (
+      <AdvancedDisclosure
+        title="Compatibilidade técnica do estudo existente"
+        description="Campos legados seguem disponíveis para preservar cálculos, A-frame e exportações enquanto o fluxo manual novo evolui."
+        badge={<StatusPill tone="pending">avançado</StatusPill>}
+      >
+        <InlineHelp tone="info" className="mb-4">
+          Use esta seção somente quando precisar ajustar entradas técnicas do baseline atual. O preenchimento manual acima é o caminho principal.
+        </InlineHelp>
+        {selectedMethod === "aframe" ? (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Card className="rounded-3xl shadow-sm">
         <CardHeader>
@@ -591,6 +601,14 @@ export function StartProjectForm() {
               <NumberInput id="houseDepth" label="Profundidade da casa (m)" error={form.formState.errors.houseDepth?.message} {...form.register("houseDepth")} />
             </section>
 
+            <section className="space-y-3 border-t pt-5">
+              <div>
+                <h3 className="font-semibold">Método construtivo</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Confirme o sistema depois das medidas iniciais. Você pode revisar depois.</p>
+              </div>
+              <ConstructionMethodSelector selectedMethod={selectedMethod} onSelect={selectConstructionMethod} />
+            </section>
+
             <div className="flex justify-end border-t pt-5">
               <Button type="submit" disabled={!form.formState.isValid}>
                 Abrir modelo 3D
@@ -671,6 +689,13 @@ export function StartProjectForm() {
             <CardContent>
               <form onSubmit={methodForm.handleSubmit(applyMethodPlaceholder)} className="space-y-6">
                 <input type="hidden" {...methodForm.register("constructionMethod")} />
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="font-semibold">Método construtivo</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Confirme o sistema depois das medidas iniciais. Você pode revisar depois.</p>
+                  </div>
+                  <ConstructionMethodSelector selectedMethod={selectedMethod} onSelect={selectConstructionMethod} />
+                </section>
                 <section className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="methodProjectName" className={cn(methodForm.formState.errors.projectName && "text-destructive")}>
@@ -967,6 +992,7 @@ export function StartProjectForm() {
           </aside>
         </div>
       )}
+      </AdvancedDisclosure>
     </div>
   );
 }

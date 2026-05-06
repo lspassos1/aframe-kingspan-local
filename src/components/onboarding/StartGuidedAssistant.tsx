@@ -258,7 +258,7 @@ export function StartGuidedAssistant({
               </p>
               <p className="flex items-start gap-2">
                 <Clock3 className="mt-1 h-4 w-4 shrink-0 text-amber-700" />
-                A edição detalhada de ambientes e aberturas continua no fluxo manual.
+                Ambientes, paredes, portas, janelas e premissas entram em etapas próprias.
               </p>
             </div>
           </StickySummary>

@@ -1,5 +1,8 @@
 import type { ComponentType, ReactNode } from "react";
 import { AlertCircle, CheckCircle2, ChevronDown, Clock3, FileUp, Info, MessageSquareText, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 type VisualIcon = ComponentType<{ className?: string }>;
@@ -167,6 +170,41 @@ export function StepProgress({
         );
       })}
     </ol>
+  );
+}
+
+export function StepShell({
+  title,
+  description,
+  status,
+  aside,
+  footer,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  status?: ReactNode;
+  aside?: ReactNode;
+  footer?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section data-slot="step-shell" className={cn("grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]", className)}>
+      <div className="overflow-hidden rounded-3xl border bg-card/88 shadow-sm shadow-foreground/5">
+        <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold tracking-normal">{title}</h2>
+            {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
+          </div>
+          {status ? <div className="shrink-0">{status}</div> : null}
+        </div>
+        <div className="p-5">{children}</div>
+        {footer ? <div className="border-t bg-background/42 px-5 py-4">{footer}</div> : null}
+      </div>
+      {aside ? <div className="min-w-0">{aside}</div> : null}
+    </section>
   );
 }
 
@@ -633,5 +671,125 @@ export function FileDropzone({
       {description ? <span className="mt-1 text-sm leading-6 text-muted-foreground">{description}</span> : null}
       {actionLabel ? <span className="mt-3 text-sm font-medium text-primary">{actionLabel}</span> : null}
     </button>
+  );
+}
+
+export function NumericAdjuster({
+  id,
+  label,
+  value,
+  unit,
+  min = 0,
+  step = 1,
+  description,
+  onChange,
+  className,
+}: {
+  id: string;
+  label: ReactNode;
+  value: number;
+  unit?: ReactNode;
+  min?: number;
+  step?: number;
+  description?: ReactNode;
+  onChange: (value: number) => void;
+  className?: string;
+}) {
+  function update(nextValue: number) {
+    if (!Number.isFinite(nextValue)) return;
+    onChange(Math.max(min, Number(nextValue.toFixed(3))));
+  }
+
+  return (
+    <div data-slot="numeric-adjuster" className={cn("space-y-2", className)}>
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={id}>{label}</Label>
+        {unit ? <span className="text-xs font-medium text-muted-foreground">{unit}</span> : null}
+      </div>
+      <div className="flex items-center rounded-2xl border bg-background/75 p-1 shadow-inner shadow-foreground/[0.015]">
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => update(value - step)} aria-label={`Reduzir ${String(label)}`}>
+          -
+        </Button>
+        <Input
+          id={id}
+          type="number"
+          min={min}
+          step={step}
+          value={Number.isFinite(value) ? value : 0}
+          onChange={(event) => update(Number(event.target.value))}
+          className="h-8 border-0 bg-transparent text-center shadow-none focus-visible:ring-0"
+        />
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 rounded-xl" onClick={() => update(value + step)} aria-label={`Aumentar ${String(label)}`}>
+          +
+        </Button>
+      </div>
+      {description ? <p className="text-xs leading-5 text-muted-foreground">{description}</p> : null}
+    </div>
+  );
+}
+
+export function RoomEditor({
+  title,
+  meta,
+  status,
+  action,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  meta?: ReactNode;
+  status?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <article data-slot="room-editor" className={cn("rounded-2xl border bg-background/78 p-4 shadow-sm shadow-foreground/5", className)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="font-semibold tracking-normal">{title}</h3>
+          {meta ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{meta}</p> : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {status}
+          {action}
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">{children}</div>
+    </article>
+  );
+}
+
+export function OpeningEditor({
+  title,
+  kind,
+  status,
+  action,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  kind: ReactNode;
+  status?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <article data-slot="opening-editor" className={cn("rounded-2xl border bg-background/78 p-4 shadow-sm shadow-foreground/5", className)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold tracking-normal">{title}</h3>
+            <StatusPill tone="neutral" icon={false}>
+              {kind}
+            </StatusPill>
+            {status}
+          </div>
+        </div>
+        {action}
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">{children}</div>
+    </article>
   );
 }
