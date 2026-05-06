@@ -115,6 +115,9 @@ describe("PlanExtractReview", () => {
   it("finds field evidence only when extraction notes or assumptions reference the field", () => {
     const resultWithOpeningEvidence: PlanExtractResult = {
       ...reviewResult,
+      fieldEvidence: {
+        state: "UF BA aparece no carimbo.",
+      },
       extracted: {
         ...reviewResult.extracted,
         notes: [...(reviewResult.extracted.notes ?? []), "2 portas no pavimento terreo.", "4 janelas na fachada."],
@@ -122,6 +125,7 @@ describe("PlanExtractReview", () => {
     };
 
     expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "city")).toBe("Cidade: Salvador aparece no carimbo.");
+    expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "state")).toBe("UF BA aparece no carimbo.");
     expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "builtAreaM2")).toBe("Area construida calculada por largura x profundidade.");
     expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "doorCount")).toBe("2 portas no pavimento terreo.");
     expect(getPlanExtractFieldEvidence(resultWithOpeningEvidence, "windowCount")).toBe("4 janelas na fachada.");
