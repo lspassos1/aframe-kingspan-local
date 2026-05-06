@@ -3,6 +3,7 @@
 const DEFAULT_REPO = "lspassos1/aframe-kingspan-local";
 const GITHUB_API_VERSION = "2022-11-28";
 const MAX_SLACK_BLOCK_TEXT = 2900;
+const FAILED_CHECK_RUN_CONCLUSIONS = new Set(["failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"]);
 
 function stripDiacritics(value) {
   return String(value ?? "")
@@ -106,7 +107,7 @@ export function latestLucasReview(entries = []) {
 }
 
 export function summarizeChecks({ checkRuns = [], statuses = [] } = {}) {
-  const failedRuns = checkRuns.filter((run) => ["failure", "timed_out", "cancelled", "action_required"].includes(run.conclusion));
+  const failedRuns = checkRuns.filter((run) => FAILED_CHECK_RUN_CONCLUSIONS.has(run.conclusion));
   const pendingRuns = checkRuns.filter((run) => run.status !== "completed" || !run.conclusion);
   const failedStatuses = statuses.filter((status) => ["failure", "error"].includes(status.state));
   const pendingStatuses = statuses.filter((status) => ["pending"].includes(status.state));
@@ -148,6 +149,15 @@ function formatIssueLine(issue, prCoverage) {
   return `• #${issue.number} ${issue.title} · ${coverage}`;
 }
 
+function uniquePrsByNumber(prs) {
+  const seen = new Set();
+  return prs.filter((pr) => {
+    if (seen.has(pr.number)) return false;
+    seen.add(pr.number);
+    return true;
+  });
+}
+
 export function buildSlackReport({ repo = DEFAULT_REPO, generatedAt = new Date(), runUrl = "", issues = [], pullRequests = [] }) {
   const prCoverage = new Map();
   for (const pr of pullRequests) {
@@ -170,6 +180,7 @@ export function buildSlackReport({ repo = DEFAULT_REPO, generatedAt = new Date()
   const manualMergePrs = pullRequests.filter((pr) => pr.lucasReview?.severity === "aprovado para merge manual");
   const failingPrs = pullRequests.filter((pr) => pr.checkSummary?.state === "failed");
   const closingRefPrs = pullRequests.filter((pr) => findForbiddenClosingRefs(pr.body || "").length);
+  const attentionPrs = uniquePrsByNumber([...blockedPrs, ...failingPrs, ...closingRefPrs]);
   const orphanIssues = issues.filter((issue) => !(prCoverage.get(issue.number) || []).length);
 
   const lines = [
@@ -188,10 +199,10 @@ export function buildSlackReport({ repo = DEFAULT_REPO, generatedAt = new Date()
     `*Atenção agora*`,
   ].filter(Boolean);
 
-  if (!blockedPrs.length && !failingPrs.length && !closingRefPrs.length) {
+  if (!attentionPrs.length) {
     lines.push("• Nenhum bloqueio automático detectado. Seguir a ordem da stack e aguardar decisão de Lucas.");
   } else {
-    for (const pr of [...blockedPrs, ...failingPrs, ...closingRefPrs].slice(0, 8)) {
+    for (const pr of attentionPrs.slice(0, 8)) {
       lines.push(formatPrLine(pr));
     }
   }

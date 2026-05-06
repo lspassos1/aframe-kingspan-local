@@ -52,6 +52,14 @@ describe("hourly GitHub triage Slack report", () => {
 
   it("summarizes failed, pending, green and unknown checks", () => {
     expect(summarizeChecks({ checkRuns: [{ status: "completed", conclusion: "failure" }] }).state).toBe("failed");
+    expect(
+      summarizeChecks({
+        checkRuns: [
+          { status: "completed", conclusion: "startup_failure" },
+          { status: "completed", conclusion: "stale" },
+        ],
+      })
+    ).toMatchObject({ state: "failed", label: "falhando (2/2)" });
     expect(summarizeChecks({ checkRuns: [{ status: "in_progress", conclusion: null }] }).state).toBe("pending");
     expect(summarizeChecks({ checkRuns: [{ status: "completed", conclusion: "success" }] }).state).toBe("success");
     expect(summarizeChecks({ checkRuns: [], statuses: [] }).state).toBe("unknown");
@@ -94,6 +102,38 @@ describe("hourly GitHub triage Slack report", () => {
     expect(report).toContain("ALERTA: closing ref #126");
     expect(report).toContain("Automação informativa");
     expect(report).not.toContain("hooks.slack.com");
+  });
+
+  it("deduplicates urgent PRs before applying the attention limit", () => {
+    const report = buildSlackReport({
+      repo: "lspassos1/aframe-kingspan-local",
+      generatedAt: new Date("2026-05-06T12:00:00.000Z"),
+      issues: [{ number: 126, title: "PR 4 — Start Novo", body: "" }],
+      pullRequests: [
+        {
+          number: 137,
+          title: "feat: redesign start entry choices",
+          draft: true,
+          body: "Closes #126",
+          base: { ref: "main" },
+          checkSummary: { state: "failed", label: "falhando (1/3)" },
+          lucasReview: { severity: "não aprovado" },
+        },
+        {
+          number: 138,
+          title: "feat: expand plan analysis schema",
+          draft: true,
+          body: "Refs #127",
+          base: { ref: "feat/start-design-reset" },
+          checkSummary: { state: "failed", label: "falhando (1/3)" },
+          lucasReview: null,
+        },
+      ],
+    });
+    const attention = report.split("*Atenção agora*")[1].split("*PRs abertos*")[0];
+
+    expect(attention.match(/#137/g)).toHaveLength(1);
+    expect(attention).toContain("#138");
   });
 
   it("chunks the Slack payload into mrkdwn blocks", () => {
