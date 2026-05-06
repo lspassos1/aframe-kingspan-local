@@ -1,5 +1,7 @@
 import { createHmac } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { NextRequest } from "next/server";
+import { POST } from "@/app/api/slack/lucas-review/route";
 import {
   buildLucasReviewComment,
   createLucasReviewHash,
@@ -24,7 +26,56 @@ function slackSignature(secret: string, body = rawBody, ts = timestamp) {
   return `v0=${createHmac("sha256", secret).update(`v0:${ts}:${body}`).digest("hex")}`;
 }
 
+function signedSlackRequest(body: URLSearchParams, secret = "test-signing-secret") {
+  const requestTimestamp = `${Math.floor(Date.now() / 1000)}`;
+  const rawRequestBody = body.toString();
+  return new Request("http://localhost:3000/api/slack/lucas-review", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Slack-Request-Timestamp": requestTimestamp,
+      "X-Slack-Signature": slackSignature(secret, rawRequestBody, requestTimestamp),
+    },
+    body: rawRequestBody,
+  }) as unknown as NextRequest;
+}
+
+function slackBody(overrides: Record<string, string> = {}) {
+  return new URLSearchParams({
+    user_id: "U_LUCAS",
+    channel_id: "C_DESIGN",
+    command: "/lucas-review",
+    trigger_id: "trigger-123",
+    response_url: "https://hooks.slack.com/commands/response",
+    text: "141 nao-aprovado Ajustar o manual stepper.",
+    ...overrides,
+  });
+}
+
 describe("Slack Lucas Review bridge", () => {
+  const originalEnv = process.env;
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    process.env = {
+      ...originalEnv,
+      SLACK_SIGNING_SECRET: "test-signing-secret",
+      SLACK_ALLOWED_USER_IDS: "",
+      SLACK_ALLOWED_CHANNEL_IDS: "",
+      GITHUB_REVIEW_TOKEN: "github-token",
+      GITHUB_FEEDBACK_TOKEN: "",
+      GITHUB_REVIEW_REPO: "lspassos1/aframe-kingspan-local",
+    };
+    global.fetch = originalFetch;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
   it("accepts a valid Slack signature", () => {
     expect(
       verifySlackSignature({
@@ -88,6 +139,28 @@ describe("Slack Lucas Review bridge", () => {
     });
   });
 
+  it("parses message= without quotes as the rest of the command", () => {
+    expect(parseLucasReviewCommand("pr=143 status=nao-aprovado message=Redesign interno ainda parece refresh superficial.")).toMatchObject({
+      ok: true,
+      value: {
+        prNumber: 143,
+        status: "não aprovado",
+        message: "Redesign interno ainda parece refresh superficial.",
+      },
+    });
+  });
+
+  it("parses mensagem= without quotes as the rest of the command", () => {
+    expect(parseLucasReviewCommand("pr=143 status=nao-aprovado mensagem=Refazer tela interna sem refresh superficial.")).toMatchObject({
+      ok: true,
+      value: {
+        prNumber: 143,
+        status: "não aprovado",
+        message: "Refazer tela interna sem refresh superficial.",
+      },
+    });
+  });
+
   it("normalizes accepted statuses with and without accent", () => {
     expect(normalizeLucasReviewStatus("nao-aprovado")).toBe("não aprovado");
     expect(normalizeLucasReviewStatus("não-aprovado")).toBe("não aprovado");
@@ -136,10 +209,25 @@ describe("Slack Lucas Review bridge", () => {
       message: "Criar editores reais.",
       slackUser: "U_LUCAS",
       slackChannel: "C_DESIGN",
+      slackExecutionId: "trigger-123",
     };
 
     expect(createLucasReviewHash(values)).toBe(createLucasReviewHash(values));
     expect(createLucasReviewHash(values)).toHaveLength(64);
+  });
+
+  it("changes the dedupe hash when Slack execution id changes", () => {
+    const values = {
+      prNumber: 141,
+      status: "não aprovado" as const,
+      message: "Criar editores reais.",
+      slackUser: "U_LUCAS",
+      slackChannel: "C_DESIGN",
+    };
+
+    expect(createLucasReviewHash({ ...values, slackExecutionId: "trigger-123" })).not.toBe(
+      createLucasReviewHash({ ...values, slackExecutionId: "trigger-456" })
+    );
   });
 
   it("blocks non-allowed Slack users and channels", () => {
@@ -198,5 +286,66 @@ describe("Slack Lucas Review bridge", () => {
 
     expect(postedBody).toBe(JSON.stringify({ body: "## Lucas Review" }));
     expect(postedBody).not.toContain("github-token");
+  });
+
+  it("handles a valid Slack endpoint request and creates a Lucas Review comment", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 10, body: "created" }), { status: 201 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const response = await POST(
+      signedSlackRequest(
+        slackBody({
+          text: "pr=143 status=nao-aprovado message=Redesign interno ainda parece refresh superficial.",
+          trigger_id: "trigger-endpoint-123",
+        })
+      )
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain("Lucas Review registrada no PR #143");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const postBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as { body: string };
+    expect(postBody.body).toContain("## Lucas Review");
+    expect(postBody.body).toContain("Status: não aprovado");
+    expect(postBody.body).toContain("PR: #143");
+    expect(postBody.body).toContain("Redesign interno ainda parece refresh superficial.");
+    expect(postBody.body).toContain("<!-- lucas-review-slack:");
+  });
+
+  it("rejects endpoint requests with invalid Slack signature", async () => {
+    const response = await POST(signedSlackRequest(slackBody(), "wrong-secret"));
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toContain("nao autorizado");
+  });
+
+  it("returns a safe endpoint error when GitHub token is absent", async () => {
+    process.env.GITHUB_REVIEW_TOKEN = "";
+    process.env.GITHUB_FEEDBACK_TOKEN = "";
+
+    const response = await POST(signedSlackRequest(slackBody()));
+
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toContain("GitHub Review token nao configurado");
+  });
+
+  it("returns a safe endpoint error for unauthorized Slack user or channel", async () => {
+    process.env.SLACK_ALLOWED_USER_IDS = "U_ALLOWED";
+
+    const response = await POST(signedSlackRequest(slackBody({ user_id: "U_OTHER" })));
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toContain("Usuario ou canal nao autorizado");
+  });
+
+  it("rejects requests for a different Slack command", async () => {
+    const response = await POST(signedSlackRequest(slackBody({ command: "/other-review" })));
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toContain("Comando Slack invalido");
   });
 });

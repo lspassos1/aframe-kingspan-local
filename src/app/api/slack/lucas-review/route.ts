@@ -56,6 +56,11 @@ export async function POST(request: NextRequest) {
   }
 
   const form = new URLSearchParams(rawBody);
+  const command = form.get("command")?.trim();
+  if (command && command !== "/lucas-review") {
+    return slackText("Comando Slack invalido para Lucas Review.", 400);
+  }
+
   const slackUserId = form.get("user_id");
   const slackChannelId = form.get("channel_id");
   const access = validateLucasReviewAccess({
@@ -90,6 +95,7 @@ export async function POST(request: NextRequest) {
     message: parsed.value.message,
     slackUser: slackUserId ?? "unknown-user",
     slackChannel: slackChannelId ?? "unknown-channel",
+    slackExecutionId: form.get("trigger_id") || form.get("response_url") || undefined,
   });
   const body = buildLucasReviewComment({ ...parsed.value, hash });
 

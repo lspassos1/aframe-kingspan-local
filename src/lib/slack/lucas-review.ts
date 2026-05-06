@@ -112,6 +112,39 @@ function tokenizeCommand(text: string) {
   return tokens;
 }
 
+function findMessageAssignment(text: string) {
+  const match = /(^|\s)(message|mensagem)=/i.exec(text);
+  if (!match) return null;
+
+  const keyStart = match.index + match[1].length;
+  const valueStart = keyStart + match[2].length + 1;
+  let rawValue = text.slice(valueStart).trimStart();
+  if (!rawValue) return { message: "", textWithoutMessage: text.slice(0, keyStart).trim() };
+
+  const quote = rawValue[0];
+  if (quote === "\"" || quote === "'") {
+    rawValue = rawValue.slice(1);
+    let message = "";
+    let escaping = false;
+    for (const char of rawValue) {
+      if (escaping) {
+        message += char;
+        escaping = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaping = true;
+        continue;
+      }
+      if (char === quote) break;
+      message += char;
+    }
+    return { message, textWithoutMessage: text.slice(0, keyStart).trim() };
+  }
+
+  return { message: rawValue, textWithoutMessage: text.slice(0, keyStart).trim() };
+}
+
 function splitAllowedList(value: string | undefined | null) {
   return new Set(
     (value ?? "")
@@ -180,7 +213,8 @@ export function normalizeLucasReviewStatus(input?: string | null): LucasReviewSt
 }
 
 export function parseLucasReviewCommand(text: string): LucasReviewParseResult {
-  const tokens = tokenizeCommand(text);
+  const explicitMessage = findMessageAssignment(text);
+  const tokens = tokenizeCommand(explicitMessage?.textWithoutMessage ?? text);
   const keyValues = new Map<string, string>();
   const positional: string[] = [];
 
@@ -205,7 +239,7 @@ export function parseLucasReviewCommand(text: string): LucasReviewParseResult {
   let status = normalizeLucasReviewStatus(keyValues.get("status"));
   if (!status) return { ok: false, reason: "invalid-status" };
 
-  let message = keyValues.get("message") ?? keyValues.get("mensagem") ?? "";
+  let message = explicitMessage?.message ?? keyValues.get("message") ?? keyValues.get("mensagem") ?? "";
   if (!message) {
     const maybeStatus = remaining[0] ? normalizeLucasReviewStatus(remaining[0]) : null;
     const messageTokens = maybeStatus ? remaining.slice(1) : remaining;
@@ -246,9 +280,10 @@ export function createLucasReviewHash(values: {
   message: string;
   slackUser: string;
   slackChannel: string;
+  slackExecutionId?: string;
 }) {
   return createHash("sha256")
-    .update([values.prNumber, values.status, values.message, values.slackUser, values.slackChannel].join("\n"))
+    .update([values.prNumber, values.status, values.message, values.slackUser, values.slackChannel, values.slackExecutionId ?? ""].join("\n"))
     .digest("hex");
 }
 

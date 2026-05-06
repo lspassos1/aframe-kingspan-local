@@ -41,6 +41,7 @@ GITHUB_REVIEW_REPO=lspassos1/aframe-kingspan-local
 ```txt
 /lucas-review 141 bloqueado O manual stepper precisa virar editor real de ambientes, portas e janelas.
 /lucas-review 143 nao-aprovado Redesign interno ainda é refresh superficial.
+/lucas-review pr=143 status=nao-aprovado message=Redesign interno ainda parece refresh superficial.
 /lucas-review 135 aprovado-para-continuar Pode seguir sem merge automático.
 ```
 
@@ -64,7 +65,7 @@ GITHUB_REVIEW_REPO=lspassos1/aframe-kingspan-local
 - Nunca usar `NEXT_PUBLIC_*` para Slack ou GitHub tokens.
 - Segredos não devem aparecer no client, logs ou resposta de API.
 
-## Teste Local
+## Gerar Curl De Teste Local
 
 Com `SLACK_SIGNING_SECRET` definido localmente:
 
@@ -72,4 +73,4 @@ Com `SLACK_SIGNING_SECRET` definido localmente:
 npm run slack:review:test -- 141 nao-aprovado Ajustar o manual stepper.
 ```
 
-O script imprime um `curl` assinado contra `http://localhost:3000/api/slack/lucas-review`. Ele não imprime o signing secret.
+O script apenas gera um `curl` assinado contra `http://localhost:3000/api/slack/lucas-review` para teste manual. Ele não executa o request sozinho e não imprime o signing secret.

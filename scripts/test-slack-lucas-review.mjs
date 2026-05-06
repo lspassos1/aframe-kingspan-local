@@ -22,7 +22,7 @@ const body = new URLSearchParams({
 
 const signature = `v0=${createHmac("sha256", signingSecret).update(`v0:${timestamp}:${body}`).digest("hex")}`;
 
-console.log("Signed Slack Lucas Review request:");
+console.log("Signed Slack Lucas Review curl for manual testing:");
 console.log("");
 console.log(`curl -X POST ${JSON.stringify(endpoint)} \\`);
 console.log(`  -H ${JSON.stringify(`X-Slack-Request-Timestamp: ${timestamp}`)} \\`);
@@ -30,4 +30,4 @@ console.log(`  -H ${JSON.stringify(`X-Slack-Signature: ${signature}`)} \\`);
 console.log(`  -H ${JSON.stringify("Content-Type: application/x-www-form-urlencoded")} \\`);
 console.log(`  --data ${JSON.stringify(body)}`);
 console.log("");
-console.log("Set SLACK_SIGNING_SECRET in the app environment before sending this request.");
+console.log("This script only generates the curl. Set SLACK_SIGNING_SECRET in the app environment before sending it manually.");
