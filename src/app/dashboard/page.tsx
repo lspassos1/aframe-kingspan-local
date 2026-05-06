@@ -78,7 +78,7 @@ function getPrimaryQuantity(project: Project, scenario: Scenario, geometry: Geom
     return {
       label: "Blocos",
       value: `${formatCompactNumber(totalBlocks)} un`,
-      detail: `${formatArea(readNumber(geometry, ["netMasonryAreaM2", "netWallAreaM2"]))} liquidos`,
+      detail: `${formatArea(readNumber(geometry, ["netMasonryAreaM2", "netWallAreaM2"]))} líquidos`,
     };
   }
 
@@ -220,7 +220,7 @@ export default function DashboardPage() {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Área principal" value={formatArea(area)} detail={usefulArea ? `${formatArea(usefulArea)} de área útil/líquida` : "Área preliminar"} icon={<Home className="h-5 w-5" />} />
+        <MetricCard label="Área principal" value={formatArea(area)} detail={usefulArea !== null ? `${formatArea(usefulArea)} de área útil/líquida` : "Área preliminar"} icon={<Home className="h-5 w-5" />} />
         <MetricCard label="Implantação" value={`${formatMeters(width)} x ${formatMeters(depth)}`} detail={`Altura ${formatMeters(height)}`} icon={<Ruler className="h-5 w-5" />} />
         <MetricCard label={primaryQuantity.label} value={primaryQuantity.value} detail={primaryQuantity.detail} icon={<Package className="h-5 w-5" />} />
         <MetricCard
