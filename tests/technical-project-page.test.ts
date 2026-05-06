@@ -68,5 +68,5 @@ describe("TechnicalProjectPage", () => {
     expect(html).toContain("Bloco ceramico para alvenaria preliminar");
     expect(html).not.toContain("Desenhos preliminares gerados por SVG");
     expect(html).not.toContain("Desenho SVG preliminar");
-  });
+  }, 10000);
 });

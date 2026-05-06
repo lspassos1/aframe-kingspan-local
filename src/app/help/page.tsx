@@ -1,5 +1,6 @@
+import { Bot, Database, FileQuestion, FileText, MapPinned, ShieldAlert } from "lucide-react";
 import { OperationalChecklist } from "@/components/help/OperationalChecklist";
-import { ActionCard, PageFrame, PageHeader } from "@/components/shared/design-system";
+import { ActionCard, PageFrame, PageHeader, SectionHeader, StatusPill } from "@/components/shared/design-system";
 import { createOperationalEnvironmentStatus } from "@/lib/operations/operational-environment";
 
 const sections = [
@@ -27,14 +28,63 @@ const sections = [
 
 export default function HelpPage() {
   const operationalEnvironment = createOperationalEnvironmentStatus();
+  const actions = [
+    {
+      title: "Upload/IA não aparece",
+      body: operationalEnvironment.aiPlanExtractEnabled
+        ? "Confira chave OpenAI, modelo e limites no ambiente do servidor."
+        : "Ative a flag de extração e configure OpenAI no servidor.",
+      icon: Bot,
+      status: operationalEnvironment.aiPlanExtractEnabled ? "verificar chave" : "desligada",
+    },
+    {
+      title: "Base de preço ausente",
+      body: "Importe SINAPI ou base equivalente no Assistente de orçamento antes de aprovar vínculos.",
+      icon: Database,
+      status: "ação",
+    },
+    {
+      title: "UF ou referência pendente",
+      body: "Revise Dados da obra e metadados da base para filtros regionais consistentes.",
+      icon: MapPinned,
+      status: "revisar",
+    },
+    {
+      title: "Relatório preliminar",
+      body: "Exportações devem manter pendências, fonte, revisão humana e avisos técnicos visíveis.",
+      icon: FileText,
+      status: "preliminar",
+    },
+  ];
 
   return (
     <PageFrame>
-      <PageHeader eyebrow="Ajuda" title="Guia rápido" description="Diagnóstico operacional, fluxo principal e limites do estudo preliminar." />
+      <PageHeader eyebrow="Ajuda" title="Operação do estudo" description="Diagnóstico, fluxo principal e limites técnicos em leitura curta." />
       <OperationalChecklist environment={operationalEnvironment} />
+      <section className="space-y-4">
+        <SectionHeader title="Ações de diagnóstico" description="Atalhos para entender por que IA, preço ou exportação ainda não estão prontos." />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {actions.map((action) => (
+            <ActionCard
+              key={action.title}
+              icon={action.icon}
+              title={action.title}
+              description={action.body}
+              badge={<StatusPill tone="warning" icon={false}>{action.status}</StatusPill>}
+              className="min-h-44"
+            />
+          ))}
+        </div>
+      </section>
+      <SectionHeader title="Referência rápida" description="Limites e uso esperado sem texto longo na primeira camada." />
       <div className="grid gap-4 md:grid-cols-2">
-        {sections.map((section) => (
-          <ActionCard key={section.title} title={section.title} description={section.body} />
+        {sections.map((section, index) => (
+          <ActionCard
+            key={section.title}
+            icon={[FileQuestion, Database, ShieldAlert, FileText, FileText][index]}
+            title={section.title}
+            description={section.body}
+          />
         ))}
       </div>
     </PageFrame>

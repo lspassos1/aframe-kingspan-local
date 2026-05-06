@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FormSection, InlineHelp, PageFrame, PageHeader, StickySummary } from "@/components/shared/design-system";
+import { FormSection, InlineHelp, PageFrame, PageHeader, StickySummary, StatusPill } from "@/components/shared/design-system";
 import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,7 +49,17 @@ function NumberField({
   );
 }
 
+const editSections = [
+  { id: "local", label: "Local", description: "Projeto, endereço e UF" },
+  { id: "lote", label: "Lote", description: "Terreno e recuos" },
+  { id: "geometria", label: "Geometria", description: "Volume e pavimentos" },
+  { id: "fontes", label: "Fontes", description: "Painel, preço e estrutura" },
+] as const;
+
+type EditSectionId = (typeof editSections)[number]["id"];
+
 export default function EditPage() {
+  const [activeSection, setActiveSection] = useState<EditSectionId>("local");
   const project = useProjectStore((state) => state.project);
   const scenario = useSelectedScenario();
   const updateProjectName = useProjectStore((state) => state.updateProjectName);
@@ -111,8 +121,9 @@ export default function EditPage() {
       <PageFrame>
         <PageHeader
           eyebrow="Dados da obra"
-          title="Projeto, local e geometria"
-          description="Lote, endereço e medidas são editáveis. Cruz das Almas/BA e 17 x 26 m são apenas dados iniciais do exemplo."
+          title="Medidas, local e premissas"
+          description="Edite a obra por partes. As premissas técnicas continuam revisáveis e alimentam geometria, 3D e orçamento preliminar."
+          status={<StatusPill tone={geometry.fitsTerrain ? "success" : "warning"}>{geometry.fitsTerrain ? "Cabe no lote" : "Revisar recuos"}</StatusPill>}
           actions={
             <Button type="submit">
               <Save className="mr-2 h-4 w-4" />
@@ -121,6 +132,25 @@ export default function EditPage() {
           }
         />
 
+        <section className="grid gap-3 md:grid-cols-4">
+          {editSections.map((section) => {
+            const active = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                data-active={active ? "true" : undefined}
+                className="rounded-3xl border bg-card/85 p-4 text-left shadow-sm shadow-foreground/5 transition-all hover:-translate-y-0.5 hover:border-primary/25 data-[active=true]:border-primary/40 data-[active=true]:bg-primary/[0.04]"
+              >
+                <span className="text-sm font-semibold">{section.label}</span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">{section.description}</span>
+              </button>
+            );
+          })}
+        </section>
+
+        {activeSection === "local" ? (
         <FormSection title="Projeto e endereço" description="Identificação do estudo e localização usada para filtros regionais." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2">
             <Label>Nome do projeto</Label>
@@ -166,9 +196,11 @@ export default function EditPage() {
             <Textarea {...form.register("location.notes")} />
           </div>
         </FormSection>
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
           <div className="space-y-6">
+            {activeSection === "lote" ? (
             <FormSection title="Lote e recuos" description="Medidas base para implantação e validação preliminar no terreno." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <NumberField label="Largura do lote (m)" {...form.register("terrain.width")} />
               <NumberField label="Profundidade do lote (m)" {...form.register("terrain.depth")} />
@@ -195,7 +227,9 @@ export default function EditPage() {
               <NumberField label="Recuo esquerdo (m)" {...form.register("terrain.leftSetback")} />
               <NumberField label="Recuo direito (m)" {...form.register("terrain.rightSetback")} />
             </FormSection>
+            ) : null}
 
+            {activeSection === "geometria" ? (
             <FormSection title="A-frame" description="Parâmetros técnicos mantidos para preservar o baseline A-frame." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {isCustomPanel ? (
                 <NumberField label="Comprimento do painel (m)" {...form.register("aFrame.panelLength")} />
@@ -317,13 +351,15 @@ export default function EditPage() {
                 )}
               />
             </FormSection>
+            ) : null}
 
-            <FormSection title="Painel, preço e estrutura" description="Fonte de painel, cotação e modo estrutural preliminar." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {activeSection === "fontes" ? (
+            <FormSection title="Painel, preço e estrutura" description="Fonte de painel, cotação e modo estrutural preliminar." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Controller
                 control={form.control}
                 name="panelProductId"
                 render={({ field }) => (
-                  <div className="space-y-2">
+                  <div className="space-y-2 xl:col-span-4">
                     <Label>Produto de painel</Label>
                     <Select
                       value={field.value}
@@ -453,6 +489,7 @@ export default function EditPage() {
                 Estes parâmetros alimentam o estudo preliminar. Fundação, estrutura e orçamento formal dependem de revisão técnica.
               </InlineHelp>
             </FormSection>
+            ) : null}
           </div>
 
           <StickySummary title="Resumo calculado" description="Leitura em tempo real dos parâmetros atuais.">

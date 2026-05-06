@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   AlertCircle,
   CheckCircle2,
   ClipboardList,
+  FileText,
   FolderOpen,
   Home,
   Layers3,
@@ -17,8 +19,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AdvancedDisclosure, EmptyState, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
-import { MetricCard } from "@/components/shared/MetricCard";
+import { ActionCard, AdvancedDisclosure, EmptyState, MetricCard, PageFrame, PageHeader, SectionHeader, StatusPill } from "@/components/shared/design-system";
 import { getSavedProjectSummary, useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { calculatePanelLayout } from "@/lib/calculations/materials";
@@ -137,6 +138,41 @@ export default function DashboardPage() {
   const mainMaterials = materials.slice(0, 5);
   const aFrameGeometry = scenario.constructionMethod === "aframe" ? calculateAFrameGeometry(scenario.terrain, scenario.aFrame) : null;
   const structural = scenario.constructionMethod === "aframe" ? estimateSteelStructure(project, scenario) : null;
+  const primaryAction = pendingPriceCount > 0 ? { href: "/budget-assistant", label: "Resolver fontes" } : { href: "/export", label: "Exportar estudo" };
+  const decisionCards = [
+    {
+      title: "Revisar dados da obra",
+      description: width === null || depth === null ? "Complete medidas, lote e premissas antes de avançar." : "Medidas base disponíveis para revisão.",
+      href: "/edit",
+      icon: Ruler,
+      tone: width === null || depth === null ? "warning" : "success",
+      cta: "Abrir dados",
+    },
+    {
+      title: "Conferir quantitativos",
+      description: materials.length === 0 ? "Nenhum quantitativo gerado para o cenário atual." : `${materials.length} linhas prontas para análise por sistema.`,
+      href: "/materials",
+      icon: Package,
+      tone: materials.length === 0 ? "warning" : "info",
+      cta: "Ver materiais",
+    },
+    {
+      title: "Aprovar fontes de preço",
+      description: pendingPriceCount > 0 ? `${pendingPriceCount} item(ns) precisam de fonte ou confirmação.` : "Fontes cadastradas não apresentam pendência crítica.",
+      href: "/budget-assistant",
+      icon: Wallet,
+      tone: pendingPriceCount > 0 ? "warning" : "success",
+      cta: "Abrir base",
+    },
+    {
+      title: "Gerar pacote de revisão",
+      description: "Exporte JSON, planilhas e relatórios preliminares com pendências visíveis.",
+      href: "/export",
+      icon: FileText,
+      tone: "pending",
+      cta: "Exportar",
+    },
+  ] as const;
 
   const addProject = () => {
     saveCurrentProject();
@@ -153,7 +189,7 @@ export default function DashboardPage() {
   return (
     <PageFrame>
       <PageHeader
-        eyebrow="Dashboard"
+        eyebrow="Painel"
         title={project.name}
         status={
           <>
@@ -161,13 +197,12 @@ export default function DashboardPage() {
             <StatusPill tone={activeProjectSaved ? "success" : "warning"}>{activeProjectSaved ? "Salvo" : "Não salvo"}</StatusPill>
           </>
         }
-        description={
-          <>
-            {[scenario.location.city, scenario.location.state].filter(Boolean).join(", ") || "Local nao informado"} | {scenario.name}
-          </>
-        }
+        description={<>{[scenario.location.city, scenario.location.state].filter(Boolean).join(", ") || "Local a confirmar"} | {scenario.name}</>}
         actions={
           <>
+          <Button asChild>
+            <Link href={primaryAction.href}>{primaryAction.label}</Link>
+          </Button>
           <Button variant="outline" onClick={saveCurrentProject}>
             <Save className="mr-2 h-4 w-4" />
             Salvar
@@ -178,7 +213,7 @@ export default function DashboardPage() {
           </Button>
           <Button variant="outline" onClick={() => setDetailsOpen((current) => !current)}>
             <ClipboardList className="mr-2 h-4 w-4" />
-            {detailsOpen ? "Ocultar detalhes" : "Ver detalhes"}
+            {detailsOpen ? "Ocultar técnico" : "Ver técnico"}
           </Button>
           </>
         }
@@ -196,29 +231,39 @@ export default function DashboardPage() {
         />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-2xl border bg-card/90 p-5 shadow-sm shadow-foreground/5">
+      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-3xl border bg-[linear-gradient(135deg,hsl(var(--card)),hsl(var(--background)))] p-5 shadow-sm shadow-foreground/5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Status do estudo</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-normal">Orcamento preliminar</h2>
+              <h2 className="mt-1 text-2xl font-semibold tracking-normal">Centro de decisão</h2>
             </div>
             <Badge variant={budgetConfidence.variant}>Confianca {budgetConfidence.label}</Badge>
           </div>
-          <div className="mt-5 grid gap-4 text-sm sm:grid-cols-3">
-            <StatusItem label="Metodo" value={method.name} />
-            <StatusItem label="Materiais" value={`${materials.length} linhas`} />
-            <StatusItem label="Alertas" value={warnings.length === 0 ? "Sem alertas criticos" : `${warnings.length} para revisar`} />
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <StatusItem label="Método" value={method.name} tone="neutral" />
+            <StatusItem label="Pendências" value={pendingPriceCount === 0 ? "Sem preço pendente" : `${pendingPriceCount} de preço`} tone={pendingPriceCount === 0 ? "success" : "warning"} />
+            <StatusItem label="Alertas técnicos" value={warnings.length === 0 ? "Sem críticos" : `${warnings.length} para revisar`} tone={warnings.length === 0 ? "success" : "warning"} />
           </div>
-          <p className="mt-5 text-sm leading-6 text-muted-foreground">
-            O dashboard mostra uma leitura executiva. Os quantitativos e alertas continuam disponiveis abaixo para revisao tecnica.
-          </p>
+          <div className="mt-5 rounded-2xl border bg-background/70 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Próximo passo recomendado</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {pendingPriceCount > 0 ? "Resolva fontes de preço antes de tratar o orçamento como revisado." : "Gere o pacote preliminar com fontes, quantitativos e avisos técnicos."}
+                </p>
+              </div>
+              <Button asChild className="shrink-0">
+                <Link href={primaryAction.href}>{primaryAction.label}</Link>
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-2xl border bg-card/90 p-5 shadow-sm shadow-foreground/5">
+        <div className="rounded-3xl border bg-card/90 p-5 shadow-sm shadow-foreground/5">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold">Proximos passos</h2>
+            <h2 className="font-semibold">Sequência guiada</h2>
           </div>
           <ol className="mt-4 space-y-3 text-sm text-muted-foreground">
             {nextSteps.map((step, index) => (
@@ -228,6 +273,30 @@ export default function DashboardPage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
+          eyebrow="Fluxo do estudo"
+          title="Do dado revisado ao orçamento com fonte"
+          description="Cada bloco abre uma tarefa objetiva. Detalhes técnicos permanecem disponíveis, mas não disputam a primeira leitura."
+        />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {decisionCards.map((item) => (
+            <ActionCard
+              key={item.title}
+              icon={item.icon}
+              title={item.title}
+              description={item.description}
+              badge={<StatusPill tone={item.tone} icon={false}>{item.cta}</StatusPill>}
+              footer={
+                <Button asChild variant={item.tone === "warning" ? "default" : "outline"} className="w-full">
+                  <Link href={item.href}>{item.cta}</Link>
+                </Button>
+              }
+            />
+          ))}
         </div>
       </section>
 
@@ -364,11 +433,13 @@ export default function DashboardPage() {
   );
 }
 
-function StatusItem({ label, value }: { label: string; value: string }) {
+function StatusItem({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "success" | "warning" }) {
   return (
-    <div className="rounded-xl border bg-background/65 p-3">
+    <div className="rounded-2xl border bg-background/65 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-medium">{value}</p>
+      <div className="mt-2">
+        <StatusPill tone={tone} icon={false}>{value}</StatusPill>
+      </div>
     </div>
   );
 }

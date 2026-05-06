@@ -1,29 +1,25 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, FileWarning, PencilLine, ShieldAlert, WalletCards } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BudgetGroupCard, MetricCard, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
+import { AdvancedDisclosure, BudgetGroupCard, InlineHelp, MetricCard, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { calculateBudget } from "@/lib/calculations/budget";
 import { estimateRadierFoundation } from "@/lib/calculations/foundation";
-import { calculateConventionalMasonryBudget } from "@/lib/construction-methods/conventional-masonry/budget";
-import { calculateConventionalMasonryGeometry } from "@/lib/construction-methods/conventional-masonry/geometry";
-import { calculateEcoBlockBudget } from "@/lib/construction-methods/eco-block/budget";
-import { calculateEcoBlockGeometry } from "@/lib/construction-methods/eco-block/geometry";
-import { calculateMonolithicEpsBudget } from "@/lib/construction-methods/monolithic-eps/budget";
-import { calculateMonolithicEpsGeometry } from "@/lib/construction-methods/monolithic-eps/geometry";
-import { formatCurrency } from "@/lib/format";
+import { calculateScenarioBudget, calculateScenarioGeometry } from "@/lib/construction-methods/scenario-calculations";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
+import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
+import type { BudgetItem, BudgetSummary, FoundationAssumptions, MaterialCategory, Project } from "@/types/project";
 
 const BudgetCategoryChart = dynamic(
   () => import("@/components/charts/BudgetCategoryChart").then((mod) => mod.BudgetCategoryChart),
   {
     ssr: false,
-    loading: () => <div className="h-full rounded-md bg-muted" />,
+    loading: () => <div className="h-full rounded-2xl bg-muted" />,
   }
 );
 
@@ -38,645 +34,431 @@ const foundationMaterialIds = new Set([
 const foundationLaborIds = new Set(["foundation-soil-prep", "foundation-labor"]);
 const foundationEquipmentIds = new Set(["foundation-pump"]);
 
+const categoryLabels: Record<MaterialCategory, string> = {
+  panels: "Paredes e painéis",
+  fasteners: "Fixação",
+  flashings: "Arremates",
+  sealants: "Vedação",
+  facade: "Aberturas e fachada",
+  steel: "Estrutura",
+  civil: "Civil e fundação",
+  labor: "Mão de obra",
+  technical: "Técnico",
+  freight: "Frete",
+  contingency: "Contingência",
+  other: "Outros",
+};
+
+function readNumber(geometry: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = geometry[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function formatArea(value: number | null) {
+  return value === null ? "A confirmar" : `${formatCompactNumber(value)} m2`;
+}
+
+function groupItems(items: BudgetItem[]) {
+  const groups = new Map<MaterialCategory, BudgetItem[]>();
+  items.forEach((item) => {
+    const current = groups.get(item.category) ?? [];
+    current.push(item);
+    groups.set(item.category, current);
+  });
+
+  return Array.from(groups.entries()).map(([category, lines]) => ({
+    category,
+    label: categoryLabels[category],
+    lines,
+    total: lines.reduce((sum, item) => sum + item.netTotalBRL, 0),
+    pending: lines.filter((item) => item.requiresConfirmation).length,
+  }));
+}
+
+function chartDataForBudget(budget: BudgetSummary) {
+  return [
+    { name: "Painéis", value: budget.panelPackageCostBRL },
+    { name: "Acessórios", value: budget.accessoriesCostBRL },
+    { name: "Frete", value: budget.freightBRL },
+    { name: "Aço", value: budget.steelStructureCostBRL },
+    { name: "Fundação", value: budget.foundationCostBRL },
+    { name: "Civil compl.", value: budget.civilPlaceholderBRL },
+    { name: "Mão obra", value: budget.laborEquipmentBRL },
+    { name: "Técnico", value: budget.technicalLegalBRL },
+    { name: "Conting.", value: budget.contingencyBRL },
+  ].filter((item) => item.value > 0);
+}
+
+function statusForItem(item: BudgetItem) {
+  if (item.requiresConfirmation) {
+    return { tone: "warning" as const, label: "Fonte pendente", action: "Informar fonte, data-base e confiança" };
+  }
+  return { tone: "success" as const, label: "Calculado", action: "Conferir revisão humana" };
+}
+
 export default function BudgetPage() {
   const project = useProjectStore((state) => state.project);
   const updateBudgetAssumptions = useProjectStore((state) => state.updateBudgetAssumptions);
   const updateFoundationAssumptions = useProjectStore((state) => state.updateFoundationAssumptions);
   const scenario = useSelectedScenario();
-  const isConventionalMasonry = scenario.constructionMethod === "conventional-masonry";
-  const isEcoBlock = scenario.constructionMethod === "eco-block";
-  const isMonolithicEps = scenario.constructionMethod === "monolithic-eps";
-  if (isMonolithicEps) {
-    const geometry = calculateMonolithicEpsGeometry({ project, scenario });
-    const budget = calculateMonolithicEpsBudget({ project, scenario });
-    const pendingItems = budget.items.filter((item) => item.requiresConfirmation).length;
-
-    return (
-      <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Orcamento</p>
-          <h1 className="text-3xl font-semibold tracking-normal">Estimativa preliminar de EPS monolitico</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Quantitativos sem preco inventado. Desempenho estrutural depende de fornecedor, sistema validado e responsavel tecnico.
-          </p>
-        </div>
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Total preliminar</p>
-              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.totalEstimatedCostBRL)}</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Custo/m2</p>
-              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.costPerTotalM2)}</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Area construida</p>
-              <p className="mt-2 text-2xl font-semibold">{geometry.builtAreaM2} m2</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Itens pendentes</p>
-              <p className="mt-2 text-2xl font-semibold">{pendingItems}</p>
-            </CardContent>
-          </Card>
-        </section>
-
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Itens preliminares</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table className="min-w-[1120px] table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-56">Descricao</TableHead>
-                  <TableHead className="w-28">Categoria</TableHead>
-                  <TableHead className="w-24 text-right">Qtd.</TableHead>
-                  <TableHead className="w-20">Un.</TableHead>
-                  <TableHead className="w-32 text-right">Liquido</TableHead>
-                  <TableHead className="w-[360px]">Notas</TableHead>
-                  <TableHead className="w-40">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {budget.items.map((item) => (
-                  <TableRow key={item.id} className="align-top">
-                    <TableCell className="whitespace-normal break-words align-top font-medium">{item.description}</TableCell>
-                    <TableCell className="align-top">{item.category}</TableCell>
-                    <TableCell className="align-top text-right">{item.quantity}</TableCell>
-                    <TableCell className="align-top">{item.unit}</TableCell>
-                    <TableCell className="align-top text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
-                    <TableCell className="whitespace-normal break-words align-top text-xs text-muted-foreground">{item.notes}</TableCell>
-                    <TableCell className="align-top">
-                      <Badge variant={item.requiresConfirmation ? "secondary" : "outline"}>
-                        {item.requiresConfirmation ? "revisar fonte" : "parametro"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Alertas tecnicos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {budget.warnings.map((warning) => (
-              <div key={warning.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                {warning.message}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (isEcoBlock) {
-    const geometry = calculateEcoBlockGeometry({ project, scenario });
-    const budget = calculateEcoBlockBudget({ project, scenario });
-    const pendingItems = budget.items.filter((item) => item.requiresConfirmation).length;
-
-    return (
-      <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Orcamento</p>
-          <h1 className="text-3xl font-semibold tracking-normal">Estimativa preliminar de bloco ecologico</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Quantitativos sem preco inventado. Uso estrutural permanece bloqueado por warnings ate existir sistema validado e responsavel tecnico.
-          </p>
-        </div>
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Total preliminar</p>
-              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.totalEstimatedCostBRL)}</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Custo/m2</p>
-              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.costPerTotalM2)}</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Area construida</p>
-              <p className="mt-2 text-2xl font-semibold">{geometry.builtAreaM2} m2</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Itens pendentes</p>
-              <p className="mt-2 text-2xl font-semibold">{pendingItems}</p>
-            </CardContent>
-          </Card>
-        </section>
-
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Itens preliminares</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table className="min-w-[1120px] table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-56">Descricao</TableHead>
-                  <TableHead className="w-28">Categoria</TableHead>
-                  <TableHead className="w-24 text-right">Qtd.</TableHead>
-                  <TableHead className="w-20">Un.</TableHead>
-                  <TableHead className="w-32 text-right">Liquido</TableHead>
-                  <TableHead className="w-[360px]">Notas</TableHead>
-                  <TableHead className="w-40">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {budget.items.map((item) => (
-                  <TableRow key={item.id} className="align-top">
-                    <TableCell className="whitespace-normal break-words align-top font-medium">{item.description}</TableCell>
-                    <TableCell className="align-top">{item.category}</TableCell>
-                    <TableCell className="align-top text-right">{item.quantity}</TableCell>
-                    <TableCell className="align-top">{item.unit}</TableCell>
-                    <TableCell className="align-top text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
-                    <TableCell className="whitespace-normal break-words align-top text-xs text-muted-foreground">{item.notes}</TableCell>
-                    <TableCell className="align-top">
-                      <Badge variant={item.requiresConfirmation ? "secondary" : "outline"}>
-                        {item.requiresConfirmation ? "revisar fonte" : "parametro"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Alertas tecnicos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {budget.warnings.map((warning) => (
-              <div key={warning.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                {warning.message}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (isConventionalMasonry) {
-    const geometry = calculateConventionalMasonryGeometry({ project, scenario });
-    const budget = calculateConventionalMasonryBudget({ project, scenario });
-    const pendingItems = budget.items.filter((item) => item.requiresConfirmation).length;
-
-    return (
-      <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Orcamento</p>
-          <h1 className="text-3xl font-semibold tracking-normal">Estimativa preliminar de alvenaria</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Quantitativos aparecem sem preco inventado. Itens pendentes devem receber fonte, data, unidade e confianca nos proximos PRs de orcamento.
-          </p>
-        </div>
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Total preliminar</p>
-              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.totalEstimatedCostBRL)}</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Custo/m2</p>
-              <p className="mt-2 text-2xl font-semibold">{formatCurrency(budget.costPerTotalM2)}</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Area construida</p>
-              <p className="mt-2 text-2xl font-semibold">{geometry.builtAreaM2} m2</p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-md shadow-none">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Itens pendentes</p>
-              <p className="mt-2 text-2xl font-semibold">{pendingItems}</p>
-            </CardContent>
-          </Card>
-        </section>
-
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Itens preliminares</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table className="min-w-[1120px] table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-56">Descricao</TableHead>
-                  <TableHead className="w-28">Categoria</TableHead>
-                  <TableHead className="w-24 text-right">Qtd.</TableHead>
-                  <TableHead className="w-20">Un.</TableHead>
-                  <TableHead className="w-32 text-right">Liquido</TableHead>
-                  <TableHead className="w-[360px]">Notas</TableHead>
-                  <TableHead className="w-40">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {budget.items.map((item) => (
-                  <TableRow key={item.id} className="align-top">
-                    <TableCell className="whitespace-normal break-words align-top font-medium">{item.description}</TableCell>
-                    <TableCell className="align-top">{item.category}</TableCell>
-                    <TableCell className="align-top text-right">{item.quantity}</TableCell>
-                    <TableCell className="align-top">{item.unit}</TableCell>
-                    <TableCell className="align-top text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
-                    <TableCell className="whitespace-normal break-words align-top text-xs text-muted-foreground">{item.notes}</TableCell>
-                    <TableCell className="align-top">
-                      <Badge variant={item.requiresConfirmation ? "secondary" : "outline"}>
-                        {item.requiresConfirmation ? "revisar fonte" : "parametro"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Alertas tecnicos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {budget.warnings.map((warning) => (
-              <div key={warning.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                {warning.message}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const budget = calculateBudget(project, scenario);
-  const foundation = estimateRadierFoundation(scenario, project.foundationAssumptions);
-  const chartData = [
-    { name: "Paineis", value: budget.panelPackageCostBRL },
-    { name: "Acessorios", value: budget.accessoriesCostBRL },
-    { name: "Frete", value: budget.freightBRL },
-    { name: "Aco", value: budget.steelStructureCostBRL },
-    { name: "Radier", value: budget.foundationCostBRL },
-    { name: "Civil compl.", value: budget.civilPlaceholderBRL },
-    { name: "Mao obra", value: budget.laborEquipmentBRL },
-    { name: "Tecnico", value: budget.technicalLegalBRL },
-    { name: "Conting.", value: budget.contingencyBRL },
-  ];
-  const foundationMaterialCostBRL = foundation.items
-    .filter((item) => foundationMaterialIds.has(item.id))
-    .reduce((sum, item) => sum + item.netTotalBRL, 0);
-  const foundationLaborCostBRL = foundation.items
-    .filter((item) => foundationLaborIds.has(item.id))
-    .reduce((sum, item) => sum + item.netTotalBRL, 0);
-  const foundationEquipmentCostBRL = foundation.items
-    .filter((item) => foundationEquipmentIds.has(item.id))
-    .reduce((sum, item) => sum + item.netTotalBRL, 0);
-  const foundationFormulaRows = [
-    {
-      label: "Area orcada",
-      formula: `(${foundation.widthM} m x ${foundation.depthM} m)`,
-      result: `${foundation.areaM2} m2`,
-    },
-    {
-      label: "Concreto da placa",
-      formula: `${foundation.areaM2} m2 x ${project.foundationAssumptions.slabThicknessM} m`,
-      result: `${foundation.slabConcreteM3} m3`,
-    },
-    {
-      label: "Concreto da viga de borda",
-      formula: `${foundation.perimeterM} m x ${project.foundationAssumptions.edgeBeamWidthM} m x ${project.foundationAssumptions.edgeBeamDepthM} m`,
-      result: `${foundation.edgeBeamConcreteM3} m3`,
-    },
-    {
-      label: "Concreto total com perda",
-      formula: `(placa + borda) x ${100 + project.foundationAssumptions.wastePercent}%`,
-      result: `${foundation.concreteM3} m3`,
-    },
-    {
-      label: "Fibra",
-      formula: `${foundation.concreteM3} m3 x ${project.foundationAssumptions.fiberDosageKgM3} kg/m3`,
-      result: `${foundation.fiberKg} kg`,
-    },
-    {
-      label: "Sub-base",
-      formula: `${foundation.areaM2} m2 x ${project.foundationAssumptions.subbaseThicknessM} m`,
-      result: `${foundation.subbaseM3} m3`,
-    },
-    {
-      label: "Lona/barreira",
-      formula: `${foundation.areaM2} m2 x 1,05`,
-      result: `${foundation.vaporBarrierM2} m2`,
-    },
-    {
-      label: "Forma lateral",
-      formula: "perimetro externo do radier",
-      result: `${foundation.formworkM} m`,
-    },
-  ];
+  const method = getConstructionMethodDefinition(scenario.constructionMethod);
+  const geometry = calculateScenarioGeometry(project, scenario) as Record<string, unknown>;
+  const budget = calculateScenarioBudget(project, scenario);
+  const groups = groupItems(budget.items);
+  const pendingItems = budget.items.filter((item) => item.requiresConfirmation);
+  const warningItems = budget.warnings.filter((warning) => warning.level !== "info");
+  const builtArea = readNumber(geometry, ["builtAreaM2", "combinedTotalArea", "groundFloorTotalArea"]);
+  const chartData = chartDataForBudget(budget);
+  const isAFrame = scenario.constructionMethod === "aframe";
+  const foundation = isAFrame ? estimateRadierFoundation(scenario, project.foundationAssumptions) : null;
+  const foundationMaterialCostBRL = foundation
+    ? foundation.items.filter((item) => foundationMaterialIds.has(item.id)).reduce((sum, item) => sum + item.netTotalBRL, 0)
+    : 0;
+  const foundationLaborCostBRL = foundation
+    ? foundation.items.filter((item) => foundationLaborIds.has(item.id)).reduce((sum, item) => sum + item.netTotalBRL, 0)
+    : 0;
+  const foundationEquipmentCostBRL = foundation
+    ? foundation.items.filter((item) => foundationEquipmentIds.has(item.id)).reduce((sum, item) => sum + item.netTotalBRL, 0)
+    : 0;
+  const foundationFormulaRows = foundation
+    ? [
+        { label: "Área orçada", formula: `(${foundation.widthM} m x ${foundation.depthM} m)`, result: `${foundation.areaM2} m2` },
+        { label: "Concreto da placa", formula: `${foundation.areaM2} m2 x ${project.foundationAssumptions.slabThicknessM} m`, result: `${foundation.slabConcreteM3} m3` },
+        {
+          label: "Concreto da viga de borda",
+          formula: `${foundation.perimeterM} m x ${project.foundationAssumptions.edgeBeamWidthM} m x ${project.foundationAssumptions.edgeBeamDepthM} m`,
+          result: `${foundation.edgeBeamConcreteM3} m3`,
+        },
+        { label: "Concreto total com perda", formula: `(placa + borda) x ${100 + project.foundationAssumptions.wastePercent}%`, result: `${foundation.concreteM3} m3` },
+        { label: "Fibra", formula: `${foundation.concreteM3} m3 x ${project.foundationAssumptions.fiberDosageKgM3} kg/m3`, result: `${foundation.fiberKg} kg` },
+        { label: "Sub-base", formula: `${foundation.areaM2} m2 x ${project.foundationAssumptions.subbaseThicknessM} m`, result: `${foundation.subbaseM3} m3` },
+        { label: "Lona/barreira", formula: `${foundation.areaM2} m2 x 1,05`, result: `${foundation.vaporBarrierM2} m2` },
+        { label: "Forma lateral", formula: "perímetro externo do radier", result: `${foundation.formworkM} m` },
+      ]
+    : [];
 
   return (
     <PageFrame>
       <PageHeader
         eyebrow="Orçamento"
-        title="Estimativa separada por categoria"
-        description="Pacote de painéis, frete, estrutura metálica, civil, fachadas, mão de obra e custos técnicos ficam separados."
-        status={<StatusPill tone="warning">Preliminar</StatusPill>}
+        title="Orçamento preliminar com rastreabilidade"
+        description="A tela prioriza decisão: total, custo por área, fonte, pendência e ação necessária. Tabelas técnicas ficam sob demanda."
+        status={
+          <>
+            <StatusPill tone="warning">Preliminar</StatusPill>
+            <StatusPill tone="info" icon={false}>{method.name}</StatusPill>
+          </>
+        }
       />
 
       <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="Total estimado" value={formatCurrency(budget.totalEstimatedCostBRL)} detail="Orçamento preliminar" tone="warning" />
-        <MetricCard label="Custo/m2 total" value={formatCurrency(budget.costPerTotalM2)} detail="Área total de referência" />
-        <MetricCard label="Custo/m2 útil" value={formatCurrency(budget.costPerUsefulM2)} detail="Área útil estimada" />
-        <MetricCard label="Radier c/ fibras" value={formatCurrency(budget.foundationCostBRL)} detail="Premissa editável" />
+        <MetricCard label="Total preliminar" value={formatCurrency(budget.totalEstimatedCostBRL)} detail="Não é orçamento final" tone="warning" icon={<WalletCards className="h-4 w-4" />} />
+        <MetricCard label="Custo/m2" value={formatCurrency(budget.costPerTotalM2)} detail={`Área: ${formatArea(builtArea)}`} />
+        <MetricCard label="Itens com pendência" value={pendingItems.length} detail="Fonte, unidade ou revisão" tone={pendingItems.length > 0 ? "warning" : "success"} icon={<FileWarning className="h-4 w-4" />} />
+        <MetricCard label="Alertas técnicos" value={warningItems.length} detail="Fundação, estrutura e premissas" tone={warningItems.length > 0 ? "warning" : "success"} icon={<ShieldAlert className="h-4 w-4" />} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle>Radier com fibras</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Estimativa interativa pela largura/profundidade da casa. Nao substitui sondagem nem projeto de fundacao.
-                </p>
-              </div>
-              <Badge variant="outline">{foundation.areaM2} m2</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3">
-              <div>
-                <Label>Incluir radier no orcamento</Label>
-                <p className="text-xs text-muted-foreground">Usa a implantacao da casa com folga perimetral.</p>
-              </div>
-              <Checkbox
-                checked={project.foundationAssumptions.enabled}
-                onCheckedChange={(checked) => updateFoundationAssumptions({ enabled: Boolean(checked) })}
-              />
-            </div>
-            <div className="rounded-md border bg-background p-3">
-              <div className="mb-3">
-                <p className="text-sm font-medium">Como este valor foi orcado</p>
-                <p className="text-xs text-muted-foreground">
-                  Area da casa + folga perimetral, concreto da placa, viga de borda, fibra, sub-base, lona, formas,
-                  preparo do solo, mao de obra e bomba/mobilizacao.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-4">
-                <div className="rounded-md bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Materiais</p>
-                  <p className="font-semibold">{formatCurrency(foundationMaterialCostBRL)}</p>
-                </div>
-                <div className="rounded-md bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Mao de obra</p>
-                  <p className="font-semibold">{formatCurrency(foundationLaborCostBRL)}</p>
-                </div>
-                <div className="rounded-md bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Equipamento</p>
-                  <p className="font-semibold">{formatCurrency(foundationEquipmentCostBRL)}</p>
-                </div>
-                <div className="rounded-md bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Total radier</p>
-                  <p className="font-semibold">{formatCurrency(foundation.totalBRL)}</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {[
-                ["extraPerimeterM", "Folga perimetral (m)"],
-                ["slabThicknessM", "Esp. placa (m)"],
-                ["edgeBeamWidthM", "Viga borda larg. (m)"],
-                ["edgeBeamDepthM", "Viga borda alt. (m)"],
-                ["subbaseThicknessM", "Sub-base (m)"],
-                ["wastePercent", "Perda (%)"],
-                ["concreteUnitPriceBRLM3", "Concreto (R$/m3)"],
-                ["fiberDosageKgM3", "Fibra (kg/m3)"],
-                ["fiberUnitPriceBRLKg", "Fibra (R$/kg)"],
-                ["subbaseUnitPriceBRLM3", "Sub-base (R$/m3)"],
-                ["vaporBarrierUnitPriceBRLM2", "Lona (R$/m2)"],
-                ["formworkUnitPriceBRLM", "Forma (R$/m)"],
-                ["laborUnitPriceBRLM2", "MO radier (R$/m2)"],
-                ["soilPrepUnitPriceBRLM2", "Preparo solo (R$/m2)"],
-                ["pumpBRL", "Bomba/mob. (R$)"],
-              ].map(([key, label]) => (
-                <div className="space-y-2" key={key}>
-                  <Label>{label}</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={(project.foundationAssumptions[key as keyof typeof project.foundationAssumptions] as number | undefined) ?? ""}
-                    onChange={(event) => updateFoundationAssumptions({ [key]: event.target.value === "" ? undefined : Number(event.target.value) })}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-md bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Concreto</p>
-                <p className="font-semibold">{foundation.concreteM3} m3</p>
-              </div>
-              <div className="rounded-md bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Fibra</p>
-                <p className="font-semibold">{foundation.fiberKg} kg</p>
-              </div>
-              <div className="rounded-md bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Sub-base</p>
-                <p className="font-semibold">{foundation.subbaseM3} m3</p>
-              </div>
-              <div className="rounded-md bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Perimetro</p>
-                <p className="font-semibold">{foundation.perimeterM} m</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Referencias seed: SINAPI Bahia 03/2026 para concreto bombeavel C25 e preparo com brita. Valores de fibra, lona, forma e mao de obra sao parametros editaveis para cotacao local.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle>Valores complementares editáveis</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            {[
-              ["foundationPlaceholderBRL", "Fundacao extra (R$)"],
-              ["slabPlaceholderBRL", "Laje extra (R$)"],
-              ["drainagePlaceholderBRL", "Drenagem (R$)"],
-              ["frontFacadePlaceholderBRL", "Fachada frontal (R$)"],
-              ["rearClosurePlaceholderBRL", "Fechamento posterior (R$)"],
-              ["doorsWindowsPlaceholderBRL", "Portas/janelas (R$)"],
-              ["panelInstallationLaborBRLM2", "Instalacao paineis (R$/m2)"],
-              ["liftingEquipmentBRL", "Içamento (R$)"],
-              ["scaffoldingBRL", "Andaimes (R$)"],
-              ["architectPlaceholderBRL", "Arquiteto (R$)"],
-              ["engineerPlaceholderBRL", "Engenheiro/ART (R$)"],
-              ["municipalApprovalPlaceholderBRL", "Aprovacao (R$)"],
-              ["contingencyPercent", "Contingencia (%)"],
-            ].map(([key, label]) => (
-              <div className="space-y-2" key={key}>
-                <Label>{label}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={(project.budgetAssumptions[key as keyof typeof project.budgetAssumptions] as number | undefined) ?? ""}
-                  onChange={(event) => updateBudgetAssumptions({ [key]: event.target.value === "" ? undefined : Number(event.target.value) })}
-                />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
+      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <BudgetGroupCard
-          title="Composição do radier"
-          description="Detalhamento da fundação incluída no orçamento: memória de cálculo, materiais, mão de obra e equipamento."
-          status={<StatusPill tone="warning" icon={false}>Revisar</StatusPill>}
-          className="xl:col-span-2"
-          contentClassName="space-y-5"
+          title="Prontidão para orçamento"
+          description="O sistema calcula, mas a aprovação depende de revisão humana e fonte rastreável."
+          status={<StatusPill tone={pendingItems.length > 0 || warningItems.length > 0 ? "warning" : "success"}>{pendingItems.length > 0 ? "Resolver pendências" : "Sem bloqueio crítico"}</StatusPill>}
+          contentClassName="space-y-4"
         >
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Total radier</p>
-                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundation.totalBRL)}</p>
-              </div>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Materiais</p>
-                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundationMaterialCostBRL)}</p>
-              </div>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Mao de obra/servicos</p>
-                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundationLaborCostBRL)}</p>
-              </div>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Equipamento</p>
-                <p className="mt-1 text-lg font-semibold">{formatCurrency(foundationEquipmentCostBRL)}</p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-              <div className="rounded-md border">
-                <div className="border-b bg-muted/30 px-3 py-2 text-sm font-medium">Memoria de calculo</div>
-                <div className="divide-y">
-                  {foundationFormulaRows.map((row) => (
-                    <div className="grid gap-1 px-3 py-2 text-sm" key={row.label}>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium">{row.label}</span>
-                        <span className="font-semibold">{row.result}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{row.formula}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-right">Qtd.</TableHead>
-                      <TableHead>Un.</TableHead>
-                      <TableHead className="text-right">Preco unit.</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {foundation.items.map((item) => {
-                      const type = foundationMaterialIds.has(item.id)
-                        ? "Material"
-                        : foundationLaborIds.has(item.id)
-                          ? "Mao de obra"
-                          : "Equipamento";
-                      return (
-                        <TableRow key={item.id}>
-                          <TableCell>{type}</TableCell>
-                          <TableCell className="min-w-64 font-medium">{item.description}</TableCell>
-                          <TableCell className="text-right">{item.quantity}</TableCell>
-                          <TableCell>{item.unit}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.unitPriceBRL ?? 0)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              O calculo usa a pegada da casa com folga perimetral. Nao inclui sondagem, armaduras especificas, drenagem definitiva, aterramento estrutural, impermeabilizacao detalhada ou projeto executivo.
-            </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ReadinessItem
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              title="Quantidades calculadas"
+              detail={`${budget.items.length} item(ns) de orçamento gerados pelo método atual.`}
+              tone={budget.items.length > 0 ? "success" : "warning"}
+            />
+            <ReadinessItem
+              icon={<PencilLine className="h-4 w-4" />}
+              title="Revisão pendente"
+              detail={pendingItems.length > 0 ? "Itens sem fonte revisada continuam bloqueados." : "Itens não exigem confirmação imediata."}
+              tone={pendingItems.length > 0 ? "warning" : "success"}
+            />
+            <ReadinessItem
+              icon={<AlertTriangle className="h-4 w-4" />}
+              title="Alertas técnicos"
+              detail={warningItems.length > 0 ? "Há premissas que exigem responsável técnico." : "Sem alerta crítico no cálculo atual."}
+              tone={warningItems.length > 0 ? "warning" : "success"}
+            />
+            <ReadinessItem
+              icon={<WalletCards className="h-4 w-4" />}
+              title="Fonte de preço"
+              detail="Use Base de preços para vincular SINAPI/cotações antes de aprovar."
+              tone="pending"
+            />
+          </div>
+          {pendingItems.length > 0 ? (
+            <InlineHelp tone="warning">
+              Preço sem fonte, unidade incompatível, região divergente ou revisão técnica pendente não deve entrar como orçamento revisado.
+            </InlineHelp>
+          ) : null}
         </BudgetGroupCard>
 
-        <Card className="rounded-md shadow-none xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Custo por categoria</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[420px]">
-            <BudgetCategoryChart data={chartData} />
-          </CardContent>
-        </Card>
+        <BudgetGroupCard title="Distribuição do custo" description="Leitura visual do orçamento preliminar por grupo." contentClassName="h-[360px]">
+          {chartData.length > 0 ? <BudgetCategoryChart data={chartData} /> : <div className="grid h-full place-items-center rounded-2xl border border-dashed text-sm text-muted-foreground">Sem valores suficientes para gráfico.</div>}
+        </BudgetGroupCard>
       </section>
 
-      <Card className="rounded-md shadow-none">
-        <CardHeader>
-          <CardTitle>Itens do orcamento</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Descricao</TableHead>
-                <TableHead className="text-right">Qtd.</TableHead>
-                <TableHead>Un.</TableHead>
-                <TableHead className="text-right">Liquido</TableHead>
-                <TableHead>Fornecedor</TableHead>
-                <TableHead>Notas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {budget.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.category}</TableCell>
-                  <TableCell className="min-w-72 font-medium">{item.description}</TableCell>
-                  <TableCell className="text-right">{item.quantity}</TableCell>
-                  <TableCell>{item.unit}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
-                  <TableCell>{item.supplier}</TableCell>
-                  <TableCell className="min-w-72 text-xs text-muted-foreground">{item.notes}</TableCell>
-                </TableRow>
+      <BudgetGroupCard
+        title="Itens por sistema"
+        description="Cards de decisão substituem a tabela como leitura principal. Cada grupo mostra total, pendência e próximas ações."
+        status={<StatusPill tone="info" icon={false}>{groups.length} grupos</StatusPill>}
+        contentClassName="grid gap-4 lg:grid-cols-2"
+      >
+        {groups.map((group) => (
+          <article key={group.category} className="rounded-2xl border bg-background/75 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">{group.label}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{group.lines.length} item(ns) · {formatCurrency(group.total)}</p>
+              </div>
+              <StatusPill tone={group.pending > 0 ? "warning" : "success"} icon={false}>
+                {group.pending > 0 ? `${group.pending} pendente(s)` : "Calculado"}
+              </StatusPill>
+            </div>
+            <div className="mt-4 space-y-3">
+              {group.lines.slice(0, 3).map((item) => {
+                const status = statusForItem(item);
+                return (
+                  <div key={item.id} className="rounded-xl border bg-card/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium leading-5">{item.description}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatCompactNumber(item.quantity)} {item.unit} · {formatCurrency(item.netTotalBRL)}
+                        </p>
+                      </div>
+                      <StatusPill tone={status.tone} icon={false}>{status.label}</StatusPill>
+                    </div>
+                    {item.requiresConfirmation ? <p className="mt-2 text-xs text-amber-800">{status.action}</p> : null}
+                  </div>
+                );
+              })}
+              {group.lines.length > 3 ? <p className="text-xs text-muted-foreground">+ {group.lines.length - 3} item(ns) na tabela técnica.</p> : null}
+            </div>
+          </article>
+        ))}
+      </BudgetGroupCard>
+
+      {foundation ? (
+        <BudgetGroupCard
+          title="Fundação preliminar"
+          description="Radier com fibras permanece premissa editável, sempre com alerta técnico."
+          status={<StatusPill tone="warning">Revisão técnica</StatusPill>}
+          contentClassName="space-y-5"
+        >
+          <div className="flex items-center justify-between rounded-2xl border bg-background/75 p-4">
+            <div>
+              <Label>Incluir radier no orçamento</Label>
+              <p className="text-sm text-muted-foreground">Usa a implantação da casa com folga perimetral.</p>
+            </div>
+            <Checkbox checked={project.foundationAssumptions.enabled} onCheckedChange={(checked) => updateFoundationAssumptions({ enabled: Boolean(checked) })} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <MetricCard label="Total radier" value={formatCurrency(foundation.totalBRL)} detail={`${foundation.areaM2} m2`} tone="warning" />
+            <MetricCard label="Materiais" value={formatCurrency(foundationMaterialCostBRL)} detail="Concreto, fibra, sub-base" />
+            <MetricCard label="Mão de obra" value={formatCurrency(foundationLaborCostBRL)} detail="Preparação e execução" />
+            <MetricCard label="Equipamento" value={formatCurrency(foundationEquipmentCostBRL)} detail="Bomba/mobilização" />
+          </div>
+          <AdvancedDisclosure title="Parâmetros editáveis da fundação" description="Campos técnicos ficam sob demanda para não dominar a leitura do orçamento.">
+            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+              {foundationInputRows.map(({ key, label }) => (
+                <NumberInput
+                  key={key}
+                  label={label}
+                  value={project.foundationAssumptions[key]}
+                  onChange={(value) => updateFoundationAssumptions({ [key]: value } as Partial<FoundationAssumptions>)}
+                />
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </div>
+          </AdvancedDisclosure>
+          <AdvancedDisclosure title="Memória de cálculo do radier" description="Fórmulas auditáveis usadas para a estimativa preliminar.">
+            <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+              <div className="divide-y rounded-2xl border bg-background/70">
+                {foundationFormulaRows.map((row) => (
+                  <div className="grid gap-1 px-4 py-3 text-sm" key={row.label}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">{row.label}</span>
+                      <span className="font-semibold">{row.result}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{row.formula}</p>
+                  </div>
+                ))}
+              </div>
+              <BudgetLinesTable
+                items={foundation.items.map((item) => ({
+                  id: item.id,
+                  category: foundationMaterialIds.has(item.id) ? "civil" : foundationLaborIds.has(item.id) ? "labor" : "other",
+                  description: item.description,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  unitPriceBRL: item.unitPriceBRL,
+                  grossTotalBRL: item.netTotalBRL,
+                  discountBRL: 0,
+                  netTotalBRL: item.netTotalBRL,
+                  supplier: foundationMaterialIds.has(item.id) ? "Parâmetro material" : foundationLaborIds.has(item.id) ? "Parâmetro mão de obra" : "Parâmetro equipamento",
+                  notes: item.notes,
+                  requiresConfirmation: true,
+                }))}
+                compact
+              />
+            </div>
+          </AdvancedDisclosure>
+        </BudgetGroupCard>
+      ) : null}
+
+      {isAFrame ? (
+        <BudgetGroupCard title="Complementos editáveis" description="Valores complementares ficam explícitos, mas fora da primeira leitura." contentClassName="space-y-4">
+          <AdvancedDisclosure title="Premissas financeiras complementares" description="Use somente valores com fonte ou cotação. Campos vazios continuam pendentes.">
+            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
+              {budgetAssumptionRows.map(({ key, label }) => (
+                <NumberInput
+                  key={key}
+                  label={label}
+                  value={project.budgetAssumptions[key] as number | undefined}
+                  onChange={(value) => updateBudgetAssumptions({ [key]: value } as Partial<Project["budgetAssumptions"]>)}
+                />
+              ))}
+            </div>
+          </AdvancedDisclosure>
+        </BudgetGroupCard>
+      ) : null}
+
+      <AdvancedDisclosure
+        title="Tabela técnica do orçamento"
+        description="Use a tabela para conferência detalhada, auditoria ou cópia. A leitura principal fica nos cards acima."
+        badge={<StatusPill tone="neutral" icon={false}>{budget.items.length} itens</StatusPill>}
+      >
+        <BudgetLinesTable items={budget.items} />
+      </AdvancedDisclosure>
     </PageFrame>
+  );
+}
+
+type NumericFoundationAssumptionKey = {
+  [Key in keyof FoundationAssumptions]: FoundationAssumptions[Key] extends number ? Key : never;
+}[keyof FoundationAssumptions];
+
+type BudgetAssumptionKey = keyof Project["budgetAssumptions"];
+
+const foundationInputRows: Array<{ key: NumericFoundationAssumptionKey; label: string }> = [
+  { key: "extraPerimeterM", label: "Folga perimetral (m)" },
+  { key: "slabThicknessM", label: "Esp. placa (m)" },
+  { key: "edgeBeamWidthM", label: "Viga borda larg. (m)" },
+  { key: "edgeBeamDepthM", label: "Viga borda alt. (m)" },
+  { key: "subbaseThicknessM", label: "Sub-base (m)" },
+  { key: "wastePercent", label: "Perda (%)" },
+  { key: "concreteUnitPriceBRLM3", label: "Concreto (R$/m3)" },
+  { key: "fiberDosageKgM3", label: "Fibra (kg/m3)" },
+  { key: "fiberUnitPriceBRLKg", label: "Fibra (R$/kg)" },
+  { key: "subbaseUnitPriceBRLM3", label: "Sub-base (R$/m3)" },
+  { key: "vaporBarrierUnitPriceBRLM2", label: "Lona (R$/m2)" },
+  { key: "formworkUnitPriceBRLM", label: "Forma (R$/m)" },
+  { key: "laborUnitPriceBRLM2", label: "MO radier (R$/m2)" },
+  { key: "soilPrepUnitPriceBRLM2", label: "Preparo solo (R$/m2)" },
+  { key: "pumpBRL", label: "Bomba/mob. (R$)" },
+];
+
+const budgetAssumptionRows: Array<{ key: BudgetAssumptionKey; label: string }> = [
+  { key: "foundationPlaceholderBRL", label: "Fundação extra (R$)" },
+  { key: "slabPlaceholderBRL", label: "Laje extra (R$)" },
+  { key: "drainagePlaceholderBRL", label: "Drenagem (R$)" },
+  { key: "frontFacadePlaceholderBRL", label: "Fachada frontal (R$)" },
+  { key: "rearClosurePlaceholderBRL", label: "Fechamento posterior (R$)" },
+  { key: "doorsWindowsPlaceholderBRL", label: "Portas/janelas (R$)" },
+  { key: "panelInstallationLaborBRLM2", label: "Instalação painéis (R$/m2)" },
+  { key: "liftingEquipmentBRL", label: "Içamento (R$)" },
+  { key: "scaffoldingBRL", label: "Andaimes (R$)" },
+  { key: "architectPlaceholderBRL", label: "Arquiteto (R$)" },
+  { key: "engineerPlaceholderBRL", label: "Engenheiro/ART (R$)" },
+  { key: "municipalApprovalPlaceholderBRL", label: "Aprovação (R$)" },
+  { key: "contingencyPercent", label: "Contingência (%)" },
+];
+
+function NumberInput({ label, value, onChange }: { label: string; value: number | undefined; onChange: (value: number | undefined) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input
+        type="number"
+        step="0.01"
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value === "" ? undefined : Number(event.target.value))}
+      />
+    </div>
+  );
+}
+
+function ReadinessItem({
+  icon,
+  title,
+  detail,
+  tone,
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  tone: "success" | "warning" | "pending";
+}) {
+  return (
+    <div className="rounded-2xl border bg-background/75 p-4">
+      <div className="flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border bg-card text-muted-foreground">{icon}</span>
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold">{title}</p>
+            <StatusPill tone={tone} icon={false}>{tone === "success" ? "ok" : tone === "warning" ? "ação" : "próximo"}</StatusPill>
+          </div>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BudgetLinesTable({ items, compact = false }: { items: BudgetItem[]; compact?: boolean }) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border bg-background/70">
+      <Table className={compact ? "min-w-[820px]" : "min-w-[1120px] table-fixed"}>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-36">Sistema</TableHead>
+            <TableHead className="w-[340px]">Descrição</TableHead>
+            <TableHead className="w-24 text-right">Qtd.</TableHead>
+            <TableHead className="w-20">Un.</TableHead>
+            <TableHead className="w-32 text-right">Preço unit.</TableHead>
+            <TableHead className="w-32 text-right">Total</TableHead>
+            <TableHead className="w-44">Fonte/status</TableHead>
+            {!compact ? <TableHead className="w-[320px]">Notas</TableHead> : null}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => {
+            const status = statusForItem(item);
+            return (
+              <TableRow key={item.id} className="align-top">
+                <TableCell className="align-top">{categoryLabels[item.category]}</TableCell>
+                <TableCell className="whitespace-normal break-words align-top font-medium">{item.description}</TableCell>
+                <TableCell className="align-top text-right">{formatCompactNumber(item.quantity)}</TableCell>
+                <TableCell className="align-top">{item.unit}</TableCell>
+                <TableCell className="align-top text-right">{item.unitPriceBRL ? formatCurrency(item.unitPriceBRL) : "A confirmar"}</TableCell>
+                <TableCell className="align-top text-right">{formatCurrency(item.netTotalBRL)}</TableCell>
+                <TableCell className="align-top">
+                  <StatusPill tone={status.tone} icon={false}>{item.supplier || status.label}</StatusPill>
+                </TableCell>
+                {!compact ? <TableCell className="whitespace-normal break-words align-top text-xs text-muted-foreground">{item.notes}</TableCell> : null}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
