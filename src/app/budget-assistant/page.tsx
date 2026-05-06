@@ -1,11 +1,24 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { BadgeDollarSign, CircleAlert, FileCheck2, Link2, MapPin, Plus, WalletCards } from "lucide-react";
+import { BadgeDollarSign, CheckSquare2, CircleAlert, Database, FileCheck2, FileUp, Link2, MapPin, Plus, SearchCheck, TableProperties, WalletCards } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState, FormSection, MetricCard, PageFrame, PageHeader, SourceBadge, ConfidenceBadge, StatusPill } from "@/components/shared/design-system";
+import {
+  ActionCard,
+  AdvancedDisclosure,
+  EmptyState,
+  FormSection,
+  MetricCard,
+  PageFrame,
+  PageHeader,
+  ReviewCard,
+  SectionHeader,
+  SourceBadge,
+  ConfidenceBadge,
+  StatusPill,
+} from "@/components/shared/design-system";
 import { PriceBaseImportCard } from "@/components/budget-assistant/PriceBaseImportCard";
 import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
@@ -100,6 +113,43 @@ export default function BudgetAssistantPage() {
   const canAddManualPrice = Boolean(
     scenarioHasValidRegion && selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0
   );
+  const workflowSteps = [
+    {
+      title: "Importar base",
+      description: "Suba CSV/XLSX/JSON/ZIP ou cadastre fonte manual.",
+      icon: FileUp,
+      status: viewModel.costSources.length > 0 ? "feito" : "pendente",
+      tone: viewModel.costSources.length > 0 ? "success" : "warning",
+    },
+    {
+      title: "Confirmar região",
+      description: `${scenario.location.city || "Cidade ausente"}${scenarioState ? `/${scenarioState}` : ""}`,
+      icon: MapPin,
+      status: scenarioHasValidRegion ? "ok" : "pendente",
+      tone: scenarioHasValidRegion ? "success" : "warning",
+    },
+    {
+      title: "Revisar colunas",
+      description: "Fonte, data-base, unidade e confiança ficam explícitas.",
+      icon: TableProperties,
+      status: viewModel.costItems.length > 0 ? "em uso" : "aguardando",
+      tone: viewModel.costItems.length > 0 ? "success" : "pending",
+    },
+    {
+      title: "Vincular composições",
+      description: "Sugestões usam apenas candidatos existentes.",
+      icon: SearchCheck,
+      status: viewModel.matches.length > 0 ? "sugerido" : "pendente",
+      tone: viewModel.matches.length > 0 ? "success" : "warning",
+    },
+    {
+      title: "Aprovar",
+      description: "Somente usuário aprova vínculos e preços revisados.",
+      icon: CheckSquare2,
+      status: viewModel.unpricedCount === 0 ? "pronto" : "bloqueado",
+      tone: viewModel.unpricedCount === 0 ? "success" : "warning",
+    },
+  ] as const;
 
   const handleSelectQuantity = (quantityId: string) => {
     setSelectedQuantityId(quantityId);
@@ -180,7 +230,7 @@ export default function BudgetAssistantPage() {
     <PageFrame>
       <PageHeader
         eyebrow="Assistente de orçamento"
-        title="Fontes, preços e revisão"
+        title="Base de preços e vínculos"
         description="Quantitativos do cenário atual, fontes cadastradas, preços pendentes e confiança. Nenhum preço é criado automaticamente."
         status={<StatusPill tone="info" icon={false}>{viewModel.methodName}</StatusPill>}
       />
@@ -192,7 +242,27 @@ export default function BudgetAssistantPage() {
         <MetricCard icon={<Link2 className="h-4 w-4" />} label="Fontes" value={viewModel.costSources.length} detail="Cadastradas/importadas" />
       </section>
 
-      <Card className="rounded-md shadow-none">
+      <section className="space-y-4">
+        <SectionHeader
+          eyebrow="Fluxo da base"
+          title="Importar, revisar, vincular e aprovar"
+          description="A tela deixa claro onde a base está pronta e onde ainda existe bloqueio antes do orçamento."
+        />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {workflowSteps.map((step) => (
+            <ActionCard
+              key={step.title}
+              icon={step.icon}
+              title={step.title}
+              description={step.description}
+              badge={<StatusPill tone={step.tone} icon={false}>{step.status}</StatusPill>}
+              className="min-h-44"
+            />
+          ))}
+        </div>
+      </section>
+
+      <Card className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -397,7 +467,7 @@ export default function BudgetAssistantPage() {
         </FormSection>
       </section>
 
-      <Card className="rounded-md shadow-none">
+      <Card className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BadgeDollarSign className="h-5 w-5" />
@@ -454,50 +524,71 @@ export default function BudgetAssistantPage() {
       </Card>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="rounded-md shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileCheck2 className="h-5 w-5" />
-              Quantitativos detectados
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table className="min-w-[880px] table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[340px]">Descrição</TableHead>
-                  <TableHead className="w-28">Categoria</TableHead>
-                  <TableHead className="w-24 text-right">Qtd.</TableHead>
-                  <TableHead className="w-20">Un.</TableHead>
-                  <TableHead className="w-32 text-right">Estimado</TableHead>
-                  <TableHead className="w-36">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {viewModel.quantityItems.map((item) => (
-                  <TableRow key={item.id} className="align-top">
-                    <TableCell className="whitespace-normal break-words align-top">
-                      <div className="font-medium">{item.description}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{item.notes}</div>
-                    </TableCell>
-                    <TableCell className="align-top">{item.category}</TableCell>
-                    <TableCell className="align-top text-right">{formatCompactNumber(item.quantity)}</TableCell>
-                    <TableCell className="align-top">{item.unit}</TableCell>
-                    <TableCell className="align-top text-right">{formatCurrency(item.estimatedTotalBRL)}</TableCell>
-                    <TableCell className="align-top">
-                      <Badge variant={item.requiresPriceSource ? "secondary" : "outline"}>
-                        {item.requiresPriceSource ? "sem fonte revisada" : "parâmetro"}
-                      </Badge>
-                    </TableCell>
+        <div className="space-y-4">
+          <SectionHeader
+            title="Quantitativos para vincular"
+            description="Cards mostram quantidade, status e ação antes da tabela técnica."
+            action={<StatusPill tone={viewModel.pendingPriceItems.length > 0 ? "warning" : "success"}>{viewModel.pendingPriceItems.length} sem fonte</StatusPill>}
+          />
+          <div className="grid gap-3">
+            {viewModel.quantityItems.slice(0, 6).map((item) => (
+              <ReviewCard
+                key={item.id}
+                title={item.description}
+                description={`${item.category} · ${formatCompactNumber(item.quantity)} ${item.unit}`}
+                status={<StatusPill tone={item.requiresPriceSource ? "warning" : "success"} icon={false}>{item.requiresPriceSource ? "sem fonte" : "parâmetro"}</StatusPill>}
+              >
+                <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <span>{item.notes || "Sem observação adicional."}</span>
+                  <strong className="text-foreground">{formatCurrency(item.estimatedTotalBRL)}</strong>
+                </div>
+              </ReviewCard>
+            ))}
+          </div>
+          <AdvancedDisclosure
+            title="Tabela técnica de quantitativos"
+            description="Use para conferir todos os itens quando precisar de leitura tabular."
+            icon={Database}
+            badge={<StatusPill tone="neutral" icon={false}>{viewModel.quantityItems.length} itens</StatusPill>}
+          >
+            <div className="overflow-x-auto rounded-2xl border bg-background/70">
+              <Table className="min-w-[880px] table-fixed">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[340px]">Descrição</TableHead>
+                    <TableHead className="w-28">Categoria</TableHead>
+                    <TableHead className="w-24 text-right">Qtd.</TableHead>
+                    <TableHead className="w-20">Un.</TableHead>
+                    <TableHead className="w-32 text-right">Estimado</TableHead>
+                    <TableHead className="w-36">Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {viewModel.quantityItems.map((item) => (
+                    <TableRow key={item.id} className="align-top">
+                      <TableCell className="whitespace-normal break-words align-top">
+                        <div className="font-medium">{item.description}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{item.notes}</div>
+                      </TableCell>
+                      <TableCell className="align-top">{item.category}</TableCell>
+                      <TableCell className="align-top text-right">{formatCompactNumber(item.quantity)}</TableCell>
+                      <TableCell className="align-top">{item.unit}</TableCell>
+                      <TableCell className="align-top text-right">{formatCurrency(item.estimatedTotalBRL)}</TableCell>
+                      <TableCell className="align-top">
+                        <Badge variant={item.requiresPriceSource ? "secondary" : "outline"}>
+                          {item.requiresPriceSource ? "sem fonte revisada" : "parâmetro"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </AdvancedDisclosure>
+        </div>
 
         <div className="space-y-4">
-          <Card className="rounded-md shadow-none">
+          <Card className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Link2 className="h-5 w-5" />
@@ -531,7 +622,7 @@ export default function BudgetAssistantPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-md shadow-none">
+          <Card className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <WalletCards className="h-5 w-5" />

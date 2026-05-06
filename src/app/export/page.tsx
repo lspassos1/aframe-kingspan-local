@@ -1,9 +1,9 @@
 "use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Download, FileJson, FileSpreadsheet, FileText } from "lucide-react";
+import { AlertTriangle, Download, FileJson, FileSpreadsheet, FileText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ActionCard, FileDropzone, FormSection, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
+import { ActionCard, AdvancedDisclosure, FileDropzone, FormSection, InlineHelp, MetricCard, PageFrame, PageHeader, SectionHeader, StatusPill } from "@/components/shared/design-system";
 import {
   calculateScenarioBudget,
   calculateScenarioMaterials,
@@ -48,6 +48,11 @@ export default function ExportPage() {
   const materials = calculateScenarioMaterials(project, scenario);
   const budget = calculateScenarioBudget(project, scenario);
   const requests = generateScenarioQuotationRequests(project, scenario);
+  const pendingMaterials = materials.filter((item) => item.requiresConfirmation);
+  const pendingBudgetItems = budget.items.filter((item) => item.requiresConfirmation);
+  const exportWarnings = budget.warnings.filter((warning) => warning.level !== "info");
+  const spreadsheetReady = exportLibraryStatus.spreadsheet === "ready";
+  const pdfReady = exportLibraryStatus.pdf === "ready";
 
   useEffect(() => {
     let cancelled = false;
@@ -212,8 +217,8 @@ export default function ExportPage() {
     <PageFrame>
       <PageHeader
         eyebrow="Exportar"
-        title="Salvar, carregar e gerar arquivos"
-        description="Os arquivos do projeto ficam no navegador. Login e autenticação ficam no Clerk; este app não armazena senhas."
+        title="Arquivos para revisão"
+        description="Baixe projeto, planilhas e PDFs preliminares com materiais, fontes, pendências e status de revisão."
         status={<StatusPill tone="warning">Preliminar</StatusPill>}
       />
         {exportError ? (
@@ -221,6 +226,19 @@ export default function ExportPage() {
             {exportError}
           </p>
         ) : null}
+
+      <section className="grid gap-4 md:grid-cols-4">
+        <MetricCard label="Materiais" value={materials.length} detail={`${pendingMaterials.length} pendente(s)`} tone={pendingMaterials.length > 0 ? "warning" : "success"} />
+        <MetricCard label="Orçamento" value={formatExportCurrency(budget.totalEstimatedCostBRL)} detail={`${pendingBudgetItems.length} item(ns) sem fonte`} tone={pendingBudgetItems.length > 0 ? "warning" : "success"} />
+        <MetricCard label="Planilhas" value={spreadsheetReady ? "Prontas" : "Preparando"} detail="XLSX/CSV sob demanda" tone={spreadsheetReady ? "success" : "pending"} />
+        <MetricCard label="PDFs" value={pdfReady ? "Prontos" : "Preparando"} detail="Relatórios preliminares" tone={pdfReady ? "success" : "pending"} icon={<ShieldCheck className="h-4 w-4" />} />
+      </section>
+
+      {(pendingMaterials.length > 0 || pendingBudgetItems.length > 0 || exportWarnings.length > 0) ? (
+        <InlineHelp tone="warning">
+          O pacote pode ser exportado, mas deve sair como preliminar: há pendências de fonte, fornecedor ou alerta técnico que precisam aparecer no relatório.
+        </InlineHelp>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         <FormSection title="Importar projeto" description="Carregue um JSON exportado anteriormente.">
@@ -235,6 +253,15 @@ export default function ExportPage() {
               Resetar para default
             </Button>
         </FormSection>
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeader
+          eyebrow="Pacote de saída"
+          title="Escolha o arquivo pelo uso"
+          description="Cada ação informa o que será exportado e quais bibliotecas precisam estar prontas."
+        />
+        <div className="grid gap-4 md:grid-cols-3">
         {actions.map((item) => {
           const Icon = item.icon;
           const libraryStatus = item.requiredLibrary ? exportLibraryStatus[item.requiredLibrary] : "ready";
@@ -258,7 +285,36 @@ export default function ExportPage() {
             />
           );
         })}
+        </div>
       </section>
+
+      <AdvancedDisclosure
+        title="Bloqueios e avisos antes da exportação"
+        description="Leitura rápida do que deve acompanhar o relatório preliminar."
+        icon={AlertTriangle}
+        badge={<StatusPill tone={pendingBudgetItems.length > 0 || exportWarnings.length > 0 ? "warning" : "success"}>{pendingBudgetItems.length + exportWarnings.length}</StatusPill>}
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          {pendingBudgetItems.slice(0, 6).map((item) => (
+            <div key={item.id} className="rounded-2xl border bg-background/75 p-3 text-sm">
+              <p className="font-medium">{item.description}</p>
+              <p className="mt-1 text-muted-foreground">Sem fonte revisada: {item.supplier || "a confirmar"}</p>
+            </div>
+          ))}
+          {exportWarnings.slice(0, 6).map((warning) => (
+            <div key={warning.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              {warning.message}
+            </div>
+          ))}
+          {pendingBudgetItems.length === 0 && exportWarnings.length === 0 ? (
+            <div className="rounded-2xl border bg-background/75 p-3 text-sm text-muted-foreground">Nenhum bloqueio crítico detectado no cenário atual.</div>
+          ) : null}
+        </div>
+      </AdvancedDisclosure>
     </PageFrame>
   );
+}
+
+function formatExportCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
 }
