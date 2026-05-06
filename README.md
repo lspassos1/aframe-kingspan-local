@@ -57,6 +57,12 @@ AI_RATE_LIMIT_SALT=valor_secreto_forte
 
 Veja [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md) para setup completo de OpenAI, Vercel, limites diários e SINAPI.
 
+### Slack GitHub Review Bridge
+
+Use `/lucas-review` in Slack to create a `Lucas Review` comment on a GitHub PR.
+
+See [docs/slack-github-review-bridge.md](docs/slack-github-review-bridge.md).
+
 ## O Que O App Faz
 
 - inicia estudos por planta baixa, medidas manuais ou exemplo;
