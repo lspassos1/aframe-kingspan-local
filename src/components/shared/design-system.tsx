@@ -1,19 +1,24 @@
 import type { ComponentType, ReactNode } from "react";
 import { AlertCircle, CheckCircle2, ChevronDown, Clock3, FileUp, Info, XCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type VisualIcon = ComponentType<{ className?: string }>;
 type Tone = "neutral" | "info" | "success" | "warning" | "danger" | "pending";
 
 const toneClasses: Record<Tone, string> = {
-  neutral: "border-border/80 bg-background/75 text-foreground",
-  info: "border-sky-200 bg-sky-50 text-sky-950",
+  neutral: "border-border/80 bg-background/80 text-foreground",
+  info: "border-cyan-200 bg-cyan-50 text-cyan-950",
   success: "border-emerald-200 bg-emerald-50 text-emerald-950",
   warning: "border-amber-200 bg-amber-50 text-amber-950",
   danger: "border-destructive/30 bg-destructive/5 text-destructive",
-  pending: "border-violet-200 bg-violet-50 text-violet-950",
+  pending: "border-indigo-200 bg-indigo-50 text-indigo-950",
 };
+
+const panelSurface =
+  "border border-border/75 bg-[linear-gradient(180deg,hsl(var(--card))_0%,hsl(var(--background))_100%)] shadow-sm shadow-slate-950/[0.035]";
+
+const interactiveSurface =
+  "transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md hover:shadow-slate-950/[0.06] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/35";
 
 const toneIcons: Record<Tone, VisualIcon> = {
   neutral: Info,
@@ -67,18 +72,20 @@ export function PageHeader({
     <header
       data-slot="page-header"
       className={cn(
-        "rounded-2xl border bg-card/86 p-5 shadow-sm shadow-foreground/5 sm:p-6",
+        "relative overflow-hidden rounded-3xl p-5 sm:p-6",
+        panelSurface,
+        "before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-[linear-gradient(90deg,hsl(var(--primary)),hsl(var(--ring)),hsl(var(--chart-2)))]",
         className
       )}
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            {eyebrow ? <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p> : null}
+            {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p> : null}
             {status}
           </div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-balance sm:text-4xl">{title}</h1>
-          {description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
+          <h1 className="mt-3 max-w-4xl text-3xl font-semibold tracking-normal text-balance sm:text-4xl">{title}</h1>
+          {description ? <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
@@ -100,9 +107,9 @@ export function SectionHeader({
   className?: string;
 }) {
   return (
-    <div data-slot="section-header" className={cn("flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between", className)}>
+    <div data-slot="section-header" className={cn("flex flex-col gap-3 border-l-2 border-primary/30 pl-4 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="min-w-0">
-        {eyebrow ? <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p> : null}
+        {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p> : null}
         <h2 className="text-xl font-semibold tracking-normal text-balance">{title}</h2>
         {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
       </div>
@@ -129,11 +136,20 @@ export function StepProgress({
             key={step.label}
             data-state={state}
             className={cn(
-              "rounded-xl border bg-background/72 p-3 text-sm",
-              state === "current" && "border-primary/35 bg-primary/[0.035]",
-              state === "complete" && "border-emerald-200 bg-emerald-50/70"
+              "relative overflow-hidden rounded-2xl border bg-background/78 p-3 text-sm",
+              state === "current" && "border-primary/35 bg-primary/[0.04] shadow-sm shadow-primary/10",
+              state === "complete" && "border-emerald-200 bg-emerald-50/80",
+              state === "pending" && "text-muted-foreground"
             )}
           >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "absolute inset-x-0 top-0 h-0.5 bg-border",
+                state === "current" && "bg-primary",
+                state === "complete" && "bg-emerald-600"
+              )}
+            />
             <div className="flex items-center gap-2">
               <span
                 className={cn(
@@ -183,8 +199,8 @@ export function ActionCard({
         {Icon ? (
           <span
             className={cn(
-              "grid h-10 w-10 shrink-0 place-items-center rounded-xl border bg-background text-muted-foreground",
-              primary && "border-primary bg-primary text-primary-foreground"
+              "grid h-11 w-11 shrink-0 place-items-center rounded-2xl border bg-background text-muted-foreground shadow-inner shadow-foreground/[0.02]",
+              primary && "border-primary bg-primary text-primary-foreground shadow-none"
             )}
           >
             <Icon className="h-5 w-5" />
@@ -193,7 +209,7 @@ export function ActionCard({
         {badge}
       </div>
       <div className="mt-5">
-        <h3 className="font-semibold tracking-normal">{title}</h3>
+        <h3 className="text-lg font-semibold tracking-normal">{title}</h3>
         {description ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p> : null}
       </div>
       {children ? <div className="mt-4">{children}</div> : null}
@@ -203,9 +219,10 @@ export function ActionCard({
   );
 
   const classes = cn(
-    "flex min-h-36 flex-col rounded-2xl border bg-card/88 p-4 text-left shadow-sm shadow-foreground/5 transition-all",
-    primary && "border-primary/35 bg-primary/[0.035]",
-    onClick && "hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/35",
+    "flex min-h-36 flex-col rounded-3xl p-4 text-left",
+    panelSurface,
+    primary && "border-primary/35 bg-[linear-gradient(180deg,hsl(var(--card)),hsl(var(--accent)))]",
+    onClick && interactiveSurface,
     className
   );
 
@@ -242,15 +259,16 @@ export function MetricCard({
   return (
     <article
       data-slot="metric-card"
-      className={cn("rounded-2xl border bg-card/88 p-4 shadow-sm shadow-foreground/5", tone !== "neutral" && toneClasses[tone], className)}
+      className={cn("relative overflow-hidden rounded-3xl p-4", panelSurface, tone !== "neutral" && toneClasses[tone], className)}
     >
+      <span aria-hidden="true" className={cn("absolute inset-y-4 left-0 w-1 rounded-r-full bg-border", tone !== "neutral" && "bg-current/40")} />
       <div className="flex min-h-24 items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
           <div className="mt-2 text-2xl font-semibold tracking-normal">{value}</div>
           {detail ? <div className="mt-2 text-xs leading-5 text-muted-foreground">{detail}</div> : null}
         </div>
-        {icon ? <div className="text-muted-foreground">{icon}</div> : null}
+        {icon ? <div className="grid h-9 w-9 place-items-center rounded-2xl border bg-background/80 text-muted-foreground">{icon}</div> : null}
       </div>
     </article>
   );
@@ -272,7 +290,7 @@ export function StatusPill({
     <span
       data-slot="status-pill"
       data-tone={tone}
-      className={cn("inline-flex h-6 w-fit items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium", toneClasses[tone], className)}
+      className={cn("inline-flex h-6 w-fit items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold", toneClasses[tone], className)}
     >
       {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {children}
@@ -323,7 +341,7 @@ export function AdvancedDisclosure({
   className?: string;
 }) {
   return (
-    <details data-slot="advanced-disclosure" className={cn("group rounded-2xl border bg-card/88 shadow-sm shadow-foreground/5", className)} open={defaultOpen}>
+    <details data-slot="advanced-disclosure" className={cn("group rounded-3xl", panelSurface, className)} open={defaultOpen}>
       <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
         {Icon ? <Icon className="h-4 w-4 shrink-0 text-primary" /> : null}
         <div className="min-w-0 flex-1">
@@ -333,7 +351,7 @@ export function AdvancedDisclosure({
         {badge}
         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
-      <div className="border-t p-4">{children}</div>
+      <div className="border-t bg-background/42 p-4">{children}</div>
     </details>
   );
 }
@@ -349,7 +367,7 @@ export function InlineHelp({
 }) {
   const Icon = toneIcons[tone];
   return (
-    <div data-slot="inline-help" className={cn("flex gap-2 rounded-xl border p-3 text-sm leading-6", toneClasses[tone], className)}>
+    <div data-slot="inline-help" className={cn("flex gap-2 rounded-2xl border p-3 text-sm leading-6", toneClasses[tone], className)}>
       <Icon className="mt-0.5 h-4 w-4 shrink-0" />
       <div>{children}</div>
     </div>
@@ -372,16 +390,16 @@ export function FormSection({
   contentClassName?: string;
 }) {
   return (
-    <Card data-slot="form-section" className={cn("rounded-2xl shadow-sm shadow-foreground/5", className)}>
-      <CardHeader className={action ? "grid-cols-[1fr_auto]" : undefined}>
+    <section data-slot="form-section" className={cn("overflow-hidden rounded-3xl", panelSurface, className)}>
+      <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>{title}</CardTitle>
+          <h2 className="font-semibold tracking-normal">{title}</h2>
           {description ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p> : null}
         </div>
-        {action ? <div className="self-start justify-self-end">{action}</div> : null}
-      </CardHeader>
-      <CardContent className={contentClassName}>{children}</CardContent>
-    </Card>
+        {action ? <div className="self-start">{action}</div> : null}
+      </div>
+      <div className={cn("p-5", contentClassName)}>{children}</div>
+    </section>
   );
 }
 
@@ -401,16 +419,16 @@ export function BudgetGroupCard({
   contentClassName?: string;
 }) {
   return (
-    <Card data-slot="budget-group-card" className={cn("rounded-2xl shadow-sm shadow-foreground/5", className)}>
-      <CardHeader className={status ? "grid-cols-[1fr_auto]" : undefined}>
+    <section data-slot="budget-group-card" className={cn("overflow-hidden rounded-3xl", panelSurface, className)}>
+      <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>{title}</CardTitle>
+          <h2 className="font-semibold tracking-normal">{title}</h2>
           {description ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p> : null}
         </div>
-        {status ? <div className="self-start justify-self-end">{status}</div> : null}
-      </CardHeader>
-      <CardContent className={contentClassName}>{children}</CardContent>
-    </Card>
+        {status ? <div className="self-start">{status}</div> : null}
+      </div>
+      <div className={cn("p-5", contentClassName)}>{children}</div>
+    </section>
   );
 }
 
@@ -426,7 +444,7 @@ export function StickySummary({
   className?: string;
 }) {
   return (
-    <aside data-slot="sticky-summary" className={cn("h-fit rounded-2xl border bg-card/90 p-5 shadow-sm shadow-foreground/5 xl:sticky xl:top-6", className)}>
+    <aside data-slot="sticky-summary" className={cn("h-fit rounded-3xl p-5 xl:sticky xl:top-6", panelSurface, className)}>
       <h2 className="font-semibold">{title}</h2>
       {description ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p> : null}
       <div className="mt-4 space-y-3 text-sm">{children}</div>
@@ -448,7 +466,7 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div data-slot="empty-state" className={cn("rounded-xl border border-dashed bg-background/60 p-4 text-sm", className)}>
+    <div data-slot="empty-state" className={cn("rounded-2xl border border-dashed bg-background/70 p-4 text-sm", className)}>
       <div className="flex gap-3">
         <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <div>
@@ -476,7 +494,7 @@ export function PendingState({
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      className={cn("grid min-h-[220px] place-items-center rounded-2xl border bg-muted/20 p-6 text-center text-sm text-muted-foreground", className)}
+      className={cn("grid min-h-[220px] place-items-center rounded-3xl border bg-muted/20 p-6 text-center text-sm text-muted-foreground", className)}
     >
       <div>
         <Clock3 className="mx-auto h-5 w-5" />
@@ -510,11 +528,13 @@ export function FileDropzone({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col items-center justify-center rounded-2xl border border-dashed bg-background/70 p-5 text-center transition hover:border-primary/35 hover:bg-primary/[0.025] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/35 disabled:pointer-events-none disabled:opacity-55",
+        "flex w-full flex-col items-center justify-center rounded-3xl border border-dashed bg-background/70 p-6 text-center",
+        interactiveSurface,
+        "disabled:pointer-events-none disabled:opacity-55",
         className
       )}
     >
-      <span className="grid h-11 w-11 place-items-center rounded-xl border bg-card text-muted-foreground">
+      <span className="grid h-12 w-12 place-items-center rounded-2xl border bg-card text-muted-foreground shadow-inner shadow-foreground/[0.02]">
         <FileUp className="h-5 w-5" />
       </span>
       <span className="mt-3 font-medium">{title}</span>
