@@ -1,0 +1,35 @@
+name: Hourly Slack GitHub triage
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  checks: read
+  statuses: read
+
+jobs:
+  triage:
+    name: Analyze open issues and PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Post hourly triage to Slack
+        run: npm run triage:slack
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_TRIAGE_WEBHOOK_URL: ${{ secrets.SLACK_TRIAGE_WEBHOOK_URL }}
