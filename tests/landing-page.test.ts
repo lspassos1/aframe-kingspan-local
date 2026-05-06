@@ -23,15 +23,21 @@ describe("HomeAuthExperience", () => {
   it("positions the homepage around plan upload and reviewed budget workflow", () => {
     const html = renderToStaticMarkup(createElement(HomeAuthExperience));
 
-    expect(html).toContain("Orçamento preliminar de obra a partir da planta baixa.");
-    expect(html).toContain("Começar com planta");
+    expect(html).toContain("Envie sua planta. Confirme os dados. Gere um orçamento preliminar com fonte.");
+    expect(html).toContain("Enviar planta");
     expect(html).toContain("Ver exemplo");
-    expect(html).toContain("IA lê e sugere");
+    expect(html).toContain("IA sugere");
     expect(html).toContain("Sistema calcula");
     expect(html).toContain("Usuário aprova");
-    expect(html).toContain("Planta");
-    expect(html).toContain("Base");
+    expect(html).toContain("Planta enviada");
+    expect(html).toContain("Dados extraídos");
+    expect(html).toContain("Perguntas pendentes");
+    expect(html).toContain("Quantitativos");
+    expect(html).toContain("Fonte de preço");
     expect(html).toContain("Exportação");
+    expect(html).toContain("planta-baixa.pdf");
+    expect(html).toContain("Cache por hash ativo. Nada aplicado automaticamente.");
+    expect(html).toContain("SINAPI 87489");
     expect(html).not.toContain("Escolha o método construtivo");
     expect(html).not.toContain("Comece pelo sistema da obra");
   });
@@ -42,6 +48,7 @@ describe("HomeAuthExperience", () => {
     const html = renderToStaticMarkup(createElement(HomeAuthExperience));
 
     expect(html).toContain('href="/start?mode=ai"');
+    expect(html).toContain('href="/start?mode=example"');
     expect(html).toContain("Abrir app");
     expect(html).toContain('data-testid="user-button"');
   });
