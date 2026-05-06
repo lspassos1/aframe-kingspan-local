@@ -58,7 +58,7 @@ function getPrimaryQuantity(project: Project, scenario: Scenario, geometry: Geom
     const aFrameGeometry = calculateAFrameGeometry(scenario.terrain, scenario.aFrame);
     const layout = calculatePanelLayout(scenario, aFrameGeometry, panel, project.materialAssumptions.sparePanelCount);
     return {
-      label: "Paineis",
+      label: "Painéis",
       value: `${layout.totalPanels} un`,
       detail: `${formatCompactNumber(layout.totalPanelAreaM2)} m2 de painel`,
     };
@@ -67,9 +67,9 @@ function getPrimaryQuantity(project: Project, scenario: Scenario, geometry: Geom
   const panelCount = readNumber(geometry, ["panelCount"]);
   if (panelCount !== null) {
     return {
-      label: "Paineis",
+      label: "Painéis",
       value: `${formatCompactNumber(panelCount)} un`,
-      detail: `${formatArea(readNumber(geometry, ["netPanelAreaM2"]))} liquidos`,
+      detail: `${formatArea(readNumber(geometry, ["netPanelAreaM2"]))} líquidos`,
     };
   }
 
@@ -91,13 +91,13 @@ function getPrimaryQuantity(project: Project, scenario: Scenario, geometry: Geom
 
 function getNextSteps(scenario: Scenario, pendingPriceCount: number) {
   const shared = [
-    "Confirmar medidas, aberturas e implantacao com projeto executivo.",
-    pendingPriceCount > 0 ? "Cadastrar fontes de preco com data, unidade e confianca." : "Revisar validade das fontes de preco cadastradas.",
-    "Exportar relatorio preliminar para cotacao e revisao tecnica.",
+    "Confirmar medidas, aberturas e implantação com projeto executivo.",
+    pendingPriceCount > 0 ? "Cadastrar fontes de preço com data, unidade e confiança." : "Revisar validade das fontes de preço cadastradas.",
+    "Exportar relatório preliminar para cotação e revisão técnica.",
   ];
 
   if (scenario.constructionMethod === "aframe") {
-    return ["Validar painel, estrutura, fundacao e fornecimento com responsaveis tecnicos.", ...shared];
+    return ["Validar painel, estrutura, fundação e fornecimento com responsáveis técnicos.", ...shared];
   }
 
   return ["Validar o sistema construtivo com fornecedor, projetista e ART/RRT.", ...shared];
@@ -220,13 +220,13 @@ export default function DashboardPage() {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Area principal" value={formatArea(area)} detail={usefulArea ? `${formatArea(usefulArea)} de area util/liquida` : "Area preliminar"} icon={<Home className="h-5 w-5" />} />
-        <MetricCard label="Implantacao" value={`${formatMeters(width)} x ${formatMeters(depth)}`} detail={`Altura ${formatMeters(height)}`} icon={<Ruler className="h-5 w-5" />} />
+        <MetricCard label="Área principal" value={formatArea(area)} detail={usefulArea ? `${formatArea(usefulArea)} de área útil/líquida` : "Área preliminar"} icon={<Home className="h-5 w-5" />} />
+        <MetricCard label="Implantação" value={`${formatMeters(width)} x ${formatMeters(depth)}`} detail={`Altura ${formatMeters(height)}`} icon={<Ruler className="h-5 w-5" />} />
         <MetricCard label={primaryQuantity.label} value={primaryQuantity.value} detail={primaryQuantity.detail} icon={<Package className="h-5 w-5" />} />
         <MetricCard
-          label="Orcamento preliminar"
+          label="Orçamento preliminar"
           value={formatCurrency(budget.totalEstimatedCostBRL)}
-          detail={`${pendingPriceCount} pendencia${pendingPriceCount === 1 ? "" : "s"} de preco/fonte`}
+          detail={`${pendingPriceCount} pendência${pendingPriceCount === 1 ? "" : "s"} de preço/fonte`}
           icon={<Wallet className="h-5 w-5" />}
         />
       </section>
