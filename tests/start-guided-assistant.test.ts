@@ -37,8 +37,9 @@ describe("createStartAssistantViewModel", () => {
     const viewModel = createStartAssistantViewModel({ mode: "choose", planExtractEnabled: true });
 
     expect(viewModel.title).toBe("Comece pela planta baixa.");
+    expect(viewModel.subtitle).toContain("IA sugere, sistema calcula e você aprova");
     expect(viewModel.options.map((option) => option.id)).toEqual(["ai", "manual", "example"]);
-    expect(viewModel.options.map((option) => option.title)).toEqual(["Enviar planta baixa", "Preencher manualmente", "Usar exemplo"]);
+    expect(viewModel.options.map((option) => option.title)).toEqual(["Enviar planta", "Preencher manualmente", "Usar exemplo"]);
     expect(viewModel.showPlanImport).toBe(false);
     expect(viewModel.showManualForm).toBe(false);
   });
@@ -47,7 +48,7 @@ describe("createStartAssistantViewModel", () => {
     const viewModel = createStartAssistantViewModel({ mode: "ai", planExtractEnabled: true });
 
     expect(viewModel.showPlanImport).toBe(true);
-    expect(viewModel.showManualForm).toBe(true);
+    expect(viewModel.showManualForm).toBe(false);
     expect(viewModel.showAiDisabledNotice).toBe(false);
     expect(viewModel.options.find((option) => option.id === "ai")?.primary).toBe(true);
   });
@@ -56,7 +57,7 @@ describe("createStartAssistantViewModel", () => {
     const viewModel = createStartAssistantViewModel({ mode: "ai", planExtractEnabled: false });
 
     expect(viewModel.showPlanImport).toBe(true);
-    expect(viewModel.showManualForm).toBe(true);
+    expect(viewModel.showManualForm).toBe(false);
     expect(viewModel.showAiDisabledNotice).toBe(true);
     expect(viewModel.options.find((option) => option.id === "ai")?.disabledReason).toBe("IA desligada");
   });
@@ -78,17 +79,29 @@ describe("StartGuidedAssistant", () => {
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true }));
 
     expect(html).toContain("Comece pela planta baixa.");
-    expect(html).toContain("Enviar planta baixa");
+    expect(html).toContain("Enviar planta");
     expect(html).toContain("Preencher manualmente");
     expect(html).toContain("Usar exemplo");
+    expect(html).toContain("IA sugere, sistema calcula e você aprova");
+    expect(html).toContain("O que acontece depois");
+    expect(html).toContain("A confirmação técnica vem depois.");
+    expect(html).not.toContain('data-slot="step-progress"');
     expect(html).not.toContain("Método construtivo");
+    expect(html).not.toContain("método construtivo");
     expect(html).not.toContain("Escolha o sistema construtivo");
   });
 
-  it("renders upload before the manual form in AI mode", () => {
+  it("renders upload with operational status and a manual fallback in AI mode", () => {
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true, initialMode: "ai" }));
 
-    expect(html.indexOf('data-testid="plan-import"')).toBeLessThan(html.indexOf('data-testid="manual-form"'));
+    expect(html).toContain('data-testid="plan-import"');
+    expect(html).not.toContain('data-testid="manual-form"');
+    expect(html).toContain("Status da IA");
+    expect(html).toContain("OpenAI API");
+    expect(html).toContain("Limite diário");
+    expect(html).toContain("Cache por hash ativo");
+    expect(html).toContain("Fallback manual disponível");
+    expect(html).toContain("Abrir preenchimento manual");
   });
 
   it("renders the manual fallback when AI mode is selected but disabled", () => {
@@ -96,6 +109,7 @@ describe("StartGuidedAssistant", () => {
 
     expect(html).toContain("A leitura por IA está desligada");
     expect(html).toContain('data-testid="plan-import"');
-    expect(html).toContain('data-testid="manual-form"');
+    expect(html).not.toContain('data-testid="manual-form"');
+    expect(html).toContain("Abrir preenchimento manual");
   });
 });
