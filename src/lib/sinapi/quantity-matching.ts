@@ -8,7 +8,10 @@ export type SinapiMatchBlockReason =
   | "price_status"
   | "out_of_region"
   | "method_uncertain"
-  | "missing_sinapi_metadata";
+  | "missing_sinapi_metadata"
+  | "missing_source"
+  | "composition_requires_review"
+  | "technical_review_required";
 
 export interface SinapiQuantityMatchLocation {
   city?: string;
@@ -354,6 +357,9 @@ function createSinapiPendingReason(composition: ServiceComposition, blockReason?
   if (blockReason === "unit_incompatible") return "Unidade incompativel bloqueia aprovacao automatica.";
   if (blockReason === "method_uncertain") return "Metodo construtivo incerto; manter vinculo pendente.";
   if (blockReason === "out_of_region") return "Fonte SINAPI fora da UF selecionada; manter pendente.";
+  if (blockReason === "missing_source") return "Fonte de preco ausente; manter vinculo pendente.";
+  if (blockReason === "composition_requires_review") return "Composicao exige revisao humana antes do orcamento.";
+  if (blockReason === "technical_review_required") return "Fundacao, estrutura ou item tecnico exigem revisao tecnica antes do orcamento.";
   if (blockReason === "price_status") return `Status de preco ${sinapi?.priceStatus ?? "ausente"}; manter pendente.`;
   return "Metadados SINAPI ausentes; manter pendente.";
 }
