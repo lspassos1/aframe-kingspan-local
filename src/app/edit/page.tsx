@@ -5,7 +5,7 @@ import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormSection, InlineHelp, PageFrame, PageHeader, StickySummary } from "@/components/shared/design-system";
 import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -108,25 +108,20 @@ export default function EditPage() {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">Configurar</p>
-          <h1 className="text-3xl font-semibold tracking-normal">Dados do projeto e geometria</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Lote, endereco e medidas sao editaveis. Cruz das Almas/BA e 17 x 26 m sao apenas defaults.
-          </p>
-        </div>
-        <Button type="submit">
-          <Save className="mr-2 h-4 w-4" />
-          Salvar configuracao
-        </Button>
-      </div>
+      <PageFrame>
+        <PageHeader
+          eyebrow="Dados da obra"
+          title="Projeto, local e geometria"
+          description="Lote, endereço e medidas são editáveis. Cruz das Almas/BA e 17 x 26 m são apenas dados iniciais do exemplo."
+          actions={
+            <Button type="submit">
+              <Save className="mr-2 h-4 w-4" />
+              Salvar configuração
+            </Button>
+          }
+        />
 
-      <Card className="rounded-md shadow-none">
-        <CardHeader>
-          <CardTitle>Projeto e endereco</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <FormSection title="Projeto e endereço" description="Identificação do estudo e localização usada para filtros regionais." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2">
             <Label>Nome do projeto</Label>
             <Input value={project.name} onChange={(event) => updateProjectName(event.target.value)} />
@@ -170,16 +165,11 @@ export default function EditPage() {
             <Label>Observacoes do local</Label>
             <Textarea {...form.register("location.notes")} />
           </div>
-        </CardContent>
-      </Card>
+        </FormSection>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-6">
-          <Card className="rounded-md shadow-none">
-            <CardHeader>
-              <CardTitle>Lote e recuos</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          <div className="space-y-6">
+            <FormSection title="Lote e recuos" description="Medidas base para implantação e validação preliminar no terreno." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <NumberField label="Largura do lote (m)" {...form.register("terrain.width")} />
               <NumberField label="Profundidade do lote (m)" {...form.register("terrain.depth")} />
               <Controller
@@ -204,14 +194,9 @@ export default function EditPage() {
               <NumberField label="Recuo fundo (m)" {...form.register("terrain.rearSetback")} />
               <NumberField label="Recuo esquerdo (m)" {...form.register("terrain.leftSetback")} />
               <NumberField label="Recuo direito (m)" {...form.register("terrain.rightSetback")} />
-            </CardContent>
-          </Card>
+            </FormSection>
 
-          <Card className="rounded-md shadow-none">
-            <CardHeader>
-              <CardTitle>A-frame</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <FormSection title="A-frame" description="Parâmetros técnicos mantidos para preservar o baseline A-frame." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {isCustomPanel ? (
                 <NumberField label="Comprimento do painel (m)" {...form.register("aFrame.panelLength")} />
               ) : (
@@ -325,20 +310,15 @@ export default function EditPage() {
                         <SelectItem value="open-glass">Vidro aberto</SelectItem>
                         <SelectItem value="panel-closed">Painel fechado</SelectItem>
                         <SelectItem value="mixed">Mista</SelectItem>
-                        <SelectItem value="placeholder">Placeholder</SelectItem>
+                        <SelectItem value="placeholder">A definir</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 )}
               />
-            </CardContent>
-          </Card>
+            </FormSection>
 
-          <Card className="rounded-md shadow-none">
-            <CardHeader>
-              <CardTitle>Painel, preco e estrutura</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <FormSection title="Painel, preço e estrutura" description="Fonte de painel, cotação e modo estrutural preliminar." contentClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <Controller
                 control={form.control}
                 name="panelProductId"
@@ -469,15 +449,13 @@ export default function EditPage() {
                   Fonte: {selectedPanel.sourceUrl?.startsWith("http") ? selectedPanel.sourceUrl : selectedPanel.sourceUrl ?? "cotacao/manual"}
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <InlineHelp tone="warning" className="md:col-span-2 xl:col-span-3">
+                Estes parâmetros alimentam o estudo preliminar. Fundação, estrutura e orçamento formal dependem de revisão técnica.
+              </InlineHelp>
+            </FormSection>
+          </div>
 
-        <Card className="h-fit rounded-md shadow-none xl:sticky xl:top-6">
-          <CardHeader>
-            <CardTitle>Resumo calculado</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <StickySummary title="Resumo calculado" description="Leitura em tempo real dos parâmetros atuais.">
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Largura</span>
               <strong>{geometry.baseWidth} m</strong>
@@ -509,9 +487,9 @@ export default function EditPage() {
                 </p>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      </section>
+          </StickySummary>
+        </section>
+      </PageFrame>
     </form>
   );
 }

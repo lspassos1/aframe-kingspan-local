@@ -1,5 +1,5 @@
 import { OperationalChecklist } from "@/components/help/OperationalChecklist";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ActionCard, PageFrame, PageHeader } from "@/components/shared/design-system";
 import { createOperationalEnvironmentStatus } from "@/lib/operations/operational-environment";
 
 const sections = [
@@ -29,24 +29,14 @@ export default function HelpPage() {
   const operationalEnvironment = createOperationalEnvironmentStatus();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">Ajuda</p>
-        <h1 className="text-3xl font-semibold tracking-normal">Guia rápido</h1>
-      </div>
+    <PageFrame>
+      <PageHeader eyebrow="Ajuda" title="Guia rápido" description="Diagnóstico operacional, fluxo principal e limites do estudo preliminar." />
       <OperationalChecklist environment={operationalEnvironment} />
       <div className="grid gap-4 md:grid-cols-2">
         {sections.map((section) => (
-          <Card className="rounded-md shadow-none" key={section.title}>
-            <CardHeader>
-              <CardTitle>{section.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{section.body}</p>
-            </CardContent>
-          </Card>
+          <ActionCard key={section.title} title={section.title} description={section.body} />
         ))}
       </div>
-    </div>
+    </PageFrame>
   );
 }

@@ -5,18 +5,24 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, FileUp, FolderOpen, Keyboard } from "lucide-react";
 import { PlanImportCard } from "@/components/ai/PlanImportCard";
 import { StartProjectForm } from "@/components/onboarding/StartProjectForm";
+import { ActionCard, InlineHelp, PageFrame, SectionHeader, StepProgress, StatusPill } from "@/components/shared/design-system";
 import { Button } from "@/components/ui/button";
 import { defaultProject } from "@/data/defaultProject";
 import { createStartAssistantViewModel, type StartAssistantMode } from "@/lib/onboarding/start-guided-assistant";
 import { cloneProject } from "@/lib/store/project-normalization";
 import { useProjectStore } from "@/lib/store/project-store";
-import { cn } from "@/lib/utils";
 
 const optionIcons = {
   ai: FileUp,
   manual: Keyboard,
   example: FolderOpen,
 } as const;
+
+const startSteps = [
+  { label: "Entrada", description: "Planta, medidas ou exemplo." },
+  { label: "Revisão", description: "Campos editáveis antes de aplicar." },
+  { label: "Estudo", description: "3D, quantitativos e orçamento." },
+];
 
 export function StartGuidedAssistant({
   planExtractEnabled,
@@ -61,44 +67,37 @@ export function StartGuidedAssistant({
     setMode(nextMode);
   }
 
+  const currentStepIndex = mode === "choose" ? 0 : 1;
+
   return (
-    <div className="space-y-6">
-      <section className="border-b pb-6">
+    <PageFrame>
+      <section className="rounded-2xl border bg-card/86 p-5 shadow-sm shadow-foreground/5 sm:p-6">
         <div className="max-w-3xl">
           <p className="text-sm font-medium text-muted-foreground">Novo estudo</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-normal text-balance sm:text-5xl">{viewModel.title}</h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">{viewModel.subtitle}</p>
         </div>
+        <StepProgress steps={startSteps} currentIndex={currentStepIndex} className="mt-7" />
 
         {mode === "choose" ? (
           <div className="mt-7 grid gap-3 lg:grid-cols-3">
             {viewModel.options.map((option) => {
               const Icon = optionIcons[option.id];
               return (
-                <button
+                <ActionCard
                   key={option.id}
-                  type="button"
                   onClick={() => selectMode(option.id)}
-                  className={cn(
-                    "group flex min-h-40 flex-col items-start rounded-lg border bg-card p-4 text-left shadow-sm shadow-foreground/5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/35",
-                    option.primary && "border-primary/35 bg-primary/[0.035]"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-lg border bg-background text-muted-foreground transition-colors",
-                      option.primary && "border-primary bg-primary text-primary-foreground"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="mt-5 flex items-center gap-2 font-semibold">
+                  icon={Icon}
+                  primary={option.primary}
+                  title={
+                    <span className="flex items-center gap-2">
                     {option.title}
-                    {option.primary ? <CheckCircle2 className="h-4 w-4 text-primary" /> : null}
+                      {option.primary ? <CheckCircle2 className="h-4 w-4 text-primary" /> : null}
                   </span>
-                  <span className="mt-2 text-sm leading-6 text-muted-foreground">{option.description}</span>
-                  {option.disabledReason ? <span className="mt-auto pt-4 text-xs font-medium text-muted-foreground">{option.disabledReason}</span> : null}
-                </button>
+                  }
+                  description={option.description}
+                  disabledReason={option.disabledReason}
+                />
               );
             })}
           </div>
@@ -111,31 +110,32 @@ export function StartGuidedAssistant({
       </section>
 
       {viewModel.showAiDisabledNotice ? (
-        <div className="rounded-lg border bg-muted/25 p-4 text-sm leading-6 text-muted-foreground">
+        <InlineHelp tone="warning">
           A leitura por IA está desligada neste ambiente. Configure `AI_PLAN_EXTRACT_ENABLED=true` e `OPENAI_API_KEY` no servidor para habilitar upload,
           ou continue preenchendo manualmente.
-        </div>
+        </InlineHelp>
       ) : null}
 
       {viewModel.showPlanImport ? (
         <section className="space-y-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-normal">Planta baixa</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Nenhum dado extraído é aplicado sem revisão.</p>
-          </div>
+          <SectionHeader
+            title="Planta baixa"
+            description="Nenhum dado extraído é aplicado sem revisão."
+            action={<StatusPill tone="pending">Revisão obrigatória</StatusPill>}
+          />
           <PlanImportCard planExtractEnabled={planExtractEnabled} />
         </section>
       ) : null}
 
       {viewModel.showManualForm ? (
         <section id="manual-start" className="scroll-mt-6 space-y-3">
-          <div>
-            <h2 className="text-xl font-semibold tracking-normal">{mode === "ai" ? "Revisar ou completar manualmente" : "Medidas iniciais"}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Depois das medidas, você confirma o método construtivo e segue para o estudo.</p>
-          </div>
+          <SectionHeader
+            title={mode === "ai" ? "Revisar ou completar manualmente" : "Medidas iniciais"}
+            description="Depois das medidas, você confirma o método construtivo e segue para o estudo."
+          />
           <StartProjectForm />
         </section>
       ) : null}
-    </div>
+    </PageFrame>
   );
 }
