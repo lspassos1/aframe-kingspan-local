@@ -13,6 +13,9 @@ Este diretório documenta o Estudo Construtivo: uma experiência guiada para pr�
 
 - `AI_PLAN_EXTRACT.md`: configuração, custo, limites e privacidade da extração de planta baixa com OpenAI API.
 - `budget-assistant.md`: contrato técnico do Assistente de orçamento para fontes, matches, composições, revisão humana, cache e limites.
+- `lucas-design-authority-protocol.md`: autoridade de revisão visual/produto e regra de comentários `Lucas Review`.
+- `slack-github-review-bridge.md`: setup do `/lucas-review` no Slack para comentar em PRs do GitHub.
+- `design-stack-critical-review.md`: avaliação crítica objetiva da stack de design `#135–#144`.
 - `calculation-method.md`: fórmulas principais, incluindo a baseline A-frame.
 - `structural-assumptions.md`: premissas e limites estruturais.
 - `material-assumptions.md`: materiais e quantidades.
