@@ -18,7 +18,8 @@ export type DirectServiceBudgetSkipReason =
   | "composition-missing"
   | "scenario-incompatible"
   | "method-incompatible"
-  | "unit-incompatible";
+  | "unit-incompatible"
+  | "approval-blocked";
 
 export interface DirectServiceBudgetSkippedLink {
   link: ServiceBudgetCompositionLink;
@@ -175,6 +176,7 @@ function createSkipMessage(link: ServiceBudgetCompositionLink, reason: DirectSer
   if (reason === "composition-missing") return `Vinculo "${link.id}" aponta para composicao inexistente.`;
   if (reason === "scenario-incompatible") return `Vinculo "${link.id}" aponta para quantitativo de outro cenario.`;
   if (reason === "method-incompatible") return `Vinculo "${link.id}" possui metodo construtivo incompativel.`;
+  if (reason === "approval-blocked") return `Vinculo "${link.id}" permanece pendente e nao entra no orcamento revisado.`;
   return `Vinculo "${link.id}" possui unidade incompativel.`;
 }
 
