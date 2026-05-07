@@ -3,7 +3,7 @@ const publicRoutes = new Set(["/", "/start", "/privacy", "/terms", "/feedback"])
 const authenticatedAppShellRoutes = new Set(["/feedback"]);
 const authenticatedAppShellRoutesBeforeOnboarding = new Set(["/feedback"]);
 const localProjectAppShellRoutes = new Set(["/feedback"]);
-const appShellRoutesBeforeOnboarding = new Set(["/feedback"]);
+const appShellRoutesBeforeOnboarding = new Set(["/feedback", "/admin/feedback"]);
 
 export function normalizePathname(pathname: string) {
   const withLeadingSlash = pathname.startsWith("/") ? pathname : `/${pathname}`;

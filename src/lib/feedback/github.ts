@@ -32,6 +32,29 @@ type GitHubIssue = {
 export const APPROVED_LABEL = "feedback-approved";
 export const REJECTED_LABEL = "feedback-rejected";
 
+export type FeedbackGitHubErrorCode =
+  | "missing-github-token"
+  | "github-create-failed"
+  | "github-close-failed"
+  | "github-list-failed"
+  | "github-label-create-failed"
+  | "github-label-remove-failed"
+  | "github-state-update-failed"
+  | "github-label-update-failed"
+  | "github-comment-create-failed";
+
+export class FeedbackGitHubError extends Error {
+  readonly code: FeedbackGitHubErrorCode;
+  readonly status?: number;
+
+  constructor(code: FeedbackGitHubErrorCode, options: { status?: number } = {}) {
+    super(code);
+    this.name = "FeedbackGitHubError";
+    this.code = code;
+    this.status = options.status;
+  }
+}
+
 function getGitHubConfig() {
   const token = process.env.GITHUB_FEEDBACK_TOKEN;
   const repo = process.env.GITHUB_FEEDBACK_REPO ?? "lspassos1/aframe-kingspan-local";
@@ -85,7 +108,7 @@ export async function createFeedbackIssue(values: {
   body: string;
 }) {
   const { token, repo } = getGitHubConfig();
-  if (!token) throw new Error("missing-github-token");
+  if (!token) throw new FeedbackGitHubError("missing-github-token");
 
   const response = await fetch(`https://api.github.com/repos/${repo}/issues`, {
     method: "POST",
@@ -93,7 +116,7 @@ export async function createFeedbackIssue(values: {
     body: JSON.stringify(values),
   });
 
-  if (!response.ok) throw new Error("github-create-failed");
+  if (!response.ok) throw new FeedbackGitHubError("github-create-failed", { status: response.status });
   const createdIssue = (await response.json()) as GitHubIssue;
 
   const closeResponse = await fetch(`https://api.github.com/repos/${repo}/issues/${createdIssue.number}`, {
@@ -102,20 +125,20 @@ export async function createFeedbackIssue(values: {
     body: JSON.stringify({ state: "closed", state_reason: "not_planned" }),
   });
 
-  if (!closeResponse.ok) throw new Error("github-close-failed");
+  if (!closeResponse.ok) throw new FeedbackGitHubError("github-close-failed", { status: closeResponse.status });
   return mapFeedbackIssue((await closeResponse.json()) as GitHubIssue);
 }
 
 export async function listFeedbackIssues() {
   const { token, repo } = getGitHubConfig();
-  if (!token) throw new Error("missing-github-token");
+  if (!token) throw new FeedbackGitHubError("missing-github-token");
 
   const response = await fetch(`https://api.github.com/repos/${repo}/issues?state=all&per_page=100&sort=updated&direction=desc`, {
     headers: headers(token),
     cache: "no-store",
   });
 
-  if (!response.ok) throw new Error("github-list-failed");
+  if (!response.ok) throw new FeedbackGitHubError("github-list-failed", { status: response.status });
   const issues = (await response.json()) as GitHubIssue[];
   return issues.filter((issue) => issue.title.startsWith("[Feedback]")).map(mapFeedbackIssue);
 }
@@ -136,7 +159,7 @@ async function ensureLabel(token: string, repo: string, label: string, color: st
     body: JSON.stringify({ name: label, color, description }),
   });
   if (response.ok || response.status === 422) return;
-  throw new Error("github-label-create-failed");
+  throw new FeedbackGitHubError("github-label-create-failed", { status: response.status });
 }
 
 async function removeLabel(token: string, repo: string, issueNumber: number, label: string) {
@@ -145,12 +168,12 @@ async function removeLabel(token: string, repo: string, issueNumber: number, lab
     headers: headers(token),
   });
   if (response.ok || response.status === 404) return;
-  throw new Error("github-label-remove-failed");
+  throw new FeedbackGitHubError("github-label-remove-failed", { status: response.status });
 }
 
 export async function updateFeedbackStatus(issueNumber: number, status: Exclude<FeedbackStatus, "pending">) {
   const { token, repo } = getGitHubConfig();
-  if (!token) throw new Error("missing-github-token");
+  if (!token) throw new FeedbackGitHubError("missing-github-token");
 
   await ensureLabel(token, repo, APPROVED_LABEL, "2f855a", "Feedback aprovado para aparecer na landing.");
   await ensureLabel(token, repo, REJECTED_LABEL, "b42318", "Feedback recusado pelo admin.");
@@ -167,23 +190,24 @@ export async function updateFeedbackStatus(issueNumber: number, status: Exclude<
       state_reason: status === "approved" ? null : "not_planned",
     }),
   });
-  if (!updateIssueResponse.ok) throw new Error("github-state-update-failed");
+  if (!updateIssueResponse.ok) throw new FeedbackGitHubError("github-state-update-failed", { status: updateIssueResponse.status });
 
   const labelResponse = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/labels`, {
     method: "POST",
     headers: headers(token),
     body: JSON.stringify({ labels: [nextLabel] }),
   });
-  if (!labelResponse.ok) throw new Error("github-label-update-failed");
+  if (!labelResponse.ok) throw new FeedbackGitHubError("github-label-update-failed", { status: labelResponse.status });
 
   const commentBody =
     status === "approved"
-      ? "Obrigado pela contribuicao. Esta melhoria foi aprovada e pode aparecer de forma discreta na pagina inicial."
-      : "Obrigado pela contribuicao. Esta sugestao foi recusada nesta etapa, mas continue enviando ideias e melhorias.";
+      ? "Obrigado pela contribuição. Esta melhoria foi aprovada e pode aparecer de forma discreta na página inicial."
+      : "Obrigado pela contribuição. Esta sugestão foi recusada nesta etapa, mas continue enviando ideias e melhorias.";
 
-  await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/comments`, {
+  const commentResponse = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/comments`, {
     method: "POST",
     headers: headers(token),
     body: JSON.stringify({ body: commentBody }),
   });
+  if (!commentResponse.ok) throw new FeedbackGitHubError("github-comment-create-failed", { status: commentResponse.status });
 }

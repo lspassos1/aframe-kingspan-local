@@ -47,4 +47,9 @@ describe("root shell route selection", () => {
     expect(canUseAppShellBeforeOnboarding("/start")).toBe(false);
     expect(canUseAppShellBeforeOnboarding("/dashboard")).toBe(false);
   });
+
+  it("allows admin feedback diagnostics before onboarding without making the route public", () => {
+    expect(canUseAppShellBeforeOnboarding("/admin/feedback")).toBe(true);
+    expect(shouldUsePublicShell("/admin/feedback", false, false)).toBe(false);
+  });
 });
