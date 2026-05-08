@@ -49,6 +49,15 @@ describe("project store manual takeoff invalidation", () => {
     expect(findScenario(scenario.id)?.manualTakeoff).toBeUndefined();
   });
 
+  it("preserves persisted manual takeoff when external method input update is a no-op", () => {
+    const { scenario } = persistManualTakeoff();
+
+    useProjectStore.getState().updateScenarioMethodInputs(scenario.id, scenario.constructionMethod, scenario.methodInputs[scenario.constructionMethod]!);
+
+    expect(findScenario(scenario.id)?.manualTakeoff?.rooms).toEqual([]);
+    expect(findScenario(scenario.id)?.manualTakeoff?.openings).toEqual([]);
+  });
+
   it("allows the manual stepper to persist manual takeoff after geometry syncs", () => {
     const { scenario, manualTakeoff } = persistManualTakeoff();
 

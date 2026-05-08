@@ -108,6 +108,26 @@ function withoutManualTakeoff(scenario: Scenario): Scenario {
   return next;
 }
 
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+}
+
+function valuesEqual(left: unknown, right: unknown) {
+  return stableSerialize(left) === stableSerialize(right);
+}
+
+function withoutManualTakeoffWhenChanged(scenario: Scenario, changed: boolean): Scenario {
+  return changed ? withoutManualTakeoff(scenario) : scenario;
+}
+
 export const useProjectStore = create<ProjectStore>()(
   persist(
     (set) => ({
@@ -163,25 +183,34 @@ export const useProjectStore = create<ProjectStore>()(
         })),
       updateScenarioTerrain: (scenarioId, terrain) =>
         set((state) => ({
-          project: updateScenario(state.project, scenarioId, (scenario) => ({ ...withoutManualTakeoff(scenario), terrain })),
+          project: updateScenario(state.project, scenarioId, (scenario) => ({
+            ...withoutManualTakeoffWhenChanged(scenario, !valuesEqual(scenario.terrain, terrain)),
+            terrain,
+          })),
         })),
       updateScenarioConstructionMethod: (scenarioId, constructionMethod) =>
         set((state) => ({
-          project: updateScenario(state.project, scenarioId, (scenario) => ({
-            ...withoutManualTakeoff(scenario),
-            constructionMethod,
-            methodInputs: {
-              ...scenario.methodInputs,
-              [constructionMethod]: scenario.methodInputs[constructionMethod] ?? getConstructionMethodDefinition(constructionMethod).getDefaultInputs(),
-            },
-          })),
+          project: updateScenario(state.project, scenarioId, (scenario) => {
+            const methodChanged = scenario.constructionMethod !== constructionMethod;
+            return {
+              ...withoutManualTakeoffWhenChanged(scenario, methodChanged),
+              constructionMethod,
+              methodInputs: {
+                ...scenario.methodInputs,
+                [constructionMethod]: scenario.methodInputs[constructionMethod] ?? getConstructionMethodDefinition(constructionMethod).getDefaultInputs(),
+              },
+            };
+          }),
         })),
       updateScenarioMethodInputs: (scenarioId, constructionMethod, inputs) =>
         set((state) => ({
-          project: updateScenario(state.project, scenarioId, (scenario) => ({
-            ...withoutManualTakeoff(scenario),
-            methodInputs: { ...scenario.methodInputs, [constructionMethod]: inputs },
-          })),
+          project: updateScenario(state.project, scenarioId, (scenario) => {
+            const activeMethodInputsChanged = scenario.constructionMethod === constructionMethod && !valuesEqual(scenario.methodInputs[constructionMethod], inputs);
+            return {
+              ...withoutManualTakeoffWhenChanged(scenario, activeMethodInputsChanged),
+              methodInputs: { ...scenario.methodInputs, [constructionMethod]: inputs },
+            };
+          }),
         })),
       updateScenarioManualTakeoff: (scenarioId, manualTakeoff) =>
         set((state) => ({
@@ -193,7 +222,7 @@ export const useProjectStore = create<ProjectStore>()(
       updateScenarioAFrame: (scenarioId, aFrame) =>
         set((state) => ({
           project: updateScenario(state.project, scenarioId, (scenario) => ({
-            ...withoutManualTakeoff(scenario),
+            ...withoutManualTakeoffWhenChanged(scenario, !valuesEqual(scenario.aFrame, aFrame)),
             aFrame,
             methodInputs: { ...scenario.methodInputs, aframe: aFrame },
           })),
