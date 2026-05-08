@@ -74,12 +74,14 @@ export function Mobile3DControls({
   advancedControls,
   onScreenshot,
   onViewChange,
+  showScreenshotAction = true,
   summary,
   view,
 }: {
   advancedControls: ReactNode;
   onScreenshot: () => void;
   onViewChange: (view: Mobile3DViewMode) => void;
+  showScreenshotAction?: boolean;
   summary: Mobile3DSummaryItem[];
   view: Mobile3DViewMode;
 }) {
@@ -102,15 +104,17 @@ export function Mobile3DControls({
             </Button>
           ))}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className={`mt-3 grid gap-2 ${showScreenshotAction ? "grid-cols-2" : "grid-cols-1"}`}>
           <Button type="button" variant="outline" size="sm" onClick={() => onViewChange("iso")}>
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onScreenshot}>
-            <Download className="mr-2 h-4 w-4" />
-            PNG
-          </Button>
+          {showScreenshotAction ? (
+            <Button type="button" variant="outline" size="sm" onClick={onScreenshot}>
+              <Download className="mr-2 h-4 w-4" />
+              PNG
+            </Button>
+          ) : null}
         </div>
       </section>
 
