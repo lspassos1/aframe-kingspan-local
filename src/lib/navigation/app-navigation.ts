@@ -41,7 +41,7 @@ export const appNavigationSections = [
     items: [
       { href: "/materials", label: "Materiais" },
       { href: "/technical-project", label: "Projeto técnico" },
-      { href: "/structure", label: "Estrutura A-frame", badge: "A-frame", aframeOnly: true },
+      { href: "/structure", label: "Estrutura A-frame", aframeOnly: true },
       { href: "/settings", label: "Premissas" },
       { href: "/budget-assistant", label: "Base de preços" },
       { href: "/quotation", label: "Cotação" },

@@ -60,4 +60,14 @@ describe("app navigation visibility by construction method", () => {
     expect(sections.map((section) => section.id)).toEqual(["primary", "advanced", "utility"]);
     expect(utility?.items.map((item) => item.label)).toEqual(["Ajuda", "Melhorias", "Admin"]);
   });
+
+  it("keeps the mobile structure label from duplicating A-frame", () => {
+    const sections = getVisibleAppNavigationSections("aframe", false);
+    const advanced = sections.find((section) => section.id === "advanced");
+    const structureItem = advanced?.items.find((item) => item.href === "/structure");
+
+    expect(structureItem).toMatchObject({ label: "Estrutura A-frame", aframeOnly: true });
+    expect(structureItem?.badge).toBeUndefined();
+    expect([structureItem?.label, structureItem?.badge].filter(Boolean).join("")).toBe("Estrutura A-frame");
+  });
 });

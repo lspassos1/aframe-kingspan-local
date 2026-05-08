@@ -27,7 +27,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { getConstructionMethodDefinition, type ConstructionMethodId } from "@/lib/construction-methods";
 import { getVisibleAppNavigationSections, type AppNavigationItem, type AppNavigationSection } from "@/lib/navigation/app-navigation";
@@ -294,6 +294,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <SheetContent side="left" className="w-80">
                 <SheetHeader>
                   <SheetTitle>Estudo Construtivo</SheetTitle>
+                  <SheetDescription>Navegue pelo estudo, opções avançadas e suporte.</SheetDescription>
                 </SheetHeader>
                 <div className="mt-5 rounded-lg border bg-background/60 p-3">
                   <p className="text-[0.68rem] font-semibold uppercase text-muted-foreground">Método ativo</p>
