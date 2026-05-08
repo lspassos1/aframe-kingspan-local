@@ -413,9 +413,11 @@ export function createManualTakeoffStateFromData(
   const wallMetrics = data?.wallMetrics;
   const foundationRoof = data?.foundationRoof;
   const mep = data?.mep;
-  const rooms = data?.rooms?.length ? data.rooms.map(normalizeManualTakeoffRoom) : base.rooms;
+  const rooms = Array.isArray(data?.rooms) ? data.rooms.map(normalizeManualTakeoffRoom) : base.rooms;
   const roomIds = rooms.map((room) => room.id);
-  const openings = data?.openings?.length ? data.openings.map((opening, index) => normalizeManualTakeoffOpening(opening, roomIds, index)) : base.openings;
+  const openings = Array.isArray(data?.openings)
+    ? data.openings.map((opening, index) => normalizeManualTakeoffOpening(opening, roomIds, index))
+    : base.openings;
 
   return {
     ...base,
@@ -458,7 +460,8 @@ export function normalizeManualTakeoffProjectData(
   fallback: Partial<ManualTakeoffState> = {}
 ): ManualTakeoffProjectData | undefined {
   if (!data) return undefined;
-  return createManualTakeoffDataFromState(createManualTakeoffStateFromData(data, fallback), typeof data.updatedAt === "string" ? data.updatedAt : "");
+  const updatedAt = typeof data.updatedAt === "string" && Number.isFinite(Date.parse(data.updatedAt)) ? data.updatedAt : undefined;
+  return createManualTakeoffDataFromState(createManualTakeoffStateFromData(data, fallback), updatedAt);
 }
 
 function sum(values: number[]) {

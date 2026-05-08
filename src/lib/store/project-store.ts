@@ -101,6 +101,13 @@ function updateScenario(project: Project, scenarioId: string, updater: (scenario
   };
 }
 
+function withoutManualTakeoff(scenario: Scenario): Scenario {
+  if (!scenario.manualTakeoff) return scenario;
+  const next = { ...scenario };
+  delete next.manualTakeoff;
+  return next;
+}
+
 export const useProjectStore = create<ProjectStore>()(
   persist(
     (set) => ({
@@ -156,12 +163,12 @@ export const useProjectStore = create<ProjectStore>()(
         })),
       updateScenarioTerrain: (scenarioId, terrain) =>
         set((state) => ({
-          project: updateScenario(state.project, scenarioId, (scenario) => ({ ...scenario, terrain })),
+          project: updateScenario(state.project, scenarioId, (scenario) => ({ ...withoutManualTakeoff(scenario), terrain })),
         })),
       updateScenarioConstructionMethod: (scenarioId, constructionMethod) =>
         set((state) => ({
           project: updateScenario(state.project, scenarioId, (scenario) => ({
-            ...scenario,
+            ...withoutManualTakeoff(scenario),
             constructionMethod,
             methodInputs: {
               ...scenario.methodInputs,
@@ -172,7 +179,7 @@ export const useProjectStore = create<ProjectStore>()(
       updateScenarioMethodInputs: (scenarioId, constructionMethod, inputs) =>
         set((state) => ({
           project: updateScenario(state.project, scenarioId, (scenario) => ({
-            ...scenario,
+            ...withoutManualTakeoff(scenario),
             methodInputs: { ...scenario.methodInputs, [constructionMethod]: inputs },
           })),
         })),
@@ -186,7 +193,7 @@ export const useProjectStore = create<ProjectStore>()(
       updateScenarioAFrame: (scenarioId, aFrame) =>
         set((state) => ({
           project: updateScenario(state.project, scenarioId, (scenario) => ({
-            ...scenario,
+            ...withoutManualTakeoff(scenario),
             aFrame,
             methodInputs: { ...scenario.methodInputs, aframe: aFrame },
           })),

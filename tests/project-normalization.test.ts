@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
-import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
+import { createDefaultManualTakeoffState, createManualTakeoffDataFromState, normalizeManualTakeoffProjectData } from "@/lib/takeoff/manual-stepper";
 import { normalizeProject } from "@/lib/store/project-normalization";
 import type { AFrameInputs, Project } from "@/types/project";
 
@@ -47,6 +47,52 @@ describe("project serialization and normalization", () => {
     expect(parsed.scenarios[0].manualTakeoff?.openings).toHaveLength(1);
     expect(parsed.scenarios[0].manualTakeoff?.wallMetrics.externalWallLengthM).toBe(manualState.externalWallLengthM);
     expect(parsed.scenarios[0].manualTakeoff?.mep.electricalPoints).toBe(18);
+  });
+
+  it("preserves empty manual takeoff collections during normalization", () => {
+    const manualTakeoff = createManualTakeoffDataFromState(
+      createDefaultManualTakeoffState({
+        rooms: [],
+        openings: [],
+      }),
+      "2026-05-08T20:00:00.000Z"
+    );
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          manualTakeoff,
+        },
+      ],
+    };
+
+    const normalized = normalizeProject(project);
+
+    expect(normalized.scenarios[0].manualTakeoff?.rooms).toEqual([]);
+    expect(normalized.scenarios[0].manualTakeoff?.openings).toEqual([]);
+  });
+
+  it("normalizes manual takeoff timestamps when imported data lacks updatedAt", () => {
+    const missingTimestamp = normalizeManualTakeoffProjectData({
+      version: 1,
+      source: "manual-stepper",
+      rooms: [],
+      openings: [],
+    });
+    const invalidTimestamp = normalizeManualTakeoffProjectData({
+      version: 1,
+      updatedAt: "not-a-date",
+      source: "manual-stepper",
+      rooms: [],
+      openings: [],
+    });
+
+    for (const normalized of [missingTimestamp, invalidTimestamp]) {
+      expect(normalized?.updatedAt).toBeTruthy();
+      expect(normalized?.updatedAt).not.toBe("");
+      expect(Number.isNaN(Date.parse(normalized?.updatedAt ?? ""))).toBe(false);
+    }
   });
 
   it("normalizes legacy A-frame mezzanine fields while preserving current defaults", () => {

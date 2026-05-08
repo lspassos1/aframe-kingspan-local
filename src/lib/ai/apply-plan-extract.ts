@@ -25,6 +25,18 @@ const rectangularMethodApplicableFields = new Set<keyof PlanExtractResult["extra
   "doorCount",
   "windowCount",
 ]);
+const manualTakeoffInvalidatingFields = new Set<keyof PlanExtractResult["extracted"]>([
+  "constructionMethod",
+  "terrainWidthM",
+  "terrainDepthM",
+  "houseWidthM",
+  "houseDepthM",
+  "builtAreaM2",
+  "floorHeightM",
+  "floors",
+  "doorCount",
+  "windowCount",
+]);
 const numericFieldConstraints: Partial<Record<keyof PlanExtractResult["extracted"], { min: number; integer?: boolean }>> = {
   terrainWidthM: { min: 0.01 },
   terrainDepthM: { min: 0.01 },
@@ -39,6 +51,10 @@ const numericFieldConstraints: Partial<Record<keyof PlanExtractResult["extracted
 
 function fieldSelected(selectedFields: PlanExtractSelectedFields, field: keyof PlanExtractResult["extracted"]) {
   return Boolean(selectedFields[field]);
+}
+
+function shouldInvalidateManualTakeoff(selectedFields: PlanExtractSelectedFields) {
+  return Array.from(manualTakeoffInvalidatingFields).some((field) => fieldSelected(selectedFields, field));
 }
 
 export function getDefaultPlanExtractSelectedFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId): PlanExtractSelectedFields {
@@ -120,7 +136,7 @@ function applyScenarioPlanExtract(scenario: Scenario, result: PlanExtractResult,
   };
   const methodUpdate = applyMethodInputs(scenario, result, selectedFields, constructionMethod);
 
-  return {
+  const nextScenario: Scenario = {
     ...scenario,
     constructionMethod,
     terrain,
@@ -128,6 +144,11 @@ function applyScenarioPlanExtract(scenario: Scenario, result: PlanExtractResult,
     methodInputs: methodUpdate.methodInputs,
     aFrame: methodUpdate.aFrame,
   };
+
+  if (!shouldInvalidateManualTakeoff(selectedFields)) return nextScenario;
+  const scenarioWithoutManualTakeoff = { ...nextScenario };
+  delete scenarioWithoutManualTakeoff.manualTakeoff;
+  return scenarioWithoutManualTakeoff;
 }
 
 export function applyPlanExtractToProject(project: Project, scenarioId: string, result: PlanExtractResult, selectedFields: PlanExtractSelectedFields): Project {

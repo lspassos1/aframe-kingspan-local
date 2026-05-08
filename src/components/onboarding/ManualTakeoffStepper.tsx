@@ -294,7 +294,6 @@ export function ManualTakeoffStepper() {
     });
     updateScenarioConstructionMethod(scenario.id, selectedMethod);
     updateScenarioMethodInputs(scenario.id, selectedMethod, methodInputs);
-    updateScenarioManualTakeoff(scenario.id, createManualTakeoffDataFromState(state));
 
     if (selectedMethod === "aframe") {
       updateScenarioAFrame(scenario.id, {
@@ -307,6 +306,7 @@ export function ManualTakeoffStepper() {
       });
     }
 
+    updateScenarioManualTakeoff(scenario.id, createManualTakeoffDataFromState(state));
     setOnboardingCompleted(true);
     setLastSync("synced");
   }

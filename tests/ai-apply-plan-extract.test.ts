@@ -6,6 +6,7 @@ import {
   getPlanExtractApplicableFields,
   type PlanExtractSelectedFields,
 } from "@/lib/ai/apply-plan-extract";
+import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
 import type { PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import type { Project } from "@/types/project";
 
@@ -43,6 +44,15 @@ const baseResult: PlanExtractResult = {
 
 function cloneProject(project: Project): Project {
   return JSON.parse(JSON.stringify(project)) as Project;
+}
+
+function projectWithManualTakeoff() {
+  const project = cloneProject(defaultProject);
+  project.scenarios[0] = {
+    ...project.scenarios[0],
+    manualTakeoff: createManualTakeoffDataFromState(createDefaultManualTakeoffState({ rooms: [], openings: [] }), "2026-05-08T20:00:00.000Z"),
+  };
+  return project;
 }
 
 describe("AI plan extract application", () => {
@@ -120,6 +130,27 @@ describe("AI plan extract application", () => {
     expect(scenario.constructionMethod).toBe("aframe");
     expect(scenario.terrain.width).toBe(16);
     expect(scenario.terrain.depth).toBe(project.scenarios[0].terrain.depth);
+  });
+
+  it("invalidates persisted manual takeoff when applying extracted geometry", () => {
+    const project = projectWithManualTakeoff();
+
+    const updated = applyPlanExtractToProject(project, project.selectedScenarioId, baseResult, {
+      houseDepthM: true,
+    });
+
+    expect(updated.scenarios[0].manualTakeoff).toBeUndefined();
+  });
+
+  it("preserves persisted manual takeoff when applying only location fields", () => {
+    const project = projectWithManualTakeoff();
+
+    const updated = applyPlanExtractToProject(project, project.selectedScenarioId, baseResult, {
+      city: true,
+    });
+
+    expect(updated.scenarios[0].manualTakeoff?.rooms).toEqual([]);
+    expect(updated.scenarios[0].manualTakeoff?.openings).toEqual([]);
   });
 
   it("maps dimensions into non-A-frame method inputs after review", () => {
