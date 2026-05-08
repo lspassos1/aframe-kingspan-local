@@ -106,8 +106,8 @@ export const useProjectStore = create<ProjectStore>()(
       savedProjects: [],
       projectHydrationStatus: "loading",
       setProjectHydrationStatus: (status) => set({ projectHydrationStatus: status }),
-      setProject: (project) => set({ project: normalizeProject(project) }),
-      resetProject: () => set({ project: { ...cloneProject(defaultProject), id: `project-${Date.now()}` } }),
+      setProject: (project) => set({ project: normalizeProject(project), projectHydrationStatus: "loaded" }),
+      resetProject: () => set({ project: { ...cloneProject(defaultProject), id: `project-${Date.now()}` }, projectHydrationStatus: "loaded" }),
       saveCurrentProject: () =>
         set((state) => ({
           savedProjects: upsertSavedProject(state.savedProjects, state.project),
@@ -115,7 +115,7 @@ export const useProjectStore = create<ProjectStore>()(
       openSavedProject: (projectId) =>
         set((state) => {
           const saved = state.savedProjects.find((item) => item.id === projectId);
-          return saved ? { project: normalizeProject(saved) } : state;
+          return saved ? { project: normalizeProject(saved), projectHydrationStatus: "loaded" } : state;
         }),
       deleteSavedProject: (projectId) =>
         set((state) => {
@@ -124,6 +124,7 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             savedProjects,
             project: savedProjects[0] ? normalizeProject(savedProjects[0]) : { ...cloneProject(defaultProject), id: `project-${Date.now()}` },
+            projectHydrationStatus: "loaded",
           };
         }),
       importProject: (project) =>
@@ -132,6 +133,7 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             project: normalized,
             savedProjects: upsertSavedProject(state.savedProjects, normalized),
+            projectHydrationStatus: "loaded",
           };
         }),
       selectScenario: (scenarioId) =>
@@ -435,6 +437,7 @@ export const useProjectStore = create<ProjectStore>()(
           return {
             project,
             savedProjects: completed ? upsertSavedProject(state.savedProjects, project) : state.savedProjects,
+            projectHydrationStatus: "loaded",
           };
         }),
       duplicateSelectedScenario: () =>
