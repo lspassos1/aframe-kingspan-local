@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import {
+  createTakeoffSeedInputFromScenario,
   createTakeoffSeedInputFromPlanExtract,
   generatePlanExtractQuantitySeeds,
   generateScenarioQuantitySeeds,
   generateTakeoffQuantitySeeds,
   type TakeoffSeedInput,
 } from "@/lib/takeoff/quantity-seeds";
+import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
 import type { PlanExtractResult } from "@/lib/ai/plan-extract-schema";
+import type { Project } from "@/types/project";
 
 const manualInput: TakeoffSeedInput = {
   scenarioId: "manual-scenario",
@@ -176,6 +179,54 @@ describe("takeoff quantity seeds", () => {
     expect(seeds.some((seed) => seed.scenarioId === scenario.id)).toBe(true);
     expect(seeds.some((seed) => seed.category === "roof")).toBe(true);
     expect(seeds.some((seed) => seed.constructionMethod === "aframe")).toBe(true);
+  });
+
+  it("prefers persisted manual rooms and openings when generating scenario seeds", () => {
+    const manualState = createDefaultManualTakeoffState({
+      projectName: "Manual persistido",
+      buildingWidthM: 9,
+      buildingDepthM: 11,
+      rooms: [
+        { ...createDefaultManualTakeoffState().rooms[0], id: "room-suite", name: "Suite", areaM2: 16, wetArea: true, electricalPoints: 7, plumbingPoints: 5 },
+      ],
+      openings: [
+        { ...createDefaultManualTakeoffState().openings[0], id: "door-suite", kind: "door", quantity: 2, widthM: 0.9, heightM: 2.1, roomId: "room-suite" },
+        { ...createDefaultManualTakeoffState().openings[1], id: "window-suite", kind: "window", quantity: 3, widthM: 1.5, heightM: 1.1, roomId: "room-suite" },
+      ],
+      electricalEstimated: false,
+      electricalPoints: 21,
+      plumbingEstimated: false,
+      plumbingPoints: 8,
+    });
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          manualTakeoff: createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z"),
+        },
+      ],
+    };
+    const scenario = project.scenarios[0];
+    const input = createTakeoffSeedInputFromScenario(project, scenario);
+    const seeds = generateScenarioQuantitySeeds(project, scenario);
+
+    expect(input).toMatchObject({
+      widthM: 9,
+      depthM: 11,
+      source: "manual",
+      electricalPointCount: 21,
+      plumbingPointCount: 8,
+    });
+    expect(input.rooms).toEqual([{ id: "room-suite", name: "Suite", type: "social", areaM2: 16, wetArea: true }]);
+    expect(input.openings).toMatchObject({ doorCount: 2, windowCount: 3, doorWidthM: 0.9, windowWidthM: 1.5 });
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-doors-count`)?.quantity).toBe(2);
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-windows-count`)?.quantity).toBe(3);
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-electrical-points`)).toMatchObject({
+      quantity: 21,
+      source: "manual",
+      confidence: "medium",
+    });
   });
 
   it("creates seed input and generated quantities from plan extraction data", () => {

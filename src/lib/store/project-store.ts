@@ -19,6 +19,7 @@ import { duplicateScenario } from "@/lib/calculations/scenarios";
 import { getConstructionMethodDefinition, type ConstructionMethodId, type ConstructionMethodInputs } from "@/lib/construction-methods";
 import type { BudgetMatch, CostItem, CostSource, PriceSource, ServiceComposition } from "@/lib/budget-assistant";
 import { cloneProject, normalizeProject, upsertSavedProject } from "@/lib/store/project-normalization";
+import type { ManualTakeoffProjectData } from "@/lib/takeoff/manual-stepper";
 
 export type SavedProjectSummary = {
   id: string;
@@ -61,6 +62,7 @@ interface ProjectStore {
   updateScenarioTerrain: (scenarioId: string, terrain: Terrain) => void;
   updateScenarioConstructionMethod: (scenarioId: string, constructionMethod: ConstructionMethodId) => void;
   updateScenarioMethodInputs: (scenarioId: string, constructionMethod: ConstructionMethodId, inputs: ConstructionMethodInputs) => void;
+  updateScenarioManualTakeoff: (scenarioId: string, manualTakeoff: ManualTakeoffProjectData) => void;
   updateScenarioAFrame: (scenarioId: string, aFrame: AFrameInputs) => void;
   updateScenarioPanel: (scenarioId: string, panelProductId: string, externalColor: string, internalFinish: string) => void;
   updateScenarioPricing: (scenarioId: string, pricing: PricingMeta) => void;
@@ -172,6 +174,13 @@ export const useProjectStore = create<ProjectStore>()(
           project: updateScenario(state.project, scenarioId, (scenario) => ({
             ...scenario,
             methodInputs: { ...scenario.methodInputs, [constructionMethod]: inputs },
+          })),
+        })),
+      updateScenarioManualTakeoff: (scenarioId, manualTakeoff) =>
+        set((state) => ({
+          project: updateScenario(state.project, scenarioId, (scenario) => ({
+            ...scenario,
+            manualTakeoff,
           })),
         })),
       updateScenarioAFrame: (scenarioId, aFrame) =>

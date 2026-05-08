@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
+import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
 import { normalizeProject } from "@/lib/store/project-normalization";
 import type { AFrameInputs, Project } from "@/types/project";
 
@@ -20,6 +21,32 @@ describe("project serialization and normalization", () => {
     expect(parsed.budgetAssumptions.engineerPlaceholderBRL).toBe(defaultProject.budgetAssumptions.engineerPlaceholderBRL);
     expect(parsed.foundationAssumptions).toMatchObject(defaultProject.foundationAssumptions);
     expect(parsed.budgetAssistant).toMatchObject(defaultProject.budgetAssistant);
+  });
+
+  it("round-trips dedicated manual takeoff collections through project JSON", () => {
+    const manualState = createDefaultManualTakeoffState({
+      projectName: "Manual persistido",
+      rooms: [createDefaultManualTakeoffState().rooms[0]],
+      openings: [createDefaultManualTakeoffState().openings[0]],
+      electricalEstimated: false,
+      electricalPoints: 18,
+    });
+    const manualTakeoff = createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z");
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          manualTakeoff,
+        },
+      ],
+    };
+    const parsed = JSON.parse(JSON.stringify(project)) as Project;
+
+    expect(parsed.scenarios[0].manualTakeoff?.rooms).toHaveLength(1);
+    expect(parsed.scenarios[0].manualTakeoff?.openings).toHaveLength(1);
+    expect(parsed.scenarios[0].manualTakeoff?.wallMetrics.externalWallLengthM).toBe(manualState.externalWallLengthM);
+    expect(parsed.scenarios[0].manualTakeoff?.mep.electricalPoints).toBe(18);
   });
 
   it("normalizes legacy A-frame mezzanine fields while preserving current defaults", () => {
@@ -121,5 +148,50 @@ describe("project serialization and normalization", () => {
       notes: "",
     });
     expect(normalizeProject(savedProject).budgetAssistant.matches[0].approvedByUser).toBe(true);
+  });
+
+  it("normalizes legacy projects without manual takeoff data and preserves imported manual collections", () => {
+    const legacyProject = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          manualTakeoff: undefined,
+        },
+      ],
+    } as Project;
+    const manualTakeoff = createManualTakeoffDataFromState(
+      createDefaultManualTakeoffState({
+        rooms: [
+          {
+            ...createDefaultManualTakeoffState().rooms[0],
+            id: "room-custom",
+            name: "Suite",
+            areaM2: 14,
+          },
+        ],
+      }),
+      "2026-05-08T20:00:00.000Z"
+    );
+    const importedProject = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          manualTakeoff,
+        },
+      ],
+    } as Project;
+
+    expect(normalizeProject(legacyProject).scenarios[0].manualTakeoff).toBeUndefined();
+    expect(normalizeProject(importedProject).scenarios[0].manualTakeoff).toMatchObject({
+      version: 1,
+      source: "manual-stepper",
+      rooms: [{ id: "room-custom", name: "Suite", areaM2: 14 }],
+      openings: expect.any(Array),
+      wallMetrics: expect.objectContaining({ floorHeightM: expect.any(Number) }),
+      foundationRoof: expect.objectContaining({ roofType: expect.any(String) }),
+      mep: expect.objectContaining({ plumbingEstimated: expect.any(Boolean) }),
+    });
   });
 });

@@ -74,6 +74,7 @@ vi.mock("@/lib/store/project-store", () => ({
       updateScenarioTerrain: vi.fn(),
       updateScenarioConstructionMethod: vi.fn(),
       updateScenarioMethodInputs: vi.fn(),
+      updateScenarioManualTakeoff: vi.fn(),
       updateScenarioAFrame: vi.fn(),
       setOnboardingCompleted: vi.fn(),
     }),

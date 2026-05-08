@@ -1,6 +1,7 @@
 import { defaultProject } from "@/data/defaultProject";
 import { constructionMethodRegistry, getConstructionMethodDefinition, type ConstructionMethodId } from "@/lib/construction-methods";
 import type { BudgetAssistantProjectData } from "@/lib/budget-assistant/types";
+import { normalizeManualTakeoffProjectData } from "@/lib/takeoff/manual-stepper";
 import type { AFrameInputs, Project, Scenario, ScenarioMethodInputs } from "@/types/project";
 
 export const cloneProject = (project: Project): Project => JSON.parse(JSON.stringify(project)) as Project;
@@ -45,6 +46,22 @@ function normalizeScenario(scenario: Scenario): Scenario {
     terrain: { ...defaultScenario.terrain, ...scenario.terrain },
     pricing: { ...defaultScenario.pricing, ...scenario.pricing },
     aFrame: normalizedAFrame,
+    manualTakeoff: normalizeManualTakeoffProjectData(scenario.manualTakeoff, {
+      projectName: scenario.name,
+      address: scenario.location?.address,
+      city: scenario.location?.city,
+      state: scenario.location?.state,
+      country: scenario.location?.country,
+      lotWidthM: scenario.terrain?.width,
+      lotDepthM: scenario.terrain?.depth,
+      frontSetbackM: scenario.terrain?.frontSetback,
+      rearSetbackM: scenario.terrain?.rearSetback,
+      leftSetbackM: scenario.terrain?.leftSetback,
+      rightSetbackM: scenario.terrain?.rightSetback,
+      buildingDepthM: normalizedAFrame.houseDepth,
+      floors: normalizedAFrame.upperFloorMode === "none" ? 1 : 2,
+      floorHeightM: normalizedAFrame.upperFloorLevelHeight,
+    }),
   };
 }
 
