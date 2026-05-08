@@ -16,6 +16,7 @@ import {
   FileText,
   HelpCircle,
   Home,
+  Loader2,
   Menu,
   MessageSquare,
   Package,
@@ -31,7 +32,7 @@ import { Separator } from "@/components/ui/separator";
 import { getConstructionMethodDefinition, type ConstructionMethodId } from "@/lib/construction-methods";
 import { getVisibleAppNavigationSections, type AppNavigationItem, type AppNavigationSection } from "@/lib/navigation/app-navigation";
 import { useProjectStore } from "@/lib/store/project-store";
-import { canUseAppShellBeforeOnboarding } from "@/lib/routes/shell";
+import { buildStartRedirectUrl, getAppShellProjectGuardState, type AppShellProjectGuardState } from "@/lib/routes/shell";
 import { cn } from "@/lib/utils";
 
 const navigationIcons: Record<string, ComponentType<{ className?: string }>> = {
@@ -160,22 +161,74 @@ function NavList({
   );
 }
 
+function ProjectRouteState({ state, pathname }: { state: Exclude<AppShellProjectGuardState, "ready">; pathname: string }) {
+  const copy =
+    state === "hydrating"
+      ? {
+          title: "Carregando estudo",
+          description: "Estamos recuperando o estudo salvo neste navegador antes de abrir a rota interna.",
+          badge: "Hidratação do projeto",
+          action: null,
+        }
+      : state === "invalid-project"
+        ? {
+            title: "Não foi possível carregar o estudo",
+            description: "Os dados locais parecem inválidos. Comece um novo estudo ou importe um JSON salvo.",
+            badge: "Projeto inválido",
+            action: buildStartRedirectUrl(pathname, "project-invalid"),
+          }
+        : {
+            title: "Nenhum estudo carregado",
+            description: "Para abrir esta rota, comece pela planta, preencha os dados ou carregue o exemplo.",
+            badge: "Projeto ausente",
+            action: buildStartRedirectUrl(pathname, "project-required"),
+          };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
+      <div className="w-full max-w-xl rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
+        <div className="flex items-start gap-4">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+            {state === "hydrating" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Ruler className="h-5 w-5" />}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{copy.badge}</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">{copy.title}</h1>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{copy.description}</p>
+            <p className="mt-4 rounded-2xl border bg-background/70 px-3 py-2 text-xs text-muted-foreground">Rota solicitada: {pathname}</p>
+            {copy.action ? (
+              <Button asChild className="mt-5">
+                <Link href={copy.action}>Ir para o início</Link>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const project = useProjectStore((state) => state.project);
+  const projectHydrationStatus = useProjectStore((state) => state.projectHydrationStatus);
   const onboardingCompleted = project.onboardingCompleted;
   const selectedScenario = project.scenarios.find((scenario) => scenario.id === project.selectedScenarioId) ?? project.scenarios[0];
   const constructionMethod = selectedScenario?.constructionMethod;
   const methodName = constructionMethod ? getConstructionMethodDefinition(constructionMethod).name : "Método a definir";
+  const projectGuardState = getAppShellProjectGuardState({ pathname, projectHydrationStatus, onboardingCompleted });
 
   useEffect(() => {
-    if (!onboardingCompleted && !canUseAppShellBeforeOnboarding(pathname)) {
-      router.replace("/start");
+    if (projectGuardState === "missing-project") {
+      router.replace(buildStartRedirectUrl(pathname, "project-required"));
     }
-  }, [onboardingCompleted, pathname, router]);
+    if (projectGuardState === "invalid-project") {
+      router.replace(buildStartRedirectUrl(pathname, "project-invalid"));
+    }
+  }, [pathname, projectGuardState, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,6 +251,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  if (projectGuardState !== "ready") {
+    return <ProjectRouteState pathname={pathname} state={projectGuardState} />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">

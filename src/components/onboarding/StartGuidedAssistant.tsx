@@ -9,6 +9,7 @@ import { ActionCard, InlineHelp, PageFrame, PageHeader, SectionHeader, StepProgr
 import { Button } from "@/components/ui/button";
 import { defaultProject } from "@/data/defaultProject";
 import { createStartAssistantViewModel, type StartAssistantMode } from "@/lib/onboarding/start-guided-assistant";
+import type { StartRedirectReason } from "@/lib/routes/shell";
 import { cloneProject } from "@/lib/store/project-normalization";
 import { useProjectStore } from "@/lib/store/project-store";
 
@@ -42,9 +43,13 @@ const aiOperationalFacts = [
 export function StartGuidedAssistant({
   planExtractEnabled,
   initialMode = "choose",
+  redirectReason,
+  redirectNext,
 }: {
   planExtractEnabled: boolean;
   initialMode?: StartAssistantMode;
+  redirectReason?: StartRedirectReason;
+  redirectNext?: string;
 }) {
   const router = useRouter();
   const setProject = useProjectStore((state) => state.setProject);
@@ -90,10 +95,24 @@ export function StartGuidedAssistant({
   }
 
   const currentStepIndex = mode === "choose" ? 0 : 1;
+  const redirectNotice =
+    redirectReason === "project-invalid"
+      ? {
+          tone: "warning" as const,
+          text: "Não foi possível carregar o estudo salvo neste navegador. Comece um novo estudo ou importe um JSON válido.",
+        }
+      : redirectReason === "project-required"
+        ? {
+            tone: "info" as const,
+            text: `Você tentou abrir ${redirectNext ?? "uma rota interna"} sem um estudo carregado. Comece pela planta, preencha manualmente ou use o exemplo.`,
+          }
+        : null;
 
   if (mode === "choose") {
     return (
       <PageFrame className="mx-auto max-w-7xl">
+        {redirectNotice ? <InlineHelp tone={redirectNotice.tone}>{redirectNotice.text}</InlineHelp> : null}
+
         <PageHeader
           eyebrow="Novo estudo"
           title={viewModel.title}
@@ -155,6 +174,8 @@ export function StartGuidedAssistant({
 
   return (
     <PageFrame className="mx-auto max-w-7xl">
+      {redirectNotice ? <InlineHelp tone={redirectNotice.tone}>{redirectNotice.text}</InlineHelp> : null}
+
       <PageHeader
         eyebrow="Novo estudo"
         title={viewModel.title}
