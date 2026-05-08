@@ -71,7 +71,7 @@ export default function TechnicalProjectPage() {
             status={<StatusPill tone="warning">Revisável</StatusPill>}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {technicalProject.metrics.slice(0, 6).map((metric) => (
+              {technicalProject.metrics.map((metric) => (
                 <div className="rounded-2xl border bg-muted/20 p-3" key={metric.label}>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{metric.label}</p>
                   <p className="mt-1 text-lg font-semibold">{metric.value}</p>
