@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Boxes, Building2, Package, Plus, SlidersHorizontal, Trash2, WalletCards } from "lucide-react";
+import { AdvancedDisclosure, BudgetGroupCard, MetricCard, PageFrame, PageHeader, SectionHeader, StatusPill } from "@/components/shared/design-system";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,16 +25,44 @@ export default function SettingsPage() {
   const deleteSupplier = useProjectStore((state) => state.deleteSupplier);
   const updateMaterialAssumptions = useProjectStore((state) => state.updateMaterialAssumptions);
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">Premissas</p>
-        <h1 className="text-3xl font-semibold tracking-normal">Catalogos e parametros editaveis</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Atualize produtos, precos, fornecedores e premissas locais. Precos devem vir de cotacao ou importacao manual.
-        </p>
-      </div>
+  const pricedPanels = project.panelProducts.filter((panel) => panel.pricePerPanelBRL).length;
+  const pricedSteelProfiles = project.steelProfiles.filter((profile) => profile.supplierPriceBRLKg).length;
+  const pricedAccessories = project.accessories.filter((item) => item.unitPriceBRL).length;
 
+  return (
+    <PageFrame>
+      <PageHeader
+        eyebrow="Premissas"
+        title="Catálogos e parâmetros editáveis"
+        description="A primeira camada mostra prontidão de dados. Tabelas densas de catálogo, fornecedores e consumo ficam recolhidas por grupo."
+        status={<StatusPill tone="warning">Fonte obrigatória</StatusPill>}
+      />
+
+      <section className="grid gap-4 md:grid-cols-4">
+        <MetricCard label="Painéis" value={project.panelProducts.length} detail={`${pricedPanels} com preço`} icon={<Boxes className="h-4 w-4" />} />
+        <MetricCard label="Acessórios" value={project.accessories.length} detail={`${pricedAccessories} com preço`} icon={<Package className="h-4 w-4" />} />
+        <MetricCard label="Perfis de aço" value={project.steelProfiles.length} detail={`${pricedSteelProfiles} com preço/kg`} icon={<SlidersHorizontal className="h-4 w-4" />} />
+        <MetricCard label="Fornecedores" value={project.suppliers.length} detail="Base local editável" icon={<Building2 className="h-4 w-4" />} />
+      </section>
+
+      <BudgetGroupCard
+        title="Próximo passo"
+        description="Complete apenas os preços e fornecedores que serão usados no estudo atual. Campos sem fonte continuam pendentes no orçamento."
+        status={<StatusPill tone={pricedPanels + pricedAccessories + pricedSteelProfiles > 0 ? "info" : "warning"}>{pricedPanels + pricedAccessories + pricedSteelProfiles} preço(s)</StatusPill>}
+      >
+        <p className="text-sm leading-6 text-muted-foreground">
+          Use importação controlada ou cotação manual. Não trate preço vazio como válido e mantenha premissas técnicas revisáveis.
+        </p>
+      </BudgetGroupCard>
+
+      <SectionHeader title="Configurações por grupo" description="Abra somente o grupo que precisa editar; as tabelas completas não aparecem na primeira camada." />
+
+      <AdvancedDisclosure
+        title="Catálogos, fornecedores e consumo"
+        description="Editar produtos, preços, fontes locais e premissas de consumo."
+        icon={WalletCards}
+        badge={<StatusPill tone="neutral">5 grupos</StatusPill>}
+      >
       <Tabs defaultValue="panels">
         <TabsList className="flex h-auto flex-wrap justify-start">
           <TabsTrigger value="panels">Paineis</TabsTrigger>
@@ -303,6 +332,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </AdvancedDisclosure>
+    </PageFrame>
   );
 }
