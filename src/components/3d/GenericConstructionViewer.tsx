@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text } from "@react-three/drei";
 import { Camera, Download, Eye, RotateCcw, Settings2 } from "lucide-react";
+import { Mobile3DControls, Mobile3DPreview, type Mobile3DViewMode, useMobile3DViewport } from "@/components/3d/Mobile3DControls";
 import type { Construction3DLayer, Construction3DPrimitive, Construction3DVector3 } from "@/lib/construction-methods";
 import type { Scenario } from "@/types/project";
 import { Button } from "@/components/ui/button";
@@ -17,8 +18,9 @@ import { getGenericViewerFramingLayers } from "@/lib/construction-methods/generi
 import { getScenarioMethodInputs } from "@/lib/construction-methods";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
 import { useProjectStore } from "@/lib/store/project-store";
+import { createGenericMobile3DSummary } from "@/lib/model-3d/mobile-summary";
 
-type ViewMode = "iso" | "top" | "front" | "rear" | "side" | "section";
+type ViewMode = Mobile3DViewMode;
 type DimensionMode = "basic" | "detailed";
 
 function maxDimensionFromLayers(layers: Construction3DLayer[]) {
@@ -268,9 +270,11 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
   const [modelOpacity, setModelOpacity] = useState(0.78);
   const updateScenarioMethodInputs = useProjectStore((state) => state.updateScenarioMethodInputs);
   const updateScenarioTerrain = useProjectStore((state) => state.updateScenarioTerrain);
+  const isMobileViewport = useMobile3DViewport();
   const methodInputs = useMemo(() => getScenarioMethodInputs(scenario), [scenario]);
   const numberControls = useMemo(() => getGeneric3DNumberControls(scenario.constructionMethod, methodInputs), [methodInputs, scenario.constructionMethod]);
   const activeLayers = useMemo(() => layers.filter((layer) => visibleLayers[layer.id] ?? layer.visibleByDefault), [layers, visibleLayers]);
+  const mobileSummary = useMemo(() => createGenericMobile3DSummary(activeLayers), [activeLayers]);
 
   const toggleLayer = (layerId: string, checked: boolean) => {
     setVisibleLayers((current) => ({ ...current, [layerId]: checked }));
@@ -294,20 +298,65 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
     anchor.click();
   };
 
+  const mobileAdvancedControls = (
+    <>
+      <div className="space-y-2">
+        <Label>Modo de cotas</Label>
+        <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="basic">Basico</SelectItem>
+            <SelectItem value="detailed">Detalhado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <Label>Transparencia volumes</Label>
+          <span className="text-xs text-muted-foreground">{Math.round(modelOpacity * 100)}%</span>
+        </div>
+        <Slider min={0.25} max={1} step={0.01} value={[modelOpacity]} onValueChange={([value]) => setModelOpacity(value)} />
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
+          <Label htmlFor="mobile-generic-dimensions" className="text-sm font-normal">
+            Cotas principais
+          </Label>
+          <Checkbox id="mobile-generic-dimensions" checked={showDimensions} onCheckedChange={(value) => setShowDimensions(Boolean(value))} />
+        </div>
+        {layers.map((layer) => (
+          <div key={layer.id} className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
+            <Label htmlFor={`mobile-${layer.id}`} className="text-sm font-normal">
+              {layer.label}
+            </Label>
+            <Checkbox id={`mobile-${layer.id}`} checked={visibleLayers[layer.id] ?? layer.visibleByDefault} onCheckedChange={(value) => toggleLayer(layer.id, Boolean(value))} />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="min-h-[680px] overflow-hidden rounded-md border bg-slate-50">
-        <Canvas shadows camera={{ position: [16, 12, 16], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
-          <GenericScene
-            layers={activeLayers}
-            dimensionMode={dimensionMode}
-            modelOpacity={modelOpacity}
-            showDimensions={showDimensions}
-            view={view}
-          />
-        </Canvas>
+      <div className="h-[58svh] min-h-[360px] max-h-[520px] overflow-hidden rounded-2xl border bg-slate-50 xl:h-auto xl:max-h-none xl:min-h-[680px] xl:rounded-md">
+        {isMobileViewport ? (
+          <Mobile3DPreview subtitle="Volume leve por camadas. Use as vistas rápidas e abra camadas/cotas sob demanda." title={title} view={view} />
+        ) : (
+          <Canvas camera={{ position: [16, 12, 16], fov: 45 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }} shadows>
+            <GenericScene
+              layers={activeLayers}
+              dimensionMode={dimensionMode}
+              modelOpacity={modelOpacity}
+              showDimensions={showDimensions}
+              view={view}
+            />
+          </Canvas>
+        )}
       </div>
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
+      <Mobile3DControls advancedControls={mobileAdvancedControls} onScreenshot={screenshot} onViewChange={setView} summary={mobileSummary} view={view} />
+      <aside className="hidden space-y-4 xl:sticky xl:top-6 xl:block xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
         <div className="rounded-md border bg-card">
           <div className="mb-3 flex items-center gap-2 font-medium">
             <div className="flex w-full items-center gap-2 px-4 pt-4">

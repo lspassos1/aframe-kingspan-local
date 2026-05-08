@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text } from "@react-three/drei";
 import { Camera, Download, Eye, RotateCcw, Settings2 } from "lucide-react";
+import { Mobile3DControls, Mobile3DPreview, type Mobile3DViewMode, useMobile3DViewport } from "@/components/3d/Mobile3DControls";
 import type { AFrameGeometry, Project, Scenario } from "@/types/project";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,8 +15,9 @@ import { Slider } from "@/components/ui/slider";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
 import { useProjectStore } from "@/lib/store/project-store";
 import { coerceAFrameToPanel, getPanelExternalOptions, getPanelInternalOptions, getPanelLengthOptions } from "@/lib/panels";
+import { createAFrameMobile3DSummary } from "@/lib/model-3d/mobile-summary";
 
-type ViewMode = "iso" | "top" | "front" | "rear" | "side" | "section";
+type ViewMode = Mobile3DViewMode;
 type DimensionMode = "basic" | "detailed";
 
 interface ToggleState {
@@ -431,6 +433,23 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
   const updateScenarioPanel = useProjectStore((state) => state.updateScenarioPanel);
   const panel = project.panelProducts.find((item) => item.id === scenario.panelProductId) ?? project.panelProducts[0];
   const lengthOptions = getPanelLengthOptions(panel);
+  const mobileSummary = useMemo(() => createAFrameMobile3DSummary(scenario), [scenario]);
+  const isMobileViewport = useMobile3DViewport();
+  const sceneToggles = useMemo<ToggleState>(
+    () =>
+      isMobileViewport
+        ? {
+            ...toggles,
+            steel: false,
+            purlins: false,
+            deadZones: false,
+            mountingDirection: false,
+            slopeDirection: false,
+            panelNumbers: false,
+          }
+        : toggles,
+    [isMobileViewport, toggles]
+  );
 
   const updateToggle = (key: keyof ToggleState, checked: boolean) => {
     setToggles((current) => ({ ...current, [key]: checked }));
@@ -463,14 +482,58 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
     anchor.click();
   };
 
+  const mobileAdvancedControls = (
+    <>
+      <div className="space-y-2">
+        <Label>Modo de cotas</Label>
+        <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="basic">Basico</SelectItem>
+            <SelectItem value="detailed">Detalhado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <Label>Transparencia telhas</Label>
+          <span className="text-xs text-muted-foreground">{Math.round(panelOpacity * 100)}%</span>
+        </div>
+        <Slider min={0.25} max={0.95} step={0.01} value={[panelOpacity]} onValueChange={([value]) => setPanelOpacity(value)} />
+      </div>
+      <div className="grid gap-3">
+        {(Object.keys(toggles) as Array<keyof ToggleState>).map((key) => (
+          <div key={key} className="flex items-center justify-between gap-4 rounded-xl border px-3 py-2">
+            <Label htmlFor={`mobile-${key}`} className="text-sm">
+              {toggleLabels[key]}
+            </Label>
+            <Checkbox id={`mobile-${key}`} checked={toggles[key]} onCheckedChange={(checked) => updateToggle(key, Boolean(checked))} />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="min-h-[680px] overflow-hidden rounded-md border bg-slate-50">
-        <Canvas shadows camera={{ position: [18, 12, 18], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
-          <AFrameScene project={project} scenario={scenario} toggles={toggles} view={view} panelOpacity={panelOpacity} dimensionMode={dimensionMode} />
-        </Canvas>
+      <div className="h-[58svh] min-h-[360px] max-h-[520px] overflow-hidden rounded-2xl border bg-slate-50 xl:h-auto xl:max-h-none xl:min-h-[680px] xl:rounded-md">
+        {isMobileViewport ? (
+          <Mobile3DPreview subtitle="Volume leve para celular. Use as vistas rápidas e abra os controles avançados quando precisar." title="Prévia A-frame" view={view} />
+        ) : (
+          <Canvas
+            camera={{ position: [18, 12, 18], fov: 45 }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
+            shadows
+          >
+            <AFrameScene project={project} scenario={scenario} toggles={sceneToggles} view={view} panelOpacity={panelOpacity} dimensionMode={dimensionMode} />
+          </Canvas>
+        )}
       </div>
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
+      <Mobile3DControls advancedControls={mobileAdvancedControls} onScreenshot={screenshot} onViewChange={setView} summary={mobileSummary} view={view} />
+      <aside className="hidden space-y-4 xl:sticky xl:top-6 xl:block xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
         <div className="rounded-md border bg-card">
           <div className="mb-3 flex items-center gap-2 font-medium">
             <div className="flex w-full items-center gap-2 px-4 pt-4">
