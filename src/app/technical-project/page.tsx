@@ -1,9 +1,8 @@
 "use client";
 
-import { AlertTriangle, FileDown } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, FileDown, FileText, Package, Ruler, ShieldAlert } from "lucide-react";
+import { AdvancedDisclosure, BudgetGroupCard, MetricCard, PageFrame, PageHeader, SectionHeader, StatusPill } from "@/components/shared/design-system";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { exportTechnicalPdf } from "@/lib/export/files";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import { getTechnicalProjectViewModel } from "@/lib/technical-project";
@@ -15,120 +14,116 @@ export default function TechnicalProjectPage() {
   const isDrawingMode = technicalProject.mode === "drawings";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">Projeto Tecnico</p>
-          <h1 className="text-3xl font-semibold tracking-normal">
-            {isDrawingMode ? "Desenhos preliminares gerados por SVG" : `Resumo tecnico preliminar - ${technicalProject.methodName}`}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {isDrawingMode
-              ? "Desenhos para discussao com fornecedores, arquiteto e engenheiro. Nao sao projeto executivo."
-              : "Quantitativos e alertas do metodo selecionado para discussao com fornecedores, arquiteto e engenheiro. Nao sao projeto executivo."}
-          </p>
-        </div>
-        <Button onClick={() => void exportTechnicalPdf(project, scenario)}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Exportar PDF tecnico
-        </Button>
-      </div>
+    <PageFrame>
+      <PageHeader
+        eyebrow="Projeto técnico"
+        title={isDrawingMode ? "Desenhos preliminares gerados por SVG" : `Resumo técnico preliminar - ${technicalProject.methodName}`}
+        description={
+          isDrawingMode
+            ? "Pranchas preliminares para conversa com fornecedores e responsáveis técnicos. Não substituem projeto executivo."
+            : "Leitura curta dos quantitativos, alertas e próximos passos do método ativo. A memória técnica completa fica sob demanda."
+        }
+        status={<StatusPill tone="warning">Preliminar</StatusPill>}
+        actions={
+          <Button onClick={() => void exportTechnicalPdf(project, scenario)}>
+            <FileDown className="mr-2 h-4 w-4" />
+            Exportar PDF técnico
+          </Button>
+        }
+      />
 
       {technicalProject.mode === "drawings" ? (
-        <div className="grid gap-6 xl:grid-cols-2">
-          {technicalProject.drawings.map((drawing) => (
-            <Card className="rounded-md shadow-none" key={drawing.id}>
-              <CardHeader>
-                <CardTitle>{drawing.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
+        <section className="space-y-4">
+          <SectionHeader
+            title="Pranchas para revisão"
+            description="Use estas vistas para alinhar fornecedor e equipe técnica antes de qualquer detalhamento executivo."
+            action={<StatusPill tone="info">{technicalProject.drawings.length} desenho(s)</StatusPill>}
+          />
+          <div className="grid gap-5 xl:grid-cols-2">
+            {technicalProject.drawings.map((drawing) => (
+              <BudgetGroupCard key={drawing.id} title={drawing.title} description="SVG preliminar, sem validade executiva.">
                 <div
-                  className="overflow-hidden rounded-md border bg-white"
+                  className="overflow-hidden rounded-2xl border bg-white"
                   dangerouslySetInnerHTML={{ __html: drawing.svg }}
                 />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </BudgetGroupCard>
+            ))}
+          </div>
+        </section>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <section className="space-y-6">
-            <Card className="rounded-md shadow-none">
-              <CardHeader className="flex-row items-center justify-between gap-3">
-                <CardTitle>Metodo construtivo</CardTitle>
-                <Badge variant="outline">Estimativa preliminar</Badge>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Selecionado</p>
-                  <p className="mt-1 text-xl font-semibold">{technicalProject.methodName}</p>
-                </div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Este resumo usa os calculos preliminares do metodo selecionado. Validar geometria, estrutura, fundacao, ART/RRT,
-                  aprovacao municipal, fornecedor e orcamento formal antes de qualquer execucao.
-                </p>
-              </CardContent>
-            </Card>
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            <MetricCard label="Método" value={technicalProject.methodName} detail="Confirmar antes de orçamento" icon={<FileText className="h-4 w-4" />} />
+            <MetricCard label="Métricas técnicas" value={technicalProject.metrics.length} detail="Resumo de geometria e método" icon={<Ruler className="h-4 w-4" />} />
+            <MetricCard label="Quantitativos" value={technicalProject.materialLines.length} detail="Linhas preliminares" icon={<Package className="h-4 w-4" />} />
+            <MetricCard
+              label="Alertas"
+              value={technicalProject.warnings.length}
+              detail="Revisão humana obrigatória"
+              tone={technicalProject.warnings.length > 0 ? "warning" : "success"}
+              icon={<ShieldAlert className="h-4 w-4" />}
+            />
+          </div>
 
-            <Card className="rounded-md shadow-none">
-              <CardHeader>
-                <CardTitle>Metricas tecnicas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {technicalProject.metrics.map((metric) => (
-                    <div className="rounded-md border bg-muted/20 p-3" key={metric.label}>
-                      <p className="text-xs text-muted-foreground">{metric.label}</p>
-                      <p className="mt-1 text-lg font-semibold">{metric.value}</p>
-                    </div>
-                  ))}
+          <BudgetGroupCard
+            title="Próximo passo técnico"
+            description="Validar geometria, estrutura, fundação, ART/RRT, aprovação municipal, fornecedor e orçamento formal antes de qualquer execução."
+            status={<StatusPill tone="warning">Revisável</StatusPill>}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {technicalProject.metrics.slice(0, 6).map((metric) => (
+                <div className="rounded-2xl border bg-muted/20 p-3" key={metric.label}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{metric.label}</p>
+                  <p className="mt-1 text-lg font-semibold">{metric.value}</p>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
+          </BudgetGroupCard>
 
-            <Card className="rounded-md shadow-none">
-              <CardHeader>
-                <CardTitle>Quantitativos preliminares</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y rounded-md border">
-                  {technicalProject.materialLines.slice(0, 10).map((line) => (
-                    <div className="grid gap-2 px-3 py-3 text-sm md:grid-cols-[1fr_140px]" key={line.id}>
-                      <div>
-                        <p className="font-medium">{line.description}</p>
-                        <p className="text-xs text-muted-foreground">{line.code}</p>
-                      </div>
-                      <p className="text-muted-foreground md:text-right">
-                        {line.quantity} {line.unit}
-                      </p>
+          <section className="space-y-4">
+            <SectionHeader
+              title="Detalhes sob demanda"
+              description="A primeira camada mostra decisão e risco; memória técnica e listas completas ficam recolhidas."
+            />
+
+            <AdvancedDisclosure
+              title="Quantitativos preliminares"
+              description="Linhas de materiais e serviços ainda dependem de fonte, revisão e aprovação técnica."
+              icon={Package}
+              badge={<StatusPill tone="neutral">{technicalProject.materialLines.length} linhas</StatusPill>}
+            >
+              <div className="divide-y rounded-2xl border bg-background">
+                {technicalProject.materialLines.map((line) => (
+                  <div className="grid gap-2 px-3 py-3 text-sm md:grid-cols-[1fr_140px]" key={line.id}>
+                    <div>
+                      <p className="font-medium">{line.description}</p>
+                      <p className="text-xs text-muted-foreground">{line.code}</p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    <p className="text-muted-foreground md:text-right">
+                      {line.quantity} {line.unit}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </AdvancedDisclosure>
+
+            <AdvancedDisclosure
+              title="Alertas técnicos"
+              description="Pendências que devem ser discutidas com fornecedores, arquiteto ou engenheiro."
+              icon={AlertTriangle}
+              badge={<StatusPill tone={technicalProject.warnings.length > 0 ? "warning" : "success"}>{technicalProject.warnings.length}</StatusPill>}
+            >
+              <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
+                {technicalProject.warnings.map((warning) => (
+                  <li className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950" key={warning}>
+                    {warning}
+                  </li>
+                ))}
+              </ul>
+            </AdvancedDisclosure>
           </section>
-
-          <aside className="space-y-6">
-            <Card className="rounded-md shadow-none">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-600" />
-                  Alertas tecnicos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
-                  {technicalProject.warnings.map((warning) => (
-                    <li className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950" key={warning}>
-                      {warning}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </aside>
         </div>
       )}
-    </div>
+    </PageFrame>
   );
 }

@@ -62,8 +62,8 @@ describe("TechnicalProjectPage", () => {
     const { default: TechnicalProjectPage } = await import("@/app/technical-project/page");
     const html = renderToStaticMarkup(createElement(TechnicalProjectPage));
 
-    expect(html).toContain("Resumo tecnico preliminar - Alvenaria convencional");
-    expect(html).toContain("Metricas tecnicas");
+    expect(html).toContain("Resumo técnico preliminar - Alvenaria convencional");
+    expect(html).toContain("Métricas técnicas");
     expect(html).toContain("Quantitativos preliminares");
     expect(html).toContain("Bloco ceramico para alvenaria preliminar");
     expect(html).not.toContain("Desenhos preliminares gerados por SVG");

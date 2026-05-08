@@ -45,16 +45,16 @@ describe("StructurePage", () => {
   it("shows the non-A-frame guard instead of A-frame calculations", () => {
     const html = renderToStaticMarkup(createElement(StructurePage));
 
-    expect(html).toContain("Estrutura metalica nao se aplica a Alvenaria convencional");
-    expect(html).toContain("Continuar com o metodo ativo");
+    expect(html).toContain("Estrutura metálica não se aplica a Alvenaria convencional");
+    expect(html).toContain("Continuar com o método ativo");
     expect(html).toContain('href="/technical-project"');
-    expect(html).toContain("Projeto tecnico");
+    expect(html).toContain("Projeto técnico");
     expect(html).toContain('href="/materials"');
     expect(html).toContain("Materiais");
     expect(html).toContain('href="/budget"');
-    expect(html).toContain("Orcamento");
-    expect(html).not.toContain("Pre-dimensionamento estrutural A-frame");
-    expect(html).not.toContain("Porticos");
+    expect(html).toContain("Orçamento");
+    expect(html).not.toContain("Pré-dimensionamento estrutural");
+    expect(html).not.toContain("Pórticos");
     expect(mocks.estimateSteelStructure).not.toHaveBeenCalled();
   });
 });
