@@ -320,6 +320,57 @@ describe("takeoff quantity seeds", () => {
     expect(seeds.find((seed) => seed.id === `${scenario.id}-windows-count`)?.quantity).toBe(8);
   });
 
+  it("uses persisted A-frame manual takeoff only while live geometry metrics match", () => {
+    const scenario = defaultProject.scenarios[0];
+    const liveInput = createTakeoffSeedInputFromScenario(defaultProject, scenario);
+    const widthM = liveInput.widthM ?? 8;
+    const depthM = liveInput.depthM ?? scenario.aFrame.houseDepth;
+    const footprintAreaM2 = liveInput.footprintAreaM2 ?? widthM * depthM;
+    const builtAreaM2 = liveInput.builtAreaM2 ?? footprintAreaM2;
+    const roofAreaM2 = liveInput.roofAreaM2 ?? footprintAreaM2;
+    const floorHeightM = liveInput.floorHeightM ?? 2.8;
+    const roofSlopeFactor = roofAreaM2 / (widthM * depthM);
+    const manualState = createDefaultManualTakeoffState({
+      lotWidthM: scenario.terrain.width,
+      lotDepthM: scenario.terrain.depth,
+      frontSetbackM: scenario.terrain.frontSetback,
+      rearSetbackM: scenario.terrain.rearSetback,
+      leftSetbackM: scenario.terrain.leftSetback,
+      rightSetbackM: scenario.terrain.rightSetback,
+      buildingWidthM: widthM,
+      buildingDepthM: depthM,
+      floors: liveInput.floors ?? 1,
+      floorHeightM,
+      rooms: [{ ...createDefaultManualTakeoffState().rooms[0], id: "room-aframe", name: "Volume A-frame", areaM2: builtAreaM2, widthM, depthM }],
+      openings: [],
+      foundationAreaM2: footprintAreaM2,
+      roofEaveM: 0,
+      roofSlopeFactor,
+    });
+    const manualTakeoff = createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z");
+    const projectWithCurrentManual: Project = {
+      ...defaultProject,
+      scenarios: [{ ...scenario, manualTakeoff }],
+    };
+    const staleAFrame = { ...scenario.aFrame, panelLength: scenario.aFrame.panelLength + 1 };
+    const projectWithStaleManual: Project = {
+      ...projectWithCurrentManual,
+      scenarios: [
+        {
+          ...projectWithCurrentManual.scenarios[0],
+          aFrame: staleAFrame,
+          methodInputs: {
+            ...projectWithCurrentManual.scenarios[0].methodInputs,
+            aframe: staleAFrame,
+          },
+        },
+      ],
+    };
+
+    expect(createTakeoffSeedInputFromScenario(projectWithCurrentManual, projectWithCurrentManual.scenarios[0]).source).toBe("manual");
+    expect(createTakeoffSeedInputFromScenario(projectWithStaleManual, projectWithStaleManual.scenarios[0]).source).toBe("system_calculated");
+  });
+
   it("creates seed input and generated quantities from plan extraction data", () => {
     const input = createTakeoffSeedInputFromPlanExtract(planExtractResult, { scenarioId: "plan-scenario" });
     const seeds = generatePlanExtractQuantitySeeds(planExtractResult, { scenarioId: "plan-scenario" });

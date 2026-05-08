@@ -57,6 +57,37 @@ function shouldInvalidateManualTakeoff(selectedFields: PlanExtractSelectedFields
   return Array.from(manualTakeoffInvalidatingFields).some((field) => fieldSelected(selectedFields, field));
 }
 
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+}
+
+function manualTakeoffInvalidationSnapshot(scenario: Scenario) {
+  return {
+    constructionMethod: scenario.constructionMethod,
+    terrain: {
+      width: scenario.terrain.width,
+      depth: scenario.terrain.depth,
+    },
+    aFrame: {
+      houseDepth: scenario.aFrame.houseDepth,
+      automaticDepth: scenario.aFrame.automaticDepth,
+    },
+    activeMethodInputs: scenario.methodInputs?.[scenario.constructionMethod] ?? {},
+  };
+}
+
+function hasManualTakeoffInvalidatingChange(previousScenario: Scenario, nextScenario: Scenario) {
+  return stableSerialize(manualTakeoffInvalidationSnapshot(previousScenario)) !== stableSerialize(manualTakeoffInvalidationSnapshot(nextScenario));
+}
+
 export function getDefaultPlanExtractSelectedFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId): PlanExtractSelectedFields {
   const constructionMethodSelected = (result.fieldConfidence.constructionMethod ?? result.confidence) === "high";
   const extractedMethod = constructionMethodSelected ? getCompatibleExtractedMethod(result.extracted.constructionMethod) : undefined;
@@ -145,7 +176,7 @@ function applyScenarioPlanExtract(scenario: Scenario, result: PlanExtractResult,
     aFrame: methodUpdate.aFrame,
   };
 
-  if (!shouldInvalidateManualTakeoff(selectedFields)) return nextScenario;
+  if (!shouldInvalidateManualTakeoff(selectedFields) || !hasManualTakeoffInvalidatingChange(scenario, nextScenario)) return nextScenario;
   const scenarioWithoutManualTakeoff = { ...nextScenario };
   delete scenarioWithoutManualTakeoff.manualTakeoff;
   return scenarioWithoutManualTakeoff;

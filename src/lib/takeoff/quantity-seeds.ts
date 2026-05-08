@@ -548,6 +548,7 @@ function equivalentNumber(current: number | undefined, manual: number, tolerance
 }
 
 function isManualTakeoffCurrentForScenario(state: ManualTakeoffState, scenario: Scenario, liveInput: TakeoffSeedInput) {
+  const manualMetrics = calculateManualTakeoffMetrics(state);
   const terrainMatches =
     equivalentNumber(scenario.terrain.width, state.lotWidthM) &&
     equivalentNumber(scenario.terrain.depth, state.lotDepthM) &&
@@ -566,7 +567,16 @@ function isManualTakeoffCurrentForScenario(state: ManualTakeoffState, scenario: 
     equivalentNumber(liveInput.openings?.doorCount, manualDoorCount) &&
     equivalentNumber(liveInput.openings?.windowCount, manualWindowCount);
 
-  if (scenario.constructionMethod === "aframe") return sharedMatches;
+  if (scenario.constructionMethod === "aframe") {
+    const aFrameAreaMatches =
+      equivalentNumber(liveInput.widthM, state.buildingWidthM) &&
+      equivalentNumber(liveInput.floorHeightM, state.floorHeightM) &&
+      equivalentNumber(liveInput.builtAreaM2, manualMetrics.builtAreaM2, 0.5) &&
+      equivalentNumber(liveInput.footprintAreaM2, manualMetrics.footprintAreaM2, 0.5) &&
+      equivalentNumber(liveInput.roofAreaM2, manualMetrics.roofAreaM2, 0.5);
+
+    return sharedMatches && aFrameAreaMatches;
+  }
 
   return sharedMatches && equivalentNumber(liveInput.widthM, state.buildingWidthM) && equivalentNumber(liveInput.floorHeightM, state.floorHeightM);
 }

@@ -6,6 +6,7 @@ import {
   getPlanExtractApplicableFields,
   type PlanExtractSelectedFields,
 } from "@/lib/ai/apply-plan-extract";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
 import type { PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import type { Project } from "@/types/project";
@@ -143,12 +144,51 @@ describe("AI plan extract application", () => {
   });
 
   it("invalidates persisted manual takeoff when applying extracted method or openings", () => {
-    for (const selectedFields of [{ constructionMethod: true }, { doorCount: true }, { windowCount: true }]) {
-      const project = projectWithManualTakeoff();
-      const updated = applyPlanExtractToProject(project, project.selectedScenarioId, baseResult, selectedFields);
+    const methodUpdate = applyPlanExtractToProject(projectWithManualTakeoff(), defaultProject.selectedScenarioId, baseResult, { constructionMethod: true });
+    expect(methodUpdate.scenarios[0].manualTakeoff).toBeUndefined();
 
+    for (const selectedFields of [{ doorCount: true }, { windowCount: true }]) {
+      const project = projectWithManualTakeoff();
+      project.scenarios[0] = {
+        ...project.scenarios[0],
+        constructionMethod: "conventional-masonry",
+        methodInputs: {
+          ...project.scenarios[0].methodInputs,
+          "conventional-masonry": {
+            ...getConstructionMethodDefinition("conventional-masonry").getDefaultInputs(),
+            doorCount: 1,
+            windowCount: 1,
+          },
+        },
+      };
+      const updated = applyPlanExtractToProject(project, project.selectedScenarioId, baseResult, selectedFields);
       expect(updated.scenarios[0].manualTakeoff).toBeUndefined();
     }
+  });
+
+  it("preserves persisted manual takeoff when selected invalidating fields do not change values", () => {
+    const project = projectWithManualTakeoff();
+    const currentDepth = project.scenarios[0].aFrame.houseDepth;
+    const equalResult: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        ...baseResult.extracted,
+        houseDepthM: currentDepth,
+      },
+    };
+    const invalidResult: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        ...baseResult.extracted,
+        houseDepthM: -12,
+      },
+    };
+
+    const equalUpdate = applyPlanExtractToProject(project, project.selectedScenarioId, equalResult, { houseDepthM: true });
+    const invalidUpdate = applyPlanExtractToProject(project, project.selectedScenarioId, invalidResult, { houseDepthM: true });
+
+    expect(equalUpdate.scenarios[0].manualTakeoff).toBeDefined();
+    expect(invalidUpdate.scenarios[0].manualTakeoff).toBeDefined();
   });
 
   it("preserves persisted manual takeoff when applying only location or non-geometric fields", () => {
