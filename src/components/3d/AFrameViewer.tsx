@@ -532,7 +532,14 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
           </Canvas>
         )}
       </div>
-      <Mobile3DControls advancedControls={mobileAdvancedControls} onScreenshot={screenshot} onViewChange={setView} summary={mobileSummary} view={view} />
+      <Mobile3DControls
+        advancedControls={mobileAdvancedControls}
+        onScreenshot={screenshot}
+        onViewChange={setView}
+        showScreenshotAction={!isMobileViewport}
+        summary={mobileSummary}
+        view={view}
+      />
       <aside className="hidden space-y-4 xl:sticky xl:top-6 xl:block xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
         <div className="rounded-md border bg-card">
           <div className="mb-3 flex items-center gap-2 font-medium">
