@@ -29,6 +29,8 @@ export type SavedProjectSummary = {
   scenarioCount: number;
 };
 
+export type ProjectHydrationStatus = "loading" | "loaded" | "invalid";
+
 
 export function getSavedProjectSummary(project: Project): SavedProjectSummary {
   const scenario = project.scenarios.find((item) => item.id === project.selectedScenarioId) ?? project.scenarios[0];
@@ -45,6 +47,8 @@ export function getSavedProjectSummary(project: Project): SavedProjectSummary {
 interface ProjectStore {
   project: Project;
   savedProjects: Project[];
+  projectHydrationStatus: ProjectHydrationStatus;
+  setProjectHydrationStatus: (status: ProjectHydrationStatus) => void;
   setProject: (project: Project) => void;
   resetProject: () => void;
   saveCurrentProject: () => void;
@@ -100,6 +104,8 @@ export const useProjectStore = create<ProjectStore>()(
     (set) => ({
       project: cloneProject(defaultProject),
       savedProjects: [],
+      projectHydrationStatus: "loading",
+      setProjectHydrationStatus: (status) => set({ projectHydrationStatus: status }),
       setProject: (project) => set({ project: normalizeProject(project) }),
       resetProject: () => set({ project: { ...cloneProject(defaultProject), id: `project-${Date.now()}` } }),
       saveCurrentProject: () =>
@@ -463,6 +469,9 @@ export const useProjectStore = create<ProjectStore>()(
       name: "aframe-project-store",
       version: 8,
       partialize: (state) => ({ project: state.project, savedProjects: state.savedProjects }),
+      onRehydrateStorage: (state) => (_persistedState, error) => {
+        state.setProjectHydrationStatus(error ? "invalid" : "loaded");
+      },
       migrate: (persisted) => {
         const persistedState = persisted as { project?: Project; savedProjects?: Project[] } | undefined;
         const persistedProject = persistedState?.project;

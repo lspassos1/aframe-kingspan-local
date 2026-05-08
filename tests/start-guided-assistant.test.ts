@@ -98,6 +98,19 @@ describe("StartGuidedAssistant", () => {
     expect(html).not.toContain("Escolha o sistema construtivo");
   });
 
+  it("explains why a protected route redirected to start", () => {
+    const html = renderToStaticMarkup(
+      createElement(StartGuidedAssistant, {
+        planExtractEnabled: true,
+        redirectReason: "project-required",
+        redirectNext: "/dashboard",
+      })
+    );
+
+    expect(html).toContain("Você tentou abrir /dashboard sem um estudo carregado");
+    expect(html).toContain("Comece pela planta, preencha manualmente ou use o exemplo.");
+  });
+
   it("renders upload with operational status and a manual fallback in AI mode", () => {
     planImportCardProps.latest = undefined;
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true, initialMode: "ai" }));
