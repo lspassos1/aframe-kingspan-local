@@ -142,11 +142,24 @@ describe("AI plan extract application", () => {
     expect(updated.scenarios[0].manualTakeoff).toBeUndefined();
   });
 
-  it("preserves persisted manual takeoff when applying only location fields", () => {
+  it("invalidates persisted manual takeoff when applying extracted method or openings", () => {
+    for (const selectedFields of [{ constructionMethod: true }, { doorCount: true }, { windowCount: true }]) {
+      const project = projectWithManualTakeoff();
+      const updated = applyPlanExtractToProject(project, project.selectedScenarioId, baseResult, selectedFields);
+
+      expect(updated.scenarios[0].manualTakeoff).toBeUndefined();
+    }
+  });
+
+  it("preserves persisted manual takeoff when applying only location or non-geometric fields", () => {
     const project = projectWithManualTakeoff();
 
     const updated = applyPlanExtractToProject(project, project.selectedScenarioId, baseResult, {
+      projectName: true,
+      address: true,
       city: true,
+      state: true,
+      country: true,
     });
 
     expect(updated.scenarios[0].manualTakeoff?.rooms).toEqual([]);

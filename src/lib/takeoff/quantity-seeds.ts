@@ -543,6 +543,34 @@ function averageManualOpeningDimension(openings: ManualTakeoffOpening[], kind: M
   return round(matching.reduce((total, opening) => total + opening[key] * opening.quantity, 0) / totalQuantity, 2);
 }
 
+function equivalentNumber(current: number | undefined, manual: number, tolerance = 0.01) {
+  return current === undefined || Math.abs(current - manual) <= tolerance;
+}
+
+function isManualTakeoffCurrentForScenario(state: ManualTakeoffState, scenario: Scenario, liveInput: TakeoffSeedInput) {
+  const terrainMatches =
+    equivalentNumber(scenario.terrain.width, state.lotWidthM) &&
+    equivalentNumber(scenario.terrain.depth, state.lotDepthM) &&
+    equivalentNumber(scenario.terrain.frontSetback, state.frontSetbackM) &&
+    equivalentNumber(scenario.terrain.rearSetback, state.rearSetbackM) &&
+    equivalentNumber(scenario.terrain.leftSetback, state.leftSetbackM) &&
+    equivalentNumber(scenario.terrain.rightSetback, state.rightSetbackM);
+
+  if (!terrainMatches) return false;
+
+  const manualDoorCount = countManualOpenings(state.openings, "door");
+  const manualWindowCount = countManualOpenings(state.openings, "window");
+  const sharedMatches =
+    equivalentNumber(liveInput.depthM, state.buildingDepthM) &&
+    equivalentNumber(liveInput.floors, state.floors) &&
+    equivalentNumber(liveInput.openings?.doorCount, manualDoorCount) &&
+    equivalentNumber(liveInput.openings?.windowCount, manualWindowCount);
+
+  if (scenario.constructionMethod === "aframe") return sharedMatches;
+
+  return sharedMatches && equivalentNumber(liveInput.widthM, state.buildingWidthM) && equivalentNumber(liveInput.floorHeightM, state.floorHeightM);
+}
+
 function createTakeoffSeedInputFromManualState(
   state: ManualTakeoffState,
   scenario: Scenario
@@ -586,26 +614,7 @@ function createTakeoffSeedInputFromManualState(
   };
 }
 
-export function createTakeoffSeedInputFromScenario(project: Project, scenario: Scenario): TakeoffSeedInput {
-  if (scenario.manualTakeoff) {
-    return createTakeoffSeedInputFromManualState(
-      createManualTakeoffStateFromData(scenario.manualTakeoff, {
-        projectName: project.name,
-        address: scenario.location.address,
-        city: scenario.location.city,
-        state: scenario.location.state,
-        country: scenario.location.country,
-        lotWidthM: scenario.terrain.width,
-        lotDepthM: scenario.terrain.depth,
-        frontSetbackM: scenario.terrain.frontSetback,
-        rearSetbackM: scenario.terrain.rearSetback,
-        leftSetbackM: scenario.terrain.leftSetback,
-        rightSetbackM: scenario.terrain.rightSetback,
-      }),
-      scenario
-    );
-  }
-
+function createLiveTakeoffSeedInputFromScenario(project: Project, scenario: Scenario): TakeoffSeedInput {
   const geometry = calculateScenarioGeometry(project, scenario) as Record<string, unknown>;
   const methodInputs = (scenario.methodInputs?.[scenario.constructionMethod] ?? {}) as Record<string, unknown>;
   const aFrameFallback = scenario.constructionMethod === "aframe" ? scenario.aFrame : undefined;
@@ -641,6 +650,32 @@ export function createTakeoffSeedInputFromScenario(project: Project, scenario: S
     rooms: [],
     source: "system_calculated",
   };
+}
+
+export function createTakeoffSeedInputFromScenario(project: Project, scenario: Scenario): TakeoffSeedInput {
+  const liveInput = createLiveTakeoffSeedInputFromScenario(project, scenario);
+
+  if (scenario.manualTakeoff) {
+    const manualState = createManualTakeoffStateFromData(scenario.manualTakeoff, {
+      projectName: project.name,
+      address: scenario.location.address,
+      city: scenario.location.city,
+      state: scenario.location.state,
+      country: scenario.location.country,
+      lotWidthM: scenario.terrain.width,
+      lotDepthM: scenario.terrain.depth,
+      frontSetbackM: scenario.terrain.frontSetback,
+      rearSetbackM: scenario.terrain.rearSetback,
+      leftSetbackM: scenario.terrain.leftSetback,
+      rightSetbackM: scenario.terrain.rightSetback,
+    });
+
+    if (isManualTakeoffCurrentForScenario(manualState, scenario, liveInput)) {
+      return createTakeoffSeedInputFromManualState(manualState, scenario);
+    }
+  }
+
+  return liveInput;
 }
 
 export function generateScenarioQuantitySeeds(project: Project, scenario: Scenario) {

@@ -80,6 +80,13 @@ describe("project serialization and normalization", () => {
       rooms: [],
       openings: [],
     });
+    const emptyTimestamp = normalizeManualTakeoffProjectData({
+      version: 1,
+      updatedAt: "",
+      source: "manual-stepper",
+      rooms: [],
+      openings: [],
+    });
     const invalidTimestamp = normalizeManualTakeoffProjectData({
       version: 1,
       updatedAt: "not-a-date",
@@ -88,7 +95,7 @@ describe("project serialization and normalization", () => {
       openings: [],
     });
 
-    for (const normalized of [missingTimestamp, invalidTimestamp]) {
+    for (const normalized of [missingTimestamp, emptyTimestamp, invalidTimestamp]) {
       expect(normalized?.updatedAt).toBeTruthy();
       expect(normalized?.updatedAt).not.toBe("");
       expect(Number.isNaN(Date.parse(normalized?.updatedAt ?? ""))).toBe(false);

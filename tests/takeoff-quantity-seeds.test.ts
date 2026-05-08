@@ -9,6 +9,7 @@ import {
   type TakeoffSeedInput,
 } from "@/lib/takeoff/quantity-seeds";
 import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import type { PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import type { Project } from "@/types/project";
 
@@ -182,10 +183,18 @@ describe("takeoff quantity seeds", () => {
   });
 
   it("prefers persisted manual rooms and openings when generating scenario seeds", () => {
+    const masonryDefinition = getConstructionMethodDefinition("conventional-masonry");
     const manualState = createDefaultManualTakeoffState({
       projectName: "Manual persistido",
+      lotWidthM: 14,
+      lotDepthM: 26,
+      frontSetbackM: 4,
+      rearSetbackM: 3,
+      leftSetbackM: 1.5,
+      rightSetbackM: 1.5,
       buildingWidthM: 9,
       buildingDepthM: 11,
+      floorHeightM: 2.9,
       rooms: [
         { ...createDefaultManualTakeoffState().rooms[0], id: "room-suite", name: "Suite", areaM2: 16, wetArea: true, electricalPoints: 7, plumbingPoints: 5 },
       ],
@@ -203,6 +212,33 @@ describe("takeoff quantity seeds", () => {
       scenarios: [
         {
           ...defaultProject.scenarios[0],
+          constructionMethod: "conventional-masonry",
+          terrain: {
+            ...defaultProject.scenarios[0].terrain,
+            width: 14,
+            depth: 26,
+            frontSetback: 4,
+            rearSetback: 3,
+            leftSetback: 1.5,
+            rightSetback: 1.5,
+          },
+          methodInputs: {
+            ...defaultProject.scenarios[0].methodInputs,
+            "conventional-masonry": {
+              ...masonryDefinition.getDefaultInputs(),
+              widthM: 9,
+              depthM: 11,
+              floors: 1,
+              floorHeightM: 2.9,
+              internalWallLengthM: manualState.internalWallLengthM,
+              doorCount: 2,
+              windowCount: 3,
+              doorWidthM: 0.9,
+              doorHeightM: 2.1,
+              windowWidthM: 1.5,
+              windowHeightM: 1.1,
+            },
+          },
           manualTakeoff: createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z"),
         },
       ],
@@ -227,6 +263,61 @@ describe("takeoff quantity seeds", () => {
       source: "manual",
       confidence: "medium",
     });
+  });
+
+  it("falls back to live scenario inputs when persisted manual takeoff is stale", () => {
+    const masonryDefinition = getConstructionMethodDefinition("conventional-masonry");
+    const manualState = createDefaultManualTakeoffState({
+      lotWidthM: 14,
+      lotDepthM: 26,
+      buildingWidthM: 9,
+      buildingDepthM: 11,
+      floorHeightM: 2.9,
+      openings: [
+        { ...createDefaultManualTakeoffState().openings[0], id: "door-suite", kind: "door", quantity: 2, widthM: 0.9, heightM: 2.1 },
+        { ...createDefaultManualTakeoffState().openings[1], id: "window-suite", kind: "window", quantity: 3, widthM: 1.5, heightM: 1.1 },
+      ],
+    });
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          constructionMethod: "conventional-masonry",
+          terrain: {
+            ...defaultProject.scenarios[0].terrain,
+            width: 14,
+            depth: 26,
+          },
+          methodInputs: {
+            ...defaultProject.scenarios[0].methodInputs,
+            "conventional-masonry": {
+              ...masonryDefinition.getDefaultInputs(),
+              widthM: 13,
+              depthM: 11,
+              floors: 1,
+              floorHeightM: 2.9,
+              internalWallLengthM: manualState.internalWallLengthM,
+              doorCount: 7,
+              windowCount: 8,
+            },
+          },
+          manualTakeoff: createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z"),
+        },
+      ],
+    };
+    const scenario = project.scenarios[0];
+    const input = createTakeoffSeedInputFromScenario(project, scenario);
+    const seeds = generateScenarioQuantitySeeds(project, scenario);
+
+    expect(input).toMatchObject({
+      widthM: 13,
+      depthM: 11,
+      source: "system_calculated",
+      openings: { doorCount: 7, windowCount: 8 },
+    });
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-doors-count`)?.quantity).toBe(7);
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-windows-count`)?.quantity).toBe(8);
   });
 
   it("creates seed input and generated quantities from plan extraction data", () => {
