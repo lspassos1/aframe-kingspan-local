@@ -47,6 +47,7 @@ import {
   type ManualFinishLevel,
   type ManualFoundationType,
   type ManualOpeningKind,
+  type ManualOpeningWallSide,
   type ManualRoofType,
   type ManualRoomType,
   type ManualTakeoffOpening,
@@ -86,6 +87,13 @@ const roofOptions: Array<{ value: ManualRoofType; label: string }> = [
   { value: "telhado_ceramico", label: "Telhado cerâmico" },
   { value: "telhado_metalico", label: "Telhado metálico" },
   { value: "laje", label: "Laje" },
+];
+
+const wallSideOptions: Array<{ value: ManualOpeningWallSide; label: string }> = [
+  { value: "front", label: "Frente" },
+  { value: "rear", label: "Fundos" },
+  { value: "left", label: "Lateral esquerda" },
+  { value: "right", label: "Lateral direita" },
 ];
 
 function round(value: number, decimals = 2) {
@@ -563,7 +571,11 @@ export function ManualTakeoffStepper() {
         {currentStep.id === "openings" ? (
           <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <InlineHelp tone="warning">As quantidades entram no desconto de paredes. Posicionamento por parede no 3D segue pendente.</InlineHelp>
+              <InlineHelp tone={selectedMethod === "aframe" ? "warning" : "info"}>
+                {selectedMethod === "aframe"
+                  ? "A-frame mantém aberturas revisáveis nos quantitativos; posicionamento fino no 3D dedicado segue pendente."
+                  : "Informe parede e afastamento para posicionar a abertura aproximada no 3D. A posição continua revisável."}
+              </InlineHelp>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => addOpening("door")}>
                   <Plus className="h-4 w-4" />
@@ -610,6 +622,22 @@ export function ManualTakeoffStepper() {
                   <NumericAdjuster id={`${opening.id}-quantity`} label="Quantidade" step={1} value={opening.quantity} onChange={(value) => updateOpening(opening.id, { quantity: Math.round(value) })} />
                   <NumericAdjuster id={`${opening.id}-width`} label="Largura" unit="m" step={0.05} value={opening.widthM} onChange={(value) => updateOpening(opening.id, { widthM: value })} />
                   <NumericAdjuster id={`${opening.id}-height`} label="Altura" unit="m" step={0.05} value={opening.heightM} onChange={(value) => updateOpening(opening.id, { heightM: value })} />
+                  <div className="space-y-2">
+                    <Label>Parede</Label>
+                    <Select value={opening.wallSide} onValueChange={(value) => updateOpening(opening.id, { wallSide: value as ManualOpeningWallSide })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wallSideOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <NumericAdjuster id={`${opening.id}-offset`} label="Afastamento no pano" unit="m" step={0.1} min={0} value={opening.offsetM} onChange={(value) => updateOpening(opening.id, { offsetM: value })} />
                   {opening.kind === "window" ? (
                     <NumericAdjuster id={`${opening.id}-sill`} label="Peitoril" unit="m" step={0.05} value={opening.sillHeightM ?? 1.1} onChange={(value) => updateOpening(opening.id, { sillHeightM: value })} />
                   ) : null}

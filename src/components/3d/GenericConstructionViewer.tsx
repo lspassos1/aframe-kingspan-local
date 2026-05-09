@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text } from "@react-three/drei";
 import { Camera, Download, Eye, RotateCcw, Settings2 } from "lucide-react";
-import { Mobile3DControls, Mobile3DPreview, type Mobile3DViewMode, useMobile3DViewport } from "@/components/3d/Mobile3DControls";
+import { Mobile3DControls, Mobile3DPreview, type Mobile3DOpeningPreview, type Mobile3DViewMode, useMobile3DViewport } from "@/components/3d/Mobile3DControls";
 import type { Construction3DLayer, Construction3DPrimitive, Construction3DVector3 } from "@/lib/construction-methods";
 import type { Scenario } from "@/types/project";
 import { Button } from "@/components/ui/button";
@@ -262,19 +262,38 @@ function NumberControl({
   );
 }
 
+function createOpeningPreview(layers: Construction3DLayer[]): Mobile3DOpeningPreview | undefined {
+  const openingPrimitives = layers.filter((layer) => layer.type === "openings").flatMap((layer) => layer.data.primitives);
+  if (!openingPrimitives.length) return undefined;
+
+  return {
+    doorCount: openingPrimitives.filter((primitive) => primitive.label === "Porta" || primitive.id.includes("door")).length,
+    windowCount: openingPrimitives.filter((primitive) => primitive.label === "Janela" || primitive.id.includes("window")).length,
+  };
+}
+
 export function GenericConstructionViewer({ layers, scenario, title }: { layers: Construction3DLayer[]; scenario: Scenario; title: string }) {
   const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({});
   const [showDimensions, setShowDimensions] = useState(true);
   const [view, setView] = useState<ViewMode>("iso");
   const [dimensionMode, setDimensionMode] = useState<DimensionMode>("detailed");
   const [modelOpacity, setModelOpacity] = useState(0.78);
+  const [canvasFallback, setCanvasFallback] = useState<{ key: string; unavailable: boolean }>({ key: "", unavailable: false });
   const updateScenarioMethodInputs = useProjectStore((state) => state.updateScenarioMethodInputs);
   const updateScenarioTerrain = useProjectStore((state) => state.updateScenarioTerrain);
   const isMobileViewport = useMobile3DViewport();
   const methodInputs = useMemo(() => getScenarioMethodInputs(scenario), [scenario]);
   const numberControls = useMemo(() => getGeneric3DNumberControls(scenario.constructionMethod, methodInputs), [methodInputs, scenario.constructionMethod]);
   const activeLayers = useMemo(() => layers.filter((layer) => visibleLayers[layer.id] ?? layer.visibleByDefault), [layers, visibleLayers]);
+  const canvasFallbackKey = `${scenario.id}:${scenario.constructionMethod}:${layers.map((layer) => layer.id).join("|")}`;
+  const canvasFallbackKeyRef = useRef(canvasFallbackKey);
+  const canvasUnavailable = canvasFallback.key === canvasFallbackKey && canvasFallback.unavailable;
+  const openingPreview = useMemo(() => createOpeningPreview(activeLayers), [activeLayers]);
   const mobileSummary = useMemo(() => createGenericMobile3DSummary(activeLayers), [activeLayers]);
+
+  useEffect(() => {
+    canvasFallbackKeyRef.current = canvasFallbackKey;
+  }, [canvasFallbackKey]);
 
   const toggleLayer = (layerId: string, checked: boolean) => {
     setVisibleLayers((current) => ({ ...current, [layerId]: checked }));
@@ -342,9 +361,25 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="h-[58svh] min-h-[360px] max-h-[520px] overflow-hidden rounded-2xl border bg-slate-50 xl:h-auto xl:max-h-none xl:min-h-[680px] xl:rounded-md">
         {isMobileViewport ? (
-          <Mobile3DPreview subtitle="Volume leve por camadas. Use as vistas rápidas e abra camadas/cotas sob demanda." title={title} view={view} />
+          <Mobile3DPreview openings={openingPreview} subtitle="Volume leve por camadas. Use as vistas rápidas e abra camadas/cotas sob demanda." title={title} view={view} />
+        ) : canvasUnavailable ? (
+          <Mobile3DPreview
+            badge="Prévia 3D simplificada"
+            openings={openingPreview}
+            subtitle="WebGL ficou indisponível neste navegador; a prévia mantém volume e aberturas manuais aproximadas."
+            title={title}
+            view={view}
+          />
         ) : (
-          <Canvas camera={{ position: [16, 12, 16], fov: 45 }} dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }} shadows>
+          <Canvas
+            camera={{ position: [16, 12, 16], fov: 45 }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
+            onCreated={({ gl }) => {
+              gl.domElement.addEventListener("webglcontextlost", () => setCanvasFallback({ key: canvasFallbackKeyRef.current, unavailable: true }), { once: true });
+            }}
+            shadows
+          >
             <GenericScene
               layers={activeLayers}
               dimensionMode={dimensionMode}
@@ -359,7 +394,7 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
         advancedControls={mobileAdvancedControls}
         onScreenshot={screenshot}
         onViewChange={setView}
-        showScreenshotAction={!isMobileViewport}
+        showScreenshotAction={!isMobileViewport && !canvasUnavailable}
         summary={mobileSummary}
         view={view}
       />
