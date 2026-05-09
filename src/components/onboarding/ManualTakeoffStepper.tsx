@@ -637,7 +637,7 @@ export function ManualTakeoffStepper() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <NumericAdjuster id={`${opening.id}-offset`} label="Afastamento no pano" unit="m" step={0.1} value={opening.offsetM} onChange={(value) => updateOpening(opening.id, { offsetM: value })} />
+                  <NumericAdjuster id={`${opening.id}-offset`} label="Afastamento no pano" unit="m" step={0.1} min={0} value={opening.offsetM} onChange={(value) => updateOpening(opening.id, { offsetM: value })} />
                   {opening.kind === "window" ? (
                     <NumericAdjuster id={`${opening.id}-sill`} label="Peitoril" unit="m" step={0.05} value={opening.sillHeightM ?? 1.1} onChange={(value) => updateOpening(opening.id, { sillHeightM: value })} />
                   ) : null}

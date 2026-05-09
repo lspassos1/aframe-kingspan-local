@@ -4,7 +4,7 @@ import { getConstructionMethodDefinition, type Construction3DLayer, type Constru
 import { getGeneric3DNumberControls } from "@/lib/construction-methods/generic-3d-controls";
 import { getGenericViewerFramingLayers } from "@/lib/construction-methods/generic-viewer-framing";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
-import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
+import { createDefaultManualTakeoffState, createManualTakeoffDataFromState, type ManualTakeoffOpening } from "@/lib/takeoff/manual-stepper";
 
 const genericMethodIds: ConstructionMethodId[] = ["conventional-masonry", "eco-block", "monolithic-eps"];
 const requiredLayerTypes: Construction3DLayerType[] = ["terrain", "foundation", "floor", "walls", "roof", "openings"];
@@ -152,6 +152,73 @@ describe("generic construction 3D layers", () => {
     expect(window?.position[1]).toBeCloseTo(1.84);
     expect(window?.position[2]).toBeCloseTo(-2);
     expect(window?.size).toEqual([0.06, 1, 1.4]);
+  });
+
+  it("does not render placeholder openings when manual openings are explicitly empty", () => {
+    const definition = getConstructionMethodDefinition("conventional-masonry");
+    const baseScenario = defaultProject.scenarios[0];
+    const scenario = {
+      ...baseScenario,
+      constructionMethod: "conventional-masonry" as const,
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "conventional-masonry": {
+          ...definition.getDefaultInputs(),
+          widthM: 10,
+          depthM: 12,
+        },
+      },
+      manualTakeoff: {
+        ...createManualTakeoffDataFromState(createDefaultManualTakeoffState(), "2026-05-09T00:00:00.000Z"),
+        openings: [],
+      },
+    };
+    const openings = definition.generate3DLayers?.({ project: defaultProject, scenario }).find((layer) => layer.type === "openings");
+
+    expect(openings?.data.primitives).toEqual([]);
+    expect(openings?.data.notes?.[0]).toContain("sem unidades renderizaveis");
+  });
+
+  it("sanitizes imported manual opening values before generic 3D placement", () => {
+    const definition = getConstructionMethodDefinition("conventional-masonry");
+    const baseScenario = defaultProject.scenarios[0];
+    const manualData = createManualTakeoffDataFromState(createDefaultManualTakeoffState(), "2026-05-09T00:00:00.000Z");
+    const malformedOpening = {
+      ...manualData.openings[1],
+      id: "legacy-bad",
+      kind: "window",
+      quantity: 99,
+      widthM: Number.NaN,
+      heightM: 50,
+      wallSide: "roof",
+      offsetM: -20,
+      sillHeightM: Number.NaN,
+    } as unknown as ManualTakeoffOpening;
+    const scenario = {
+      ...baseScenario,
+      constructionMethod: "conventional-masonry" as const,
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "conventional-masonry": {
+          ...definition.getDefaultInputs(),
+          widthM: 10,
+          depthM: 12,
+          wallThicknessM: 0.2,
+        },
+      },
+      manualTakeoff: {
+        ...manualData,
+        openings: [malformedOpening],
+      },
+    };
+    const openings = definition.generate3DLayers?.({ project: defaultProject, scenario }).find((layer) => layer.type === "openings");
+    const primitives = openings?.data.primitives ?? [];
+
+    expect(primitives).toHaveLength(12);
+    expect(primitives.every((primitive) => primitive.position.every(Number.isFinite) && primitive.size.every(Number.isFinite))).toBe(true);
+    expect(primitives[0]?.position[2]).toBeCloseTo(-6.145);
+    expect(primitives[0]?.size).toEqual([1.2, 5, 0.06]);
+    expect(openings?.data.notes).toContain("Render limitado a 12 unidades por grupo para manter o modelo leve.");
   });
 
   it("adds a buildable area primitive from terrain setbacks", () => {

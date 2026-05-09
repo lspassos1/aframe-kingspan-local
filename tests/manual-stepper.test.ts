@@ -7,6 +7,7 @@ import {
   getManualTakeoffStepIndex,
   getManualTakeoffStepLabel,
   manualTakeoffSteps,
+  normalizeManualTakeoffOpening,
 } from "@/lib/takeoff/manual-stepper";
 
 describe("manual takeoff stepper", () => {
@@ -68,5 +69,31 @@ describe("manual takeoff stepper", () => {
       offsetM: 4.2,
       sillHeightM: 1.15,
     });
+  });
+
+  it("falls back invalid manual opening placement during normalization", () => {
+    const invalidOpening = normalizeManualTakeoffOpening(
+      {
+        id: "legacy-window",
+        kind: "window",
+        wallSide: "roof" as never,
+        offsetM: -2,
+      },
+      ["living"]
+    );
+    const missingOpening = normalizeManualTakeoffOpening(
+      {
+        id: "legacy-door",
+        kind: "door",
+        wallSide: undefined,
+        offsetM: Number.NaN,
+      },
+      ["living"]
+    );
+
+    expect(invalidOpening.wallSide).toBe("front");
+    expect(invalidOpening.offsetM).toBe(0);
+    expect(missingOpening.wallSide).toBe("front");
+    expect(missingOpening.offsetM).toBe(1.2);
   });
 });
