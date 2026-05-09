@@ -45,6 +45,12 @@ export function createGenericMobile3DSummary(layers: Construction3DLayer[]): Mob
   const dimensions = getGenericConstructionDimensions(layers);
   if (!dimensions) return [];
 
+  const openingLayer = layers.find((layer) => layer.type === "openings");
+  const openingPrimitives = openingLayer?.data.primitives ?? [];
+  const doorCount = openingPrimitives.filter((primitive) => primitive.label === "Porta" || primitive.id.includes("door")).length;
+  const windowCount = openingPrimitives.filter((primitive) => primitive.label === "Janela" || primitive.id.includes("window")).length;
+  const openingCount = doorCount + windowCount;
+
   return [
     {
       label: "Volume",
@@ -62,6 +68,15 @@ export function createGenericMobile3DSummary(layers: Construction3DLayer[]): Mob
             label: "Lote",
             value: footprint(dimensions.terrainWidthM, dimensions.terrainDepthM),
             detail: "terreno e recuos",
+          },
+        ]
+      : []),
+    ...(openingCount > 0
+      ? [
+          {
+            label: "Aberturas",
+            value: `${doorCount} porta${doorCount === 1 ? "" : "s"} · ${windowCount} janela${windowCount === 1 ? "" : "s"}`,
+            detail: openingLayer?.data.notes?.[0] ?? "posicionamento aproximado",
           },
         ]
       : []),

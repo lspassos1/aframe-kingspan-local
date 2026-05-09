@@ -31,8 +31,9 @@ describe("mobile 3D summary", () => {
     const layers = definition.generate3DLayers?.({ project: defaultProject, scenario }) ?? [];
     const summary = createGenericMobile3DSummary(layers);
 
-    expect(summary.map((item) => item.label)).toEqual(["Volume", "Altura", "Lote"]);
+    expect(summary.map((item) => item.label)).toEqual(["Volume", "Altura", "Lote", "Aberturas"]);
     expect(summary[0]).toMatchObject({ value: "9,14 m x 11,14 m", detail: "largura x profundidade" });
     expect(summary[1]).toMatchObject({ value: "3,46 m", detail: "altura do modelo" });
+    expect(summary[3]).toMatchObject({ value: "1 porta · 1 janela", detail: "Aberturas simplificadas para leitura volumetrica inicial." });
   });
 });

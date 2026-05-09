@@ -24,11 +24,61 @@ const viewLabels: Record<Mobile3DViewMode, string> = {
   top: "Topo",
 };
 
-export function Mobile3DPreview({ subtitle, title, view }: { subtitle: string; title: string; view: Mobile3DViewMode }) {
+export interface Mobile3DOpeningPreview {
+  doorCount: number;
+  windowCount: number;
+}
+
+function hasOpeningPreview(openings: Mobile3DOpeningPreview | undefined) {
+  return openings != null && openings.doorCount + openings.windowCount > 0;
+}
+
+function MobileOpeningMarkers({ openings, view }: { openings?: Mobile3DOpeningPreview; view: Mobile3DViewMode }) {
+  if (!hasOpeningPreview(openings)) return null;
+
+  if (view === "top") {
+    return (
+      <>
+        {openings?.doorCount ? <rect x="132" y="172" width="42" height="8" rx="4" fill="#111827" /> : null}
+        {openings?.windowCount ? <rect x="236" y="112" width="8" height="34" rx="4" fill="#0ea5e9" /> : null}
+      </>
+    );
+  }
+
+  if (view === "front" || view === "section") {
+    return (
+      <>
+        {openings?.doorCount ? <rect x="142" y="162" width="32" height="44" rx="2" fill="#111827" opacity="0.82" /> : null}
+        {openings?.windowCount ? <rect x="186" y="142" width="34" height="24" rx="3" fill="#38bdf8" stroke="#0f172a" strokeWidth="2" opacity="0.86" /> : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {openings?.doorCount ? <polygon points="230,132 244,126 244,174 230,180" fill="#111827" opacity="0.84" /> : null}
+      {openings?.windowCount ? <polygon points="182,144 208,134 208,158 182,168" fill="#38bdf8" stroke="#0f172a" strokeWidth="2" opacity="0.86" /> : null}
+    </>
+  );
+}
+
+export function Mobile3DPreview({
+  badge = "Modo mobile simplificado",
+  openings,
+  subtitle,
+  title,
+  view,
+}: {
+  badge?: string;
+  openings?: Mobile3DOpeningPreview;
+  subtitle: string;
+  title: string;
+  view: Mobile3DViewMode;
+}) {
   return (
     <div className="relative grid h-full min-h-[360px] place-items-center overflow-hidden bg-[linear-gradient(90deg,#e2e8f0_1px,transparent_1px),linear-gradient(#e2e8f0_1px,transparent_1px)] bg-[size:32px_32px] p-5">
       <div className="absolute left-4 top-4 rounded-full border bg-background/90 px-3 py-1 text-xs font-semibold text-muted-foreground shadow-sm">
-        Modo mobile simplificado
+        {badge}
       </div>
       <div className="absolute right-4 top-4 rounded-full border bg-background/90 px-3 py-1 text-xs font-semibold shadow-sm">{viewLabels[view]}</div>
       <svg aria-hidden="true" className="h-full max-h-[300px] w-full max-w-[320px]" viewBox="0 0 320 260">
@@ -38,12 +88,14 @@ export function Mobile3DPreview({ subtitle, title, view }: { subtitle: string; t
             <rect x="80" y="76" width="160" height="100" rx="6" fill="#e0f2fe" stroke="#0891b2" strokeWidth="3" />
             <line x1="80" y1="126" x2="240" y2="126" stroke="#0f172a" strokeDasharray="8 8" strokeWidth="2" />
             <line x1="160" y1="76" x2="160" y2="176" stroke="#0f172a" strokeDasharray="8 8" strokeWidth="2" />
+            <MobileOpeningMarkers openings={openings} view={view} />
           </>
         ) : view === "front" ? (
           <>
             <polygon points="160,42 66,206 254,206" fill="#dbeafe" stroke="#0f172a" strokeLinejoin="round" strokeWidth="4" />
             <rect x="112" y="132" width="96" height="74" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
             <line x1="160" y1="42" x2="160" y2="206" stroke="#0369a1" strokeDasharray="9 8" strokeWidth="3" />
+            <MobileOpeningMarkers openings={openings} view={view} />
           </>
         ) : view === "section" ? (
           <>
@@ -51,6 +103,7 @@ export function Mobile3DPreview({ subtitle, title, view }: { subtitle: string; t
             <path d="M108 210 L108 142 L212 142 L212 210" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
             <rect x="126" y="158" width="68" height="52" fill="#fde68a" stroke="#92400e" strokeWidth="3" />
             <line x1="70" y1="210" x2="250" y2="210" stroke="#0f766e" strokeWidth="5" />
+            <MobileOpeningMarkers openings={openings} view={view} />
           </>
         ) : (
           <>
@@ -59,6 +112,7 @@ export function Mobile3DPreview({ subtitle, title, view }: { subtitle: string; t
             <polygon points="154,134 262,92 262,172 154,214" fill="#e0f2fe" stroke="#0f172a" strokeLinejoin="round" strokeWidth="4" />
             <line x1="84" y1="162" x2="154" y2="214" stroke="#0f766e" strokeWidth="5" />
             <line x1="154" y1="214" x2="262" y2="172" stroke="#0f766e" strokeWidth="5" />
+            <MobileOpeningMarkers openings={openings} view={view} />
           </>
         )}
       </svg>
