@@ -38,9 +38,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { getConstructionMethodDefinition, getScenarioMethodInputs, type ConstructionMethodId, type ConstructionMethodInputs } from "@/lib/construction-methods";
 import {
   calculateManualTakeoffMetrics,
+  createManualTakeoffDataFromState,
   createDefaultManualTakeoffState,
   createManualTakeoffOpening,
   createManualTakeoffRoom,
+  createManualTakeoffStateFromData,
   manualTakeoffSteps,
   type ManualFinishLevel,
   type ManualFoundationType,
@@ -135,7 +137,7 @@ function buildMethodInputsFromManualState(
 
 function createInitialState(projectName: string, scenario: ReturnType<typeof useSelectedScenario>) {
   const inputs = getScenarioMethodInputs<Record<string, unknown>>(scenario);
-  return createDefaultManualTakeoffState({
+  const fallback = {
     projectName,
     address: scenario.location.address,
     city: scenario.location.city,
@@ -153,7 +155,15 @@ function createInitialState(projectName: string, scenario: ReturnType<typeof use
     floorHeightM: Number(inputs.floorHeightM ?? scenario.aFrame.upperFloorLevelHeight ?? 2.8),
     wallThicknessM: Number(inputs.wallThicknessM ?? 0.14),
     internalWallLengthM: Number(inputs.internalWallLengthM ?? 18),
-  });
+  };
+  if (!scenario.manualTakeoff) {
+    return createDefaultManualTakeoffState(fallback);
+  }
+
+  return {
+    ...createManualTakeoffStateFromData(scenario.manualTakeoff, fallback),
+    projectName,
+  };
 }
 
 export function ManualTakeoffStepper() {
@@ -166,6 +176,7 @@ export function ManualTakeoffStepper() {
   const updateScenarioTerrain = useProjectStore((state) => state.updateScenarioTerrain);
   const updateScenarioConstructionMethod = useProjectStore((state) => state.updateScenarioConstructionMethod);
   const updateScenarioMethodInputs = useProjectStore((state) => state.updateScenarioMethodInputs);
+  const updateScenarioManualTakeoff = useProjectStore((state) => state.updateScenarioManualTakeoff);
   const updateScenarioAFrame = useProjectStore((state) => state.updateScenarioAFrame);
   const setOnboardingCompleted = useProjectStore((state) => state.setOnboardingCompleted);
   const [stepIndex, setStepIndex] = useState(0);
@@ -302,6 +313,7 @@ export function ManualTakeoffStepper() {
       });
     }
 
+    updateScenarioManualTakeoff(scenario.id, createManualTakeoffDataFromState(state));
     setOnboardingCompleted(true);
     setLastSync("synced");
   }

@@ -1,5 +1,6 @@
 import type { ConstructionMethodId, ConstructionMethodInputs } from "@/lib/construction-methods";
 import type { BudgetAssistantProjectData } from "@/lib/budget-assistant/types";
+import type { ManualTakeoffProjectData } from "@/lib/takeoff/manual-stepper";
 
 export type CurrencyCode = "BRL";
 
@@ -68,6 +69,7 @@ export interface Scenario {
   name: string;
   constructionMethod: ConstructionMethodId;
   methodInputs: ScenarioMethodInputs;
+  manualTakeoff?: ManualTakeoffProjectData;
   terrain: Terrain;
   location: LocationData;
   aFrame: AFrameInputs;

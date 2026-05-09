@@ -1,6 +1,7 @@
 import { defaultProject } from "@/data/defaultProject";
 import { constructionMethodRegistry, getConstructionMethodDefinition, type ConstructionMethodId } from "@/lib/construction-methods";
 import type { BudgetAssistantProjectData } from "@/lib/budget-assistant/types";
+import { normalizeManualTakeoffProjectData } from "@/lib/takeoff/manual-stepper";
 import type { AFrameInputs, Project, Scenario, ScenarioMethodInputs } from "@/types/project";
 
 export const cloneProject = (project: Project): Project => JSON.parse(JSON.stringify(project)) as Project;
@@ -9,6 +10,14 @@ type LegacyAFrameInputs = Partial<AFrameInputs> & {
   mezzanineFloorHeight?: number;
   mezzanineDepth?: number;
 };
+
+function numericInput(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function calculateAFrameBaseWidth(input: AFrameInputs) {
+  return 2 * input.panelLength * Math.cos((input.baseAngleDeg * Math.PI) / 180);
+}
 
 function normalizeScenario(scenario: Scenario): Scenario {
   const defaultScenario = defaultProject.scenarios[0];
@@ -36,15 +45,40 @@ function normalizeScenario(scenario: Scenario): Scenario {
     methodInputs[constructionMethod] = getConstructionMethodDefinition(constructionMethod).getDefaultInputs();
   }
 
+  const location = { ...defaultScenario.location, ...scenario.location };
+  const terrain = { ...defaultScenario.terrain, ...scenario.terrain };
+  const activeInputs = (methodInputs[constructionMethod] ?? {}) as Record<string, unknown>;
+  const fallbackBuildingWidthM =
+    constructionMethod === "aframe" ? calculateAFrameBaseWidth(normalizedAFrame) : numericInput(activeInputs.widthM);
+  const fallbackBuildingDepthM =
+    constructionMethod === "aframe" ? normalizedAFrame.houseDepth : numericInput(activeInputs.depthM) ?? normalizedAFrame.houseDepth;
+
   return {
     ...defaultScenario,
     ...scenario,
     constructionMethod,
     methodInputs,
-    location: { ...defaultScenario.location, ...scenario.location },
-    terrain: { ...defaultScenario.terrain, ...scenario.terrain },
+    location,
+    terrain,
     pricing: { ...defaultScenario.pricing, ...scenario.pricing },
     aFrame: normalizedAFrame,
+    manualTakeoff: normalizeManualTakeoffProjectData(scenario.manualTakeoff, {
+      projectName: scenario.name,
+      address: location.address,
+      city: location.city,
+      state: location.state,
+      country: location.country,
+      lotWidthM: terrain.width,
+      lotDepthM: terrain.depth,
+      frontSetbackM: terrain.frontSetback,
+      rearSetbackM: terrain.rearSetback,
+      leftSetbackM: terrain.leftSetback,
+      rightSetbackM: terrain.rightSetback,
+      buildingWidthM: fallbackBuildingWidthM,
+      buildingDepthM: fallbackBuildingDepthM,
+      floors: numericInput(activeInputs.floors) ?? (normalizedAFrame.upperFloorMode === "none" ? 1 : 2),
+      floorHeightM: numericInput(activeInputs.floorHeightM) ?? normalizedAFrame.upperFloorLevelHeight,
+    }),
   };
 }
 

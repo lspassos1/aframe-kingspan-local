@@ -1,6 +1,7 @@
 import type { PlanExtractResult, PlanExtractQuantitySeed } from "@/lib/ai/plan-extract-schema";
 import { calculateScenarioGeometry } from "@/lib/construction-methods/scenario-calculations";
 import type { ConstructionMethodId } from "@/lib/construction-methods";
+import { calculateManualTakeoffMetrics, createManualTakeoffStateFromData, type ManualOpeningKind, type ManualTakeoffOpening, type ManualTakeoffState } from "@/lib/takeoff/manual-stepper";
 import type { Project, Scenario } from "@/types/project";
 
 export type QuantitySeedCategory =
@@ -82,6 +83,10 @@ export interface TakeoffSeedInput {
   rooms?: TakeoffRoomInput[];
   openings?: TakeoffOpeningInput;
   fixtures?: TakeoffFixtureInput;
+  electricalPointCount?: number;
+  electricalEstimated?: boolean;
+  plumbingPointCount?: number;
+  plumbingEstimated?: boolean;
   source: Extract<QuantitySeedSource, "system_calculated" | "manual" | "ai_visible">;
 }
 
@@ -455,33 +460,42 @@ export function generateTakeoffQuantitySeeds(input: TakeoffSeedInput): QuantityS
   }
 
   if (builtAreaM2) {
+    const manualElectricalPoints = nonNegative(input.electricalPointCount);
+    const electricalPoints = manualElectricalPoints ?? estimateElectricalPoints(rooms, builtAreaM2);
+    const electricalEstimated = input.electricalEstimated ?? manualElectricalPoints === undefined;
+    const electricalSource = electricalEstimated ? "rule_estimated" : input.source;
     addSeed(seeds, {
       ...baseMeta,
       id: `${input.scenarioId ?? "takeoff"}-electrical-points`,
       category: "electrical",
-      description: "Pontos eletricos estimados por media",
-      quantity: estimateElectricalPoints(rooms, builtAreaM2),
+      description: electricalEstimated ? "Pontos eletricos estimados por media" : "Pontos eletricos informados manualmente",
+      quantity: electricalPoints,
       unit: "un",
-      source: "rule_estimated",
-      confidence: "low",
-      pendingReason: "Confirmar se existe projeto eletrico ou se a media por ambiente pode ser usada.",
-      notes: "Estimativa editavel por ambiente; nao substitui projeto eletrico.",
+      source: electricalSource,
+      confidence: electricalEstimated ? "low" : "medium",
+      pendingReason: electricalEstimated ? "Confirmar se existe projeto eletrico ou se a media por ambiente pode ser usada." : "Confirmar pontos antes do orcamento revisado.",
+      notes: electricalEstimated ? "Estimativa editavel por ambiente; nao substitui projeto eletrico." : "Quantidade informada no preenchimento manual; nao substitui projeto eletrico.",
     });
   }
 
-  const plumbingPoints = estimatePlumbingPoints(rooms);
+  const manualPlumbingPoints = nonNegative(input.plumbingPointCount);
+  const plumbingPoints = manualPlumbingPoints ?? estimatePlumbingPoints(rooms);
   if (plumbingPoints > 0) {
+    const plumbingEstimated = input.plumbingEstimated ?? manualPlumbingPoints === undefined;
+    const plumbingSource = plumbingEstimated ? "rule_estimated" : input.source;
     addSeed(seeds, {
       ...baseMeta,
       id: `${input.scenarioId ?? "takeoff"}-plumbing-points`,
       category: "plumbing",
-      description: "Pontos hidraulicos estimados por areas molhadas",
+      description: plumbingEstimated ? "Pontos hidraulicos estimados por areas molhadas" : "Pontos hidraulicos informados manualmente",
       quantity: plumbingPoints,
       unit: "un",
-      source: "rule_estimated",
-      confidence: "low",
-      pendingReason: "Confirmar projeto hidraulico ou premissas por area molhada.",
-      notes: `${wetRoomCount} ambiente(s) molhado(s) detectado(s). Nao substitui projeto hidraulico.`,
+      source: plumbingSource,
+      confidence: plumbingEstimated ? "low" : "medium",
+      pendingReason: plumbingEstimated ? "Confirmar projeto hidraulico ou premissas por area molhada." : "Confirmar pontos antes do orcamento revisado.",
+      notes: plumbingEstimated
+        ? `${wetRoomCount} ambiente(s) molhado(s) detectado(s). Nao substitui projeto hidraulico.`
+        : "Quantidade informada no preenchimento manual; nao substitui projeto hidraulico.",
     });
   }
 
@@ -518,7 +532,108 @@ export function generateTakeoffQuantitySeeds(input: TakeoffSeedInput): QuantityS
   return seeds;
 }
 
-export function createTakeoffSeedInputFromScenario(project: Project, scenario: Scenario): TakeoffSeedInput {
+function countManualOpenings(openings: ManualTakeoffOpening[], kind: ManualOpeningKind) {
+  return openings.filter((opening) => opening.kind === kind).reduce((total, opening) => total + opening.quantity, 0);
+}
+
+function averageManualOpeningDimension(openings: ManualTakeoffOpening[], kind: ManualOpeningKind, key: "widthM" | "heightM", fallback: number) {
+  const matching = openings.filter((opening) => opening.kind === kind);
+  const totalQuantity = matching.reduce((total, opening) => total + opening.quantity, 0);
+  if (totalQuantity <= 0) return fallback;
+  return round(matching.reduce((total, opening) => total + opening[key] * opening.quantity, 0) / totalQuantity, 2);
+}
+
+function equivalentNumber(current: number | undefined, manual: number, tolerance = 0.01) {
+  return current === undefined || Math.abs(current - manual) <= tolerance;
+}
+
+function isManualTakeoffCurrentForScenario(state: ManualTakeoffState, scenario: Scenario, liveInput: TakeoffSeedInput) {
+  const manualMetrics = calculateManualTakeoffMetrics(state);
+  const terrainMatches =
+    equivalentNumber(scenario.terrain.width, state.lotWidthM) &&
+    equivalentNumber(scenario.terrain.depth, state.lotDepthM) &&
+    equivalentNumber(scenario.terrain.frontSetback, state.frontSetbackM) &&
+    equivalentNumber(scenario.terrain.rearSetback, state.rearSetbackM) &&
+    equivalentNumber(scenario.terrain.leftSetback, state.leftSetbackM) &&
+    equivalentNumber(scenario.terrain.rightSetback, state.rightSetbackM);
+
+  if (!terrainMatches) return false;
+
+  const manualDoorCount = countManualOpenings(state.openings, "door");
+  const manualWindowCount = countManualOpenings(state.openings, "window");
+  const manualDoorWidthM = averageManualOpeningDimension(state.openings, "door", "widthM", defaultDoorWidthM);
+  const manualDoorHeightM = averageManualOpeningDimension(state.openings, "door", "heightM", defaultDoorHeightM);
+  const manualWindowWidthM = averageManualOpeningDimension(state.openings, "window", "widthM", defaultWindowWidthM);
+  const manualWindowHeightM = averageManualOpeningDimension(state.openings, "window", "heightM", defaultWindowHeightM);
+  const sharedMatches =
+    equivalentNumber(liveInput.depthM, state.buildingDepthM) &&
+    equivalentNumber(liveInput.floors, state.floors) &&
+    equivalentNumber(liveInput.internalWallLengthM, state.internalWallLengthM) &&
+    equivalentNumber(liveInput.openings?.doorCount, manualDoorCount) &&
+    equivalentNumber(liveInput.openings?.windowCount, manualWindowCount) &&
+    equivalentNumber(liveInput.openings?.doorWidthM, manualDoorWidthM) &&
+    equivalentNumber(liveInput.openings?.doorHeightM, manualDoorHeightM) &&
+    equivalentNumber(liveInput.openings?.windowWidthM, manualWindowWidthM) &&
+    equivalentNumber(liveInput.openings?.windowHeightM, manualWindowHeightM);
+
+  if (scenario.constructionMethod === "aframe") {
+    const aFrameAreaMatches =
+      equivalentNumber(liveInput.widthM, state.buildingWidthM) &&
+      equivalentNumber(liveInput.floorHeightM, state.floorHeightM) &&
+      equivalentNumber(liveInput.builtAreaM2, manualMetrics.builtAreaM2, 0.5) &&
+      equivalentNumber(liveInput.footprintAreaM2, manualMetrics.footprintAreaM2, 0.5) &&
+      equivalentNumber(liveInput.roofAreaM2, manualMetrics.roofAreaM2, 0.5);
+
+    return sharedMatches && aFrameAreaMatches;
+  }
+
+  return sharedMatches && equivalentNumber(liveInput.widthM, state.buildingWidthM) && equivalentNumber(liveInput.floorHeightM, state.floorHeightM);
+}
+
+function createTakeoffSeedInputFromManualState(
+  state: ManualTakeoffState,
+  scenario: Scenario
+): TakeoffSeedInput {
+  const metrics = calculateManualTakeoffMetrics(state);
+  return {
+    scenarioId: scenario.id,
+    constructionMethod: scenario.constructionMethod,
+    widthM: state.buildingWidthM,
+    depthM: state.buildingDepthM,
+    builtAreaM2: metrics.builtAreaM2,
+    footprintAreaM2: metrics.footprintAreaM2,
+    floors: state.floors,
+    floorHeightM: state.floorHeightM,
+    perimeterM: state.externalWallLengthM,
+    internalWallLengthM: state.internalWallLengthM,
+    externalAreaM2: Math.max(0, state.lotWidthM * state.lotDepthM - metrics.footprintAreaM2),
+    roofAreaM2: metrics.roofAreaM2,
+    roofHasPlan: state.roofType !== "a_confirmar",
+    structureVisible: false,
+    rooms: state.rooms.map((room) => ({ id: room.id, name: room.name, type: room.type, areaM2: room.areaM2, wetArea: room.wetArea })),
+    openings: {
+      doorCount: countManualOpenings(state.openings, "door"),
+      windowCount: countManualOpenings(state.openings, "window"),
+      doorWidthM: averageManualOpeningDimension(state.openings, "door", "widthM", defaultDoorWidthM),
+      doorHeightM: averageManualOpeningDimension(state.openings, "door", "heightM", defaultDoorHeightM),
+      windowWidthM: averageManualOpeningDimension(state.openings, "window", "widthM", defaultWindowWidthM),
+      windowHeightM: averageManualOpeningDimension(state.openings, "window", "heightM", defaultWindowHeightM),
+    },
+    fixtures: {
+      toilets: state.rooms.filter((room) => room.type === "bathroom").length,
+      sinks: state.rooms.filter((room) => room.wetArea).length,
+      showers: state.rooms.filter((room) => room.type === "bathroom").length,
+      faucets: state.rooms.filter((room) => room.wetArea).length,
+    },
+    electricalPointCount: metrics.electricalPoints,
+    electricalEstimated: state.electricalEstimated,
+    plumbingPointCount: metrics.plumbingPoints,
+    plumbingEstimated: state.plumbingEstimated,
+    source: "manual",
+  };
+}
+
+function createLiveTakeoffSeedInputFromScenario(project: Project, scenario: Scenario): TakeoffSeedInput {
   const geometry = calculateScenarioGeometry(project, scenario) as Record<string, unknown>;
   const methodInputs = (scenario.methodInputs?.[scenario.constructionMethod] ?? {}) as Record<string, unknown>;
   const aFrameFallback = scenario.constructionMethod === "aframe" ? scenario.aFrame : undefined;
@@ -526,7 +641,11 @@ export function createTakeoffSeedInputFromScenario(project: Project, scenario: S
   const depthM = positive(geometry.depthM) ?? positive(geometry.effectiveHouseDepth) ?? positive(aFrameFallback?.houseDepth);
   const builtAreaM2 = positive(geometry.builtAreaM2) ?? positive(geometry.combinedTotalArea) ?? positive(geometry.groundFloorTotalArea);
   const footprintAreaM2 = positive(geometry.footprintAreaM2) ?? (widthM && depthM ? widthM * depthM : undefined);
-  const floorHeightM = positive(geometry.floorHeightM) ?? positive(methodInputs.floorHeightM) ?? positive(aFrameFallback?.minimumUsefulHeight);
+  const floorHeightM =
+    positive(geometry.floorHeightM) ??
+    positive(methodInputs.floorHeightM) ??
+    positive(aFrameFallback?.upperFloorLevelHeight) ??
+    positive(aFrameFallback?.minimumUsefulHeight);
   const floors = positive(geometry.floors) ?? positive(methodInputs.floors) ?? (positive(geometry.upperFloorTotalArea) ? 2 : 1);
 
   return {
@@ -541,7 +660,7 @@ export function createTakeoffSeedInputFromScenario(project: Project, scenario: S
     perimeterM: positive(geometry.perimeterM) ?? (widthM && depthM ? 2 * (widthM + depthM) : undefined),
     externalWallAreaM2:
       positive(geometry.externalWallGrossAreaM2) ?? positive(geometry.externalPanelAreaM2) ?? positive(geometry.totalFacadeArea),
-    internalWallLengthM: positive(methodInputs.internalWallLengthM),
+    internalWallLengthM: nonNegative(methodInputs.internalWallLengthM),
     roofAreaM2: positive(geometry.roofAreaM2) ?? positive(geometry.roofInclinedArea),
     openings: {
       doorCount: nonNegative(methodInputs.doorCount),
@@ -554,6 +673,32 @@ export function createTakeoffSeedInputFromScenario(project: Project, scenario: S
     rooms: [],
     source: "system_calculated",
   };
+}
+
+export function createTakeoffSeedInputFromScenario(project: Project, scenario: Scenario): TakeoffSeedInput {
+  const liveInput = createLiveTakeoffSeedInputFromScenario(project, scenario);
+
+  if (scenario.manualTakeoff) {
+    const manualState = createManualTakeoffStateFromData(scenario.manualTakeoff, {
+      projectName: project.name,
+      address: scenario.location.address,
+      city: scenario.location.city,
+      state: scenario.location.state,
+      country: scenario.location.country,
+      lotWidthM: scenario.terrain.width,
+      lotDepthM: scenario.terrain.depth,
+      frontSetbackM: scenario.terrain.frontSetback,
+      rearSetbackM: scenario.terrain.rearSetback,
+      leftSetbackM: scenario.terrain.leftSetback,
+      rightSetbackM: scenario.terrain.rightSetback,
+    });
+
+    if (isManualTakeoffCurrentForScenario(manualState, scenario, liveInput)) {
+      return createTakeoffSeedInputFromManualState(manualState, scenario);
+    }
+  }
+
+  return liveInput;
 }
 
 export function generateScenarioQuantitySeeds(project: Project, scenario: Scenario) {

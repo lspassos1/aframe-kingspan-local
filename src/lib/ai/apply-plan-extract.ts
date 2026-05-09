@@ -25,6 +25,18 @@ const rectangularMethodApplicableFields = new Set<keyof PlanExtractResult["extra
   "doorCount",
   "windowCount",
 ]);
+const manualTakeoffInvalidatingFields = new Set<keyof PlanExtractResult["extracted"]>([
+  "constructionMethod",
+  "terrainWidthM",
+  "terrainDepthM",
+  "houseWidthM",
+  "houseDepthM",
+  "builtAreaM2",
+  "floorHeightM",
+  "floors",
+  "doorCount",
+  "windowCount",
+]);
 const numericFieldConstraints: Partial<Record<keyof PlanExtractResult["extracted"], { min: number; integer?: boolean }>> = {
   terrainWidthM: { min: 0.01 },
   terrainDepthM: { min: 0.01 },
@@ -39,6 +51,41 @@ const numericFieldConstraints: Partial<Record<keyof PlanExtractResult["extracted
 
 function fieldSelected(selectedFields: PlanExtractSelectedFields, field: keyof PlanExtractResult["extracted"]) {
   return Boolean(selectedFields[field]);
+}
+
+function shouldInvalidateManualTakeoff(selectedFields: PlanExtractSelectedFields) {
+  return Array.from(manualTakeoffInvalidatingFields).some((field) => fieldSelected(selectedFields, field));
+}
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
+}
+
+function manualTakeoffInvalidationSnapshot(scenario: Scenario) {
+  return {
+    constructionMethod: scenario.constructionMethod,
+    terrain: {
+      width: scenario.terrain.width,
+      depth: scenario.terrain.depth,
+    },
+    aFrame: {
+      houseDepth: scenario.aFrame.houseDepth,
+      automaticDepth: scenario.aFrame.automaticDepth,
+    },
+    activeMethodInputs: scenario.methodInputs?.[scenario.constructionMethod] ?? {},
+  };
+}
+
+function hasManualTakeoffInvalidatingChange(previousScenario: Scenario, nextScenario: Scenario) {
+  return stableSerialize(manualTakeoffInvalidationSnapshot(previousScenario)) !== stableSerialize(manualTakeoffInvalidationSnapshot(nextScenario));
 }
 
 export function getDefaultPlanExtractSelectedFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId): PlanExtractSelectedFields {
@@ -120,7 +167,7 @@ function applyScenarioPlanExtract(scenario: Scenario, result: PlanExtractResult,
   };
   const methodUpdate = applyMethodInputs(scenario, result, selectedFields, constructionMethod);
 
-  return {
+  const nextScenario: Scenario = {
     ...scenario,
     constructionMethod,
     terrain,
@@ -128,6 +175,11 @@ function applyScenarioPlanExtract(scenario: Scenario, result: PlanExtractResult,
     methodInputs: methodUpdate.methodInputs,
     aFrame: methodUpdate.aFrame,
   };
+
+  if (!shouldInvalidateManualTakeoff(selectedFields) || !hasManualTakeoffInvalidatingChange(scenario, nextScenario)) return nextScenario;
+  const scenarioWithoutManualTakeoff = { ...nextScenario };
+  delete scenarioWithoutManualTakeoff.manualTakeoff;
+  return scenarioWithoutManualTakeoff;
 }
 
 export function applyPlanExtractToProject(project: Project, scenarioId: string, result: PlanExtractResult, selectedFields: PlanExtractSelectedFields): Project {
