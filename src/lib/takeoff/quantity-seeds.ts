@@ -564,6 +564,7 @@ function isManualTakeoffCurrentForScenario(state: ManualTakeoffState, scenario: 
   const sharedMatches =
     equivalentNumber(liveInput.depthM, state.buildingDepthM) &&
     equivalentNumber(liveInput.floors, state.floors) &&
+    equivalentNumber(liveInput.internalWallLengthM, state.internalWallLengthM) &&
     equivalentNumber(liveInput.openings?.doorCount, manualDoorCount) &&
     equivalentNumber(liveInput.openings?.windowCount, manualWindowCount);
 

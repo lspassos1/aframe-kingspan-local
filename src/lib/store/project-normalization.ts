@@ -11,6 +11,14 @@ type LegacyAFrameInputs = Partial<AFrameInputs> & {
   mezzanineDepth?: number;
 };
 
+function numericInput(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function calculateAFrameBaseWidth(input: AFrameInputs) {
+  return 2 * input.panelLength * Math.cos((input.baseAngleDeg * Math.PI) / 180);
+}
+
 function normalizeScenario(scenario: Scenario): Scenario {
   const defaultScenario = defaultProject.scenarios[0];
   const legacyAFrame = scenario.aFrame as LegacyAFrameInputs;
@@ -37,30 +45,39 @@ function normalizeScenario(scenario: Scenario): Scenario {
     methodInputs[constructionMethod] = getConstructionMethodDefinition(constructionMethod).getDefaultInputs();
   }
 
+  const location = { ...defaultScenario.location, ...scenario.location };
+  const terrain = { ...defaultScenario.terrain, ...scenario.terrain };
+  const activeInputs = (methodInputs[constructionMethod] ?? {}) as Record<string, unknown>;
+  const fallbackBuildingWidthM =
+    constructionMethod === "aframe" ? calculateAFrameBaseWidth(normalizedAFrame) : numericInput(activeInputs.widthM);
+  const fallbackBuildingDepthM =
+    constructionMethod === "aframe" ? normalizedAFrame.houseDepth : numericInput(activeInputs.depthM) ?? normalizedAFrame.houseDepth;
+
   return {
     ...defaultScenario,
     ...scenario,
     constructionMethod,
     methodInputs,
-    location: { ...defaultScenario.location, ...scenario.location },
-    terrain: { ...defaultScenario.terrain, ...scenario.terrain },
+    location,
+    terrain,
     pricing: { ...defaultScenario.pricing, ...scenario.pricing },
     aFrame: normalizedAFrame,
     manualTakeoff: normalizeManualTakeoffProjectData(scenario.manualTakeoff, {
       projectName: scenario.name,
-      address: scenario.location?.address,
-      city: scenario.location?.city,
-      state: scenario.location?.state,
-      country: scenario.location?.country,
-      lotWidthM: scenario.terrain?.width,
-      lotDepthM: scenario.terrain?.depth,
-      frontSetbackM: scenario.terrain?.frontSetback,
-      rearSetbackM: scenario.terrain?.rearSetback,
-      leftSetbackM: scenario.terrain?.leftSetback,
-      rightSetbackM: scenario.terrain?.rightSetback,
-      buildingDepthM: normalizedAFrame.houseDepth,
-      floors: normalizedAFrame.upperFloorMode === "none" ? 1 : 2,
-      floorHeightM: normalizedAFrame.upperFloorLevelHeight,
+      address: location.address,
+      city: location.city,
+      state: location.state,
+      country: location.country,
+      lotWidthM: terrain.width,
+      lotDepthM: terrain.depth,
+      frontSetbackM: terrain.frontSetback,
+      rearSetbackM: terrain.rearSetback,
+      leftSetbackM: terrain.leftSetback,
+      rightSetbackM: terrain.rightSetback,
+      buildingWidthM: fallbackBuildingWidthM,
+      buildingDepthM: fallbackBuildingDepthM,
+      floors: numericInput(activeInputs.floors) ?? (normalizedAFrame.upperFloorMode === "none" ? 1 : 2),
+      floorHeightM: numericInput(activeInputs.floorHeightM) ?? normalizedAFrame.upperFloorLevelHeight,
     }),
   };
 }

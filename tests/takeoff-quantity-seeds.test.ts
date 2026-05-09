@@ -320,6 +320,59 @@ describe("takeoff quantity seeds", () => {
     expect(seeds.find((seed) => seed.id === `${scenario.id}-windows-count`)?.quantity).toBe(8);
   });
 
+  it("falls back to live scenario inputs when internal wall length changes", () => {
+    const masonryDefinition = getConstructionMethodDefinition("conventional-masonry");
+    const manualState = createDefaultManualTakeoffState({
+      lotWidthM: 14,
+      lotDepthM: 26,
+      buildingWidthM: 9,
+      buildingDepthM: 11,
+      floorHeightM: 2.9,
+      internalWallLengthM: 18,
+      openings: [
+        { ...createDefaultManualTakeoffState().openings[0], id: "door-suite", kind: "door", quantity: 2, widthM: 0.9, heightM: 2.1 },
+        { ...createDefaultManualTakeoffState().openings[1], id: "window-suite", kind: "window", quantity: 3, widthM: 1.5, heightM: 1.1 },
+      ],
+    });
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          constructionMethod: "conventional-masonry",
+          terrain: {
+            ...defaultProject.scenarios[0].terrain,
+            width: 14,
+            depth: 26,
+          },
+          methodInputs: {
+            ...defaultProject.scenarios[0].methodInputs,
+            "conventional-masonry": {
+              ...masonryDefinition.getDefaultInputs(),
+              widthM: 9,
+              depthM: 11,
+              floors: 1,
+              floorHeightM: 2.9,
+              internalWallLengthM: 24,
+              doorCount: 2,
+              windowCount: 3,
+            },
+          },
+          manualTakeoff: createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z"),
+        },
+      ],
+    };
+    const scenario = project.scenarios[0];
+    const input = createTakeoffSeedInputFromScenario(project, scenario);
+    const seeds = generateScenarioQuantitySeeds(project, scenario);
+
+    expect(input).toMatchObject({
+      source: "system_calculated",
+      internalWallLengthM: 24,
+    });
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-internal-walls-area`)?.quantity).toBe(69.6);
+  });
+
   it("uses persisted A-frame manual takeoff only while live geometry metrics match", () => {
     const scenario = defaultProject.scenarios[0];
     const liveInput = createTakeoffSeedInputFromScenario(defaultProject, scenario);

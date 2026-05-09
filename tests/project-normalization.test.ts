@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
+import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { createDefaultManualTakeoffState, createManualTakeoffDataFromState, normalizeManualTakeoffProjectData } from "@/lib/takeoff/manual-stepper";
 import { normalizeProject } from "@/lib/store/project-normalization";
 import type { AFrameInputs, Project } from "@/types/project";
@@ -100,6 +101,49 @@ describe("project serialization and normalization", () => {
       expect(normalized?.updatedAt).not.toBe("");
       expect(Number.isNaN(Date.parse(normalized?.updatedAt ?? ""))).toBe(false);
     }
+  });
+
+  it("uses current scenario width as fallback for imported manual takeoff geometry", () => {
+    const masonryInputs = {
+      ...getConstructionMethodDefinition("conventional-masonry").getDefaultInputs(),
+      widthM: 10.5,
+      depthM: 12,
+      floors: 1,
+      floorHeightM: 2.9,
+    };
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          constructionMethod: "conventional-masonry",
+          methodInputs: {
+            ...defaultProject.scenarios[0].methodInputs,
+            "conventional-masonry": masonryInputs,
+          },
+          manualTakeoff: {
+            version: 1,
+            updatedAt: "2026-05-08T20:00:00.000Z",
+            source: "manual-stepper",
+            site: {
+              ...createManualTakeoffDataFromState(createDefaultManualTakeoffState()).site,
+              buildingWidthM: undefined as unknown as number,
+              buildingDepthM: undefined as unknown as number,
+            },
+            rooms: [],
+            openings: [],
+            wallMetrics: createManualTakeoffDataFromState(createDefaultManualTakeoffState()).wallMetrics,
+            foundationRoof: createManualTakeoffDataFromState(createDefaultManualTakeoffState()).foundationRoof,
+            mep: createManualTakeoffDataFromState(createDefaultManualTakeoffState()).mep,
+          },
+        },
+      ],
+    };
+
+    const normalized = normalizeProject(project).scenarios[0].manualTakeoff;
+
+    expect(normalized?.site.buildingWidthM).toBe(10.5);
+    expect(normalized?.site.buildingDepthM).toBe(12);
   });
 
   it("normalizes legacy A-frame mezzanine fields while preserving current defaults", () => {
