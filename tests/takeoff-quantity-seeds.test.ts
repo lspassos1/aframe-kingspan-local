@@ -373,6 +373,56 @@ describe("takeoff quantity seeds", () => {
     expect(seeds.find((seed) => seed.id === `${scenario.id}-internal-walls-area`)?.quantity).toBe(69.6);
   });
 
+  it("falls back to live scenario inputs when internal wall length is zero", () => {
+    const masonryDefinition = getConstructionMethodDefinition("conventional-masonry");
+    const manualState = createDefaultManualTakeoffState({
+      lotWidthM: 14,
+      lotDepthM: 26,
+      buildingWidthM: 9,
+      buildingDepthM: 11,
+      floorHeightM: 2.9,
+      internalWallLengthM: 18,
+      openings: [],
+    });
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          constructionMethod: "conventional-masonry",
+          terrain: {
+            ...defaultProject.scenarios[0].terrain,
+            width: 14,
+            depth: 26,
+          },
+          methodInputs: {
+            ...defaultProject.scenarios[0].methodInputs,
+            "conventional-masonry": {
+              ...masonryDefinition.getDefaultInputs(),
+              widthM: 9,
+              depthM: 11,
+              floors: 1,
+              floorHeightM: 2.9,
+              internalWallLengthM: 0,
+              doorCount: 0,
+              windowCount: 0,
+            },
+          },
+          manualTakeoff: createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z"),
+        },
+      ],
+    };
+    const scenario = project.scenarios[0];
+    const input = createTakeoffSeedInputFromScenario(project, scenario);
+    const seeds = generateScenarioQuantitySeeds(project, scenario);
+
+    expect(input).toMatchObject({
+      source: "system_calculated",
+      internalWallLengthM: 0,
+    });
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-internal-walls-area`)).toBeUndefined();
+  });
+
   it("uses persisted A-frame manual takeoff only while live geometry metrics match", () => {
     const scenario = defaultProject.scenarios[0];
     const liveInput = createTakeoffSeedInputFromScenario(defaultProject, scenario);

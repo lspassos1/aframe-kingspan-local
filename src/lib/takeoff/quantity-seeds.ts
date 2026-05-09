@@ -648,7 +648,7 @@ function createLiveTakeoffSeedInputFromScenario(project: Project, scenario: Scen
     perimeterM: positive(geometry.perimeterM) ?? (widthM && depthM ? 2 * (widthM + depthM) : undefined),
     externalWallAreaM2:
       positive(geometry.externalWallGrossAreaM2) ?? positive(geometry.externalPanelAreaM2) ?? positive(geometry.totalFacadeArea),
-    internalWallLengthM: positive(methodInputs.internalWallLengthM),
+    internalWallLengthM: nonNegative(methodInputs.internalWallLengthM),
     roofAreaM2: positive(geometry.roofAreaM2) ?? positive(geometry.roofInclinedArea),
     openings: {
       doorCount: nonNegative(methodInputs.doorCount),
