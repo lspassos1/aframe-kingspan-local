@@ -61,6 +61,7 @@ export type ManualFinishLevel = "economico" | "medio" | "superior";
 export type ManualFoundationType = "radier" | "baldrame" | "sapatas" | "a_confirmar";
 export type ManualRoofType = "telhado_ceramico" | "telhado_metalico" | "laje" | "a_confirmar";
 export type ManualOpeningKind = "door" | "window";
+export type ManualOpeningWallSide = "front" | "rear" | "left" | "right";
 
 export interface ManualTakeoffRoom {
   id: string;
@@ -83,6 +84,8 @@ export interface ManualTakeoffOpening {
   quantity: number;
   widthM: number;
   heightM: number;
+  wallSide: ManualOpeningWallSide;
+  offsetM: number;
   roomId: string;
   sillHeightM?: number;
   notes: string;
@@ -223,6 +226,8 @@ export function createManualTakeoffOpening(
     quantity: overrides.quantity ?? 1,
     widthM: overrides.widthM ?? (isDoor ? 0.8 : 1.2),
     heightM: overrides.heightM ?? (isDoor ? 2.1 : 1),
+    wallSide: overrides.wallSide ?? "front",
+    offsetM: overrides.offsetM ?? (isDoor ? 1.2 : 3),
     sillHeightM: isDoor ? undefined : (overrides.sillHeightM ?? 1.1),
     notes: overrides.notes ?? "",
   };
@@ -304,6 +309,10 @@ function normalizeOpeningKind(value: unknown, fallback: ManualOpeningKind): Manu
   return value === "door" || value === "window" ? value : fallback;
 }
 
+function normalizeOpeningWallSide(value: unknown, fallback: ManualOpeningWallSide): ManualOpeningWallSide {
+  return value === "front" || value === "rear" || value === "left" || value === "right" ? value : fallback;
+}
+
 function normalizeFoundationType(value: unknown, fallback: ManualFoundationType): ManualFoundationType {
   return ["radier", "baldrame", "sapatas", "a_confirmar"].includes(String(value)) ? (value as ManualFoundationType) : fallback;
 }
@@ -348,6 +357,8 @@ export function normalizeManualTakeoffOpening(
     quantity: Math.max(0, Math.round(normalizeNumber(opening?.quantity, fallback.quantity))),
     widthM: normalizeNumber(opening?.widthM, fallback.widthM),
     heightM: normalizeNumber(opening?.heightM, fallback.heightM),
+    wallSide: normalizeOpeningWallSide(opening?.wallSide, fallback.wallSide),
+    offsetM: Math.max(0, normalizeNumber(opening?.offsetM, fallback.offsetM)),
     roomId,
     sillHeightM: kind === "window" ? normalizeNumber(opening?.sillHeightM, fallback.sillHeightM ?? 1.1) : undefined,
     notes: normalizeText(opening?.notes, ""),

@@ -54,4 +54,19 @@ describe("manual takeoff stepper", () => {
     expect(metrics.plumbingPoints).toBe(6);
     expect(metrics.pendingCount).toBeGreaterThanOrEqual(4);
   });
+
+  it("normalizes wall side and offset for manual openings", () => {
+    const opening = createManualTakeoffOpening("window", "window", "living", {
+      wallSide: "right",
+      offsetM: 4.2,
+      sillHeightM: 1.15,
+    });
+    const state = createDefaultManualTakeoffState({ openings: [opening] });
+
+    expect(state.openings[0]).toMatchObject({
+      wallSide: "right",
+      offsetM: 4.2,
+      sillHeightM: 1.15,
+    });
+  });
 });

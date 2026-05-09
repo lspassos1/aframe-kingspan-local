@@ -4,6 +4,7 @@ import { getConstructionMethodDefinition, type Construction3DLayer, type Constru
 import { getGeneric3DNumberControls } from "@/lib/construction-methods/generic-3d-controls";
 import { getGenericViewerFramingLayers } from "@/lib/construction-methods/generic-viewer-framing";
 import { getGenericConstructionDimensions } from "@/lib/construction-methods/three-dimensions";
+import { createDefaultManualTakeoffState, createManualTakeoffDataFromState } from "@/lib/takeoff/manual-stepper";
 
 const genericMethodIds: ConstructionMethodId[] = ["conventional-masonry", "eco-block", "monolithic-eps"];
 const requiredLayerTypes: Construction3DLayerType[] = ["terrain", "foundation", "floor", "walls", "roof", "openings"];
@@ -95,6 +96,62 @@ describe("generic construction 3D layers", () => {
 
     expect(ecoWalls?.data.primitives.some((primitive) => primitive.size[0] === 0.2 || primitive.size[2] === 0.2)).toBe(true);
     expect(epsWalls?.data.primitives.some((primitive) => primitive.size[0] === 0.22 || primitive.size[2] === 0.22)).toBe(true);
+  });
+
+  it("renders positioned manual openings for supported rectangular methods", () => {
+    const definition = getConstructionMethodDefinition("conventional-masonry");
+    const baseScenario = defaultProject.scenarios[0];
+    const manualState = createDefaultManualTakeoffState({
+      openings: [
+        {
+          ...createDefaultManualTakeoffState().openings[0],
+          id: "entry",
+          kind: "door",
+          quantity: 1,
+          widthM: 0.9,
+          heightM: 2.1,
+          wallSide: "front",
+          offsetM: 2,
+        },
+        {
+          ...createDefaultManualTakeoffState().openings[1],
+          id: "suite-window",
+          kind: "window",
+          quantity: 1,
+          widthM: 1.4,
+          heightM: 1,
+          wallSide: "right",
+          offsetM: 4,
+          sillHeightM: 1.1,
+        },
+      ],
+    });
+    const scenario = {
+      ...baseScenario,
+      constructionMethod: "conventional-masonry" as const,
+      methodInputs: {
+        ...baseScenario.methodInputs,
+        "conventional-masonry": {
+          ...definition.getDefaultInputs(),
+          widthM: 10,
+          depthM: 12,
+          floorHeightM: 3,
+          wallThicknessM: 0.2,
+        },
+      },
+      manualTakeoff: createManualTakeoffDataFromState(manualState, "2026-05-09T00:00:00.000Z"),
+    };
+    const openings = definition.generate3DLayers?.({ project: defaultProject, scenario }).find((layer) => layer.type === "openings");
+    const door = openings?.data.primitives.find((primitive) => primitive.id === "manual-door-entry-1");
+    const window = openings?.data.primitives.find((primitive) => primitive.id === "manual-window-suite-window-1");
+
+    expect(openings?.data.notes?.[0]).toContain("Aberturas manuais");
+    expect(door?.position).toEqual([-3, 1.29, -6.145]);
+    expect(door?.size).toEqual([0.9, 2.1, 0.06]);
+    expect(window?.position[0]).toBeCloseTo(5.145);
+    expect(window?.position[1]).toBeCloseTo(1.84);
+    expect(window?.position[2]).toBeCloseTo(-2);
+    expect(window?.size).toEqual([0.06, 1, 1.4]);
   });
 
   it("adds a buildable area primitive from terrain setbacks", () => {
