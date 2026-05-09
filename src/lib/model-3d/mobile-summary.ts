@@ -47,8 +47,9 @@ export function createGenericMobile3DSummary(layers: Construction3DLayer[]): Mob
 
   const openingLayer = layers.find((layer) => layer.type === "openings");
   const openingPrimitives = openingLayer?.data.primitives ?? [];
-  const doorCount = openingPrimitives.filter((primitive) => primitive.label === "Porta" || primitive.id.includes("door")).length;
-  const windowCount = openingPrimitives.filter((primitive) => primitive.label === "Janela" || primitive.id.includes("window")).length;
+  const doorCount = openingLayer?.data.openingTotals?.doorCount ?? openingPrimitives.filter((primitive) => primitive.label === "Porta" || primitive.id.includes("door")).length;
+  const windowCount =
+    openingLayer?.data.openingTotals?.windowCount ?? openingPrimitives.filter((primitive) => primitive.label === "Janela" || primitive.id.includes("window")).length;
   const openingCount = doorCount + windowCount;
 
   return [

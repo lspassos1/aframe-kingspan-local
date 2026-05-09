@@ -63,6 +63,10 @@ export type Construction3DPrimitive = Construction3DBoxPrimitive;
 export interface Construction3DLayerData {
   primitives: Construction3DPrimitive[];
   notes?: string[];
+  openingTotals?: {
+    doorCount: number;
+    windowCount: number;
+  };
 }
 
 export interface Construction3DLayer {

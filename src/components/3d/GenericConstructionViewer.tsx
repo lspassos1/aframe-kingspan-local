@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text } from "@react-three/drei";
 import { Camera, Download, Eye, RotateCcw, Settings2 } from "lucide-react";
@@ -286,9 +286,14 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
   const numberControls = useMemo(() => getGeneric3DNumberControls(scenario.constructionMethod, methodInputs), [methodInputs, scenario.constructionMethod]);
   const activeLayers = useMemo(() => layers.filter((layer) => visibleLayers[layer.id] ?? layer.visibleByDefault), [layers, visibleLayers]);
   const canvasFallbackKey = `${scenario.id}:${scenario.constructionMethod}:${layers.map((layer) => layer.id).join("|")}`;
+  const canvasFallbackKeyRef = useRef(canvasFallbackKey);
   const canvasUnavailable = canvasFallback.key === canvasFallbackKey && canvasFallback.unavailable;
   const openingPreview = useMemo(() => createOpeningPreview(activeLayers), [activeLayers]);
   const mobileSummary = useMemo(() => createGenericMobile3DSummary(activeLayers), [activeLayers]);
+
+  useEffect(() => {
+    canvasFallbackKeyRef.current = canvasFallbackKey;
+  }, [canvasFallbackKey]);
 
   const toggleLayer = (layerId: string, checked: boolean) => {
     setVisibleLayers((current) => ({ ...current, [layerId]: checked }));
@@ -371,7 +376,7 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
             dpr={[1, 1.5]}
             gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
             onCreated={({ gl }) => {
-              gl.domElement.addEventListener("webglcontextlost", () => setCanvasFallback({ key: canvasFallbackKey, unavailable: true }), { once: true });
+              gl.domElement.addEventListener("webglcontextlost", () => setCanvasFallback({ key: canvasFallbackKeyRef.current, unavailable: true }), { once: true });
             }}
             shadows
           >
@@ -389,7 +394,7 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
         advancedControls={mobileAdvancedControls}
         onScreenshot={screenshot}
         onViewChange={setView}
-        showScreenshotAction={!isMobileViewport}
+        showScreenshotAction={!isMobileViewport && !canvasUnavailable}
         summary={mobileSummary}
         view={view}
       />

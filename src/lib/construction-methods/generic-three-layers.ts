@@ -69,6 +69,22 @@ function sanitizeOpeningQuantity(value: unknown) {
   return Math.min(12, Math.max(0, Math.round(readFiniteNumber(value, 0))));
 }
 
+function countOpeningQuantity(value: unknown) {
+  return Math.max(0, Math.round(readFiniteNumber(value, 0)));
+}
+
+function getManualOpeningTotals(openings: ManualTakeoffOpening[] | undefined) {
+  return (openings ?? []).reduce(
+    (totals, opening) => {
+      const quantity = countOpeningQuantity(opening.quantity);
+      if (opening.kind === "door") return { ...totals, doorCount: totals.doorCount + quantity };
+      if (opening.kind === "window") return { ...totals, windowCount: totals.windowCount + quantity };
+      return totals;
+    },
+    { doorCount: 0, windowCount: 0 }
+  );
+}
+
 function createManualOpeningPrimitives(openings: ManualTakeoffOpening[] | undefined, widthM: number, depthM: number, wallThicknessM: number) {
   if (!openings?.length) return [];
 
@@ -120,6 +136,7 @@ export function generateRectangularConstructionLayers(
   const manualOpenings = scenario.manualTakeoff?.openings;
   const hasManualOpeningData = Array.isArray(manualOpenings);
   const manualOpeningPrimitives = createManualOpeningPrimitives(manualOpenings, widthM, depthM, wallThicknessM);
+  const openingTotals = hasManualOpeningData ? getManualOpeningTotals(manualOpenings) : { doorCount: 1, windowCount: 1 };
   const openingPrimitives: Construction3DLayer["data"]["primitives"] =
     hasManualOpeningData
       ? manualOpeningPrimitives
@@ -284,6 +301,7 @@ export function generateRectangularConstructionLayers(
       data: {
         primitives: openingPrimitives,
         notes: openingNotes,
+        openingTotals,
       },
     },
   ];
