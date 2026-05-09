@@ -320,6 +320,67 @@ describe("takeoff quantity seeds", () => {
     expect(seeds.find((seed) => seed.id === `${scenario.id}-windows-count`)?.quantity).toBe(8);
   });
 
+  it("falls back to live scenario inputs when opening dimensions change", () => {
+    const masonryDefinition = getConstructionMethodDefinition("conventional-masonry");
+    const manualState = createDefaultManualTakeoffState({
+      lotWidthM: 14,
+      lotDepthM: 26,
+      buildingWidthM: 9,
+      buildingDepthM: 11,
+      floorHeightM: 2.9,
+      openings: [
+        { ...createDefaultManualTakeoffState().openings[0], id: "door-suite", kind: "door", quantity: 2, widthM: 0.9, heightM: 2.1 },
+        { ...createDefaultManualTakeoffState().openings[1], id: "window-suite", kind: "window", quantity: 3, widthM: 1.5, heightM: 1.1 },
+      ],
+    });
+    const project: Project = {
+      ...defaultProject,
+      scenarios: [
+        {
+          ...defaultProject.scenarios[0],
+          constructionMethod: "conventional-masonry",
+          terrain: {
+            ...defaultProject.scenarios[0].terrain,
+            width: 14,
+            depth: 26,
+          },
+          methodInputs: {
+            ...defaultProject.scenarios[0].methodInputs,
+            "conventional-masonry": {
+              ...masonryDefinition.getDefaultInputs(),
+              widthM: 9,
+              depthM: 11,
+              floors: 1,
+              floorHeightM: 2.9,
+              internalWallLengthM: manualState.internalWallLengthM,
+              doorCount: 2,
+              windowCount: 3,
+              doorWidthM: 1.1,
+              doorHeightM: 2.2,
+              windowWidthM: 1.8,
+              windowHeightM: 1.2,
+            },
+          },
+          manualTakeoff: createManualTakeoffDataFromState(manualState, "2026-05-08T20:00:00.000Z"),
+        },
+      ],
+    };
+    const scenario = project.scenarios[0];
+    const input = createTakeoffSeedInputFromScenario(project, scenario);
+
+    expect(input).toMatchObject({
+      source: "system_calculated",
+      openings: {
+        doorCount: 2,
+        windowCount: 3,
+        doorWidthM: 1.1,
+        doorHeightM: 2.2,
+        windowWidthM: 1.8,
+        windowHeightM: 1.2,
+      },
+    });
+  });
+
   it("falls back to live scenario inputs when internal wall length changes", () => {
     const masonryDefinition = getConstructionMethodDefinition("conventional-masonry");
     const manualState = createDefaultManualTakeoffState({
@@ -431,7 +492,7 @@ describe("takeoff quantity seeds", () => {
     const footprintAreaM2 = liveInput.footprintAreaM2 ?? widthM * depthM;
     const builtAreaM2 = liveInput.builtAreaM2 ?? footprintAreaM2;
     const roofAreaM2 = liveInput.roofAreaM2 ?? footprintAreaM2;
-    const floorHeightM = liveInput.floorHeightM ?? 2.8;
+    const floorHeightM = scenario.aFrame.upperFloorLevelHeight;
     const roofSlopeFactor = roofAreaM2 / (widthM * depthM);
     const manualState = createDefaultManualTakeoffState({
       lotWidthM: scenario.terrain.width,
@@ -470,7 +531,10 @@ describe("takeoff quantity seeds", () => {
       ],
     };
 
-    expect(createTakeoffSeedInputFromScenario(projectWithCurrentManual, projectWithCurrentManual.scenarios[0]).source).toBe("manual");
+    const currentInput = createTakeoffSeedInputFromScenario(projectWithCurrentManual, projectWithCurrentManual.scenarios[0]);
+
+    expect(currentInput.source).toBe("manual");
+    expect(currentInput.floorHeightM).toBe(scenario.aFrame.upperFloorLevelHeight);
     expect(createTakeoffSeedInputFromScenario(projectWithStaleManual, projectWithStaleManual.scenarios[0]).source).toBe("system_calculated");
   });
 

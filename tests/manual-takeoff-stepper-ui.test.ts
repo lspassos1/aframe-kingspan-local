@@ -57,6 +57,13 @@ const mockScenario = {
     freightBRL: 0,
     notes: "",
   },
+  manualTakeoff: {
+    version: 1,
+    updatedAt: "2026-05-08T20:00:00.000Z",
+    site: {
+      projectName: "Nome antigo persistido",
+    },
+  },
 };
 
 vi.mock("next/navigation", () => ({
@@ -96,5 +103,7 @@ describe("ManualTakeoffStepper UI", () => {
     expect(html).toContain("Método");
     expect(html).toContain("Revisão");
     expect(html).toContain("Base de preço sugerida");
+    expect(html).toContain('value="Estudo manual teste"');
+    expect(html).not.toContain("Nome antigo persistido");
   });
 });

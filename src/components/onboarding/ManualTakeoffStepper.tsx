@@ -156,7 +156,14 @@ function createInitialState(projectName: string, scenario: ReturnType<typeof use
     wallThicknessM: Number(inputs.wallThicknessM ?? 0.14),
     internalWallLengthM: Number(inputs.internalWallLengthM ?? 18),
   };
-  return scenario.manualTakeoff ? createManualTakeoffStateFromData(scenario.manualTakeoff, fallback) : createDefaultManualTakeoffState(fallback);
+  if (!scenario.manualTakeoff) {
+    return createDefaultManualTakeoffState(fallback);
+  }
+
+  return {
+    ...createManualTakeoffStateFromData(scenario.manualTakeoff, fallback),
+    projectName,
+  };
 }
 
 export function ManualTakeoffStepper() {

@@ -561,12 +561,20 @@ function isManualTakeoffCurrentForScenario(state: ManualTakeoffState, scenario: 
 
   const manualDoorCount = countManualOpenings(state.openings, "door");
   const manualWindowCount = countManualOpenings(state.openings, "window");
+  const manualDoorWidthM = averageManualOpeningDimension(state.openings, "door", "widthM", defaultDoorWidthM);
+  const manualDoorHeightM = averageManualOpeningDimension(state.openings, "door", "heightM", defaultDoorHeightM);
+  const manualWindowWidthM = averageManualOpeningDimension(state.openings, "window", "widthM", defaultWindowWidthM);
+  const manualWindowHeightM = averageManualOpeningDimension(state.openings, "window", "heightM", defaultWindowHeightM);
   const sharedMatches =
     equivalentNumber(liveInput.depthM, state.buildingDepthM) &&
     equivalentNumber(liveInput.floors, state.floors) &&
     equivalentNumber(liveInput.internalWallLengthM, state.internalWallLengthM) &&
     equivalentNumber(liveInput.openings?.doorCount, manualDoorCount) &&
-    equivalentNumber(liveInput.openings?.windowCount, manualWindowCount);
+    equivalentNumber(liveInput.openings?.windowCount, manualWindowCount) &&
+    equivalentNumber(liveInput.openings?.doorWidthM, manualDoorWidthM) &&
+    equivalentNumber(liveInput.openings?.doorHeightM, manualDoorHeightM) &&
+    equivalentNumber(liveInput.openings?.windowWidthM, manualWindowWidthM) &&
+    equivalentNumber(liveInput.openings?.windowHeightM, manualWindowHeightM);
 
   if (scenario.constructionMethod === "aframe") {
     const aFrameAreaMatches =
@@ -633,7 +641,11 @@ function createLiveTakeoffSeedInputFromScenario(project: Project, scenario: Scen
   const depthM = positive(geometry.depthM) ?? positive(geometry.effectiveHouseDepth) ?? positive(aFrameFallback?.houseDepth);
   const builtAreaM2 = positive(geometry.builtAreaM2) ?? positive(geometry.combinedTotalArea) ?? positive(geometry.groundFloorTotalArea);
   const footprintAreaM2 = positive(geometry.footprintAreaM2) ?? (widthM && depthM ? widthM * depthM : undefined);
-  const floorHeightM = positive(geometry.floorHeightM) ?? positive(methodInputs.floorHeightM) ?? positive(aFrameFallback?.minimumUsefulHeight);
+  const floorHeightM =
+    positive(geometry.floorHeightM) ??
+    positive(methodInputs.floorHeightM) ??
+    positive(aFrameFallback?.upperFloorLevelHeight) ??
+    positive(aFrameFallback?.minimumUsefulHeight);
   const floors = positive(geometry.floors) ?? positive(methodInputs.floors) ?? (positive(geometry.upperFloorTotalArea) ? 2 : 1);
 
   return {
