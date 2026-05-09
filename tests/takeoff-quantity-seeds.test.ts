@@ -370,7 +370,7 @@ describe("takeoff quantity seeds", () => {
       source: "system_calculated",
       internalWallLengthM: 24,
     });
-    expect(seeds.find((seed) => seed.id === `${scenario.id}-internal-walls-area`)?.quantity).toBe(69.6);
+    expect(seeds.find((seed) => seed.id === `${scenario.id}-internal-walls-area`)?.quantity).toBeCloseTo(69.6, 2);
   });
 
   it("falls back to live scenario inputs when internal wall length is zero", () => {
