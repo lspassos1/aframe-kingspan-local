@@ -4,6 +4,7 @@ import {
   createPlanExtractCacheKey,
   getPlanExtractCacheTtlSeconds,
   getPlanExtractCacheVersion,
+  shouldCachePlanExtractResult,
 } from "@/lib/ai/plan-extract-cache";
 import type { AiPlanExtractProviderResult } from "@/lib/ai/providers";
 
@@ -61,6 +62,23 @@ describe("AI plan extract cache", () => {
     expect(getPlanExtractCacheVersion({ AI_PLAN_EXTRACT_CACHE_VERSION: "manual-v2" })).toBe("manual-v2");
   });
 
+  it("varies cache versions for invalid free-cloud review configuration", () => {
+    const baseEnv = {
+      AI_MODE: "free-cloud",
+      AI_PLAN_PRIMARY_PROVIDER: "gemini",
+      GEMINI_API_KEY: "gemini-key",
+      GEMINI_MODEL: "gemini-2.5-flash",
+      OPENROUTER_API_KEY: "openrouter-key",
+    };
+
+    expect(getPlanExtractCacheVersion({ ...baseEnv, OPENROUTER_PLAN_REVIEW_MODEL: "openai/gpt-4o" })).not.toBe(
+      getPlanExtractCacheVersion({ ...baseEnv, OPENROUTER_PLAN_REVIEW_MODEL: "anthropic/claude-3-haiku" })
+    );
+    expect(getPlanExtractCacheVersion({ ...baseEnv, OPENROUTER_PLAN_REVIEW_MODEL: "openai/gpt-4o" })).not.toBe(
+      getPlanExtractCacheVersion({ ...baseEnv, OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.0-flash-exp:free" })
+    );
+  });
+
   it("uses a 24 hour TTL by default and accepts hour overrides", () => {
     expect(getPlanExtractCacheTtlSeconds({})).toBe(86_400);
     expect(getPlanExtractCacheTtlSeconds({ AI_PLAN_EXTRACT_CACHE_TTL_HOURS: "2" })).toBe(7_200);
@@ -97,5 +115,41 @@ describe("AI plan extract cache", () => {
 
     expect(entries.has("expired-key")).toBe(false);
     expect(entries.has("fresh-key")).toBe(true);
+  });
+
+  it("does not cache retryable plan-review provider failures", () => {
+    expect(shouldCachePlanExtractResult(validExtraction)).toBe(true);
+    expect(
+      shouldCachePlanExtractResult({
+        ...validExtraction,
+        review: {
+          status: "completed",
+          provider: "openrouter",
+          model: "google/gemini-2.0-flash-exp:free",
+        },
+      })
+    ).toBe(true);
+    expect(
+      shouldCachePlanExtractResult({
+        ...validExtraction,
+        review: {
+          status: "unavailable",
+          provider: "openrouter",
+          model: "google/gemini-2.0-flash-exp:free",
+          error: { message: "Provider openrouter respondeu 429.", retryable: true },
+        },
+      })
+    ).toBe(false);
+    expect(
+      shouldCachePlanExtractResult({
+        ...validExtraction,
+        review: {
+          status: "unavailable",
+          provider: "openrouter",
+          model: "openai/gpt-4o",
+          error: { message: "Modelo pago bloqueado.", code: "ai-paid-model-blocked", retryable: false },
+        },
+      })
+    ).toBe(true);
   });
 });

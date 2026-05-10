@@ -2,7 +2,7 @@
 
 ## Status
 
-Este documento define a política operacional do ciclo `#182`. O roteador contratual vive em `src/lib/ai/free-cloud-router.ts`, mas as chamadas reais Gemini/OpenRouter/Groq/Cerebras/SambaNova ainda serão implementadas em PRs seguintes. Até os PRs de provider serem entregues, `/api/ai/plan-extract` continua usando o caminho OpenAI existente quando a feature estiver habilitada.
+Este documento define a política operacional do ciclo `#182`. O roteador contratual vive em `src/lib/ai/free-cloud-router.ts`. Gemini já atua como primeira leitura visual no modo `free-cloud`; OpenRouter Free atua como segunda leitura visual/comparação quando configurado e quando o tipo de arquivo for suportado pelo modelo selecionado.
 
 ## Objetivo
 
@@ -36,7 +36,7 @@ OpenAI não deve ser removido. A chave `OPENAI_API_KEY` continua server-side e s
 | Fallback textual opcional | Cerebras ou SambaNova Free | `AI_TEXT_FALLBACK_PROVIDER=cerebras` ou `sambanova` |
 | Standby pago | OpenAI | somente com `AI_PAID_FALLBACK_ENABLED=true` ou modo pago explícito |
 
-OpenRouter deve usar apenas modelos gratuitos no modo `free-cloud`. Neste contrato inicial, OpenRouter é tratado como segunda leitura visual sem suporte PDF genérico; suporte PDF dependerá do modelo/rota em PR futuro. No modo `free-cloud`, `OPENROUTER_PLAN_REVIEW_MODEL` é obrigatório para OpenRouter e o router só aceita IDs de modelo com sufixo `:free`. Se não houver modelo gratuito compatível com a tarefa, o app deve retornar fallback manual claro.
+OpenRouter deve usar apenas modelos gratuitos no modo `free-cloud`. Neste contrato inicial, OpenRouter é tratado como segunda leitura visual sem suporte PDF genérico; suporte PDF dependerá do modelo/rota em PR futuro. No modo `free-cloud`, `OPENROUTER_PLAN_REVIEW_MODEL` é obrigatório para OpenRouter e o router só aceita IDs de modelo com sufixo `:free`. Se não houver modelo gratuito compatível com a tarefa, a extração primária com Gemini continua e a segunda leitura fica marcada como indisponível/pendente.
 
 Modelos configuráveis por provider:
 
@@ -61,7 +61,7 @@ GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_FREE_TIER_NOTICE=true
 OPENROUTER_API_KEY=
-OPENROUTER_PLAN_REVIEW_MODEL=
+OPENROUTER_PLAN_REVIEW_MODEL=google/gemini-2.0-flash-exp:free
 GROQ_API_KEY=
 GROQ_TEXT_MODEL=
 CEREBRAS_API_KEY=

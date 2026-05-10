@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { getAiPlanExtractProviderConfigs, type AiPlanExtractEnv, type AiPlanExtractMimeType, type AiPlanExtractProviderResult } from "@/lib/ai/providers";
+import {
+  getAiPlanExtractProviderConfigs,
+  getAiPlanReviewProviderConfig,
+  type AiPlanExtractEnv,
+  type AiPlanExtractMimeType,
+  type AiPlanExtractProviderResult,
+} from "@/lib/ai/providers";
 import { planExtractResultSchema } from "@/lib/ai/plan-extract-schema";
 
 export type AiPlanExtractCacheStore = {
@@ -25,6 +31,18 @@ function hashValue(value: string | Uint8Array) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function createReviewErrorVersion(error: unknown, env: AiPlanExtractEnv) {
+  const message = error instanceof Error ? error.message : "unknown";
+  return {
+    id: "review-unavailable",
+    requestedProvider: env.AI_PLAN_REVIEW_PROVIDER ?? null,
+    requestedModel: env.OPENROUTER_PLAN_REVIEW_MODEL ?? null,
+    configured: false,
+    errorName: error instanceof Error ? error.name : "Error",
+    errorHash: hashValue(message).slice(0, 16),
+  };
+}
+
 function getNumberEnv(env: AiPlanExtractEnv, key: string, fallback: number) {
   const value = Number(env[key]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -44,8 +62,27 @@ export function getPlanExtractCacheVersion(env: AiPlanExtractEnv = process.env) 
     configured: provider.configured,
     supports: provider.supports,
   }));
+  let reviewVersion: Record<string, unknown> | null = null;
+  try {
+    const reviewProvider = getAiPlanReviewProviderConfig(env);
+    if (reviewProvider) {
+      reviewVersion = {
+        id: reviewProvider.id,
+        model: reviewProvider.model,
+        baseUrl: reviewProvider.baseUrl,
+        configured: reviewProvider.configured,
+        supports: reviewProvider.supports,
+      };
+    }
+  } catch (error) {
+    reviewVersion = createReviewErrorVersion(error, env);
+  }
 
-  return hashValue(JSON.stringify({ schema: "1.0-advanced-v2", prompt: "plan-extract-advanced-v2", providers })).slice(0, 24);
+  return hashValue(JSON.stringify({ schema: "1.0-advanced-v2", prompt: "plan-extract-advanced-v2", providers, reviewVersion })).slice(0, 24);
+}
+
+export function shouldCachePlanExtractResult(value: AiPlanExtractProviderResult) {
+  return value.review?.status !== "unavailable" || value.review.error?.retryable !== true;
 }
 
 export function createPlanExtractCacheKey({
