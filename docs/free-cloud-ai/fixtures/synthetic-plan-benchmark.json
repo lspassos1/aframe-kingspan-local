@@ -1,0 +1,203 @@
+[
+  {
+    "id": "synthetic-rectangular-house",
+    "title": "Synthetic rectangular house plan",
+    "description": "Sanitized mock of a simple rectangular single-floor house with rooms, openings and visible dimensions.",
+    "mimeType": "image/png",
+    "fileName": "synthetic-rectangular-house.png",
+    "cacheKey": "synthetic-rectangular-house:v1",
+    "sampleFileBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+    "expectedFields": ["city", "state", "builtAreaM2", "houseWidthM", "houseDepthM", "doorCount", "windowCount"],
+    "dryRun": {
+      "primary": {
+        "task": "plan-primary",
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "latencyMs": 940,
+        "result": {
+          "version": "1.0",
+          "summary": "Synthetic rectangular plan with dimensions and room labels.",
+          "confidence": "medium",
+          "extractionStatus": "partial",
+          "extracted": {
+            "city": "Curitiba",
+            "state": "PR",
+            "houseWidthM": 8,
+            "houseDepthM": 12,
+            "builtAreaM2": 96,
+            "floorHeightM": 2.8,
+            "floors": 1,
+            "doorCount": 5,
+            "windowCount": 6,
+            "notes": ["Synthetic fixture; not a real project."]
+          },
+          "fieldConfidence": {
+            "builtAreaM2": "medium",
+            "houseWidthM": "high",
+            "houseDepthM": "high",
+            "doorCount": "medium",
+            "windowCount": "medium"
+          },
+          "rooms": [
+            {
+              "id": "room-living",
+              "name": {
+                "value": "Sala",
+                "unit": "un",
+                "confidence": "high",
+                "evidence": "Room label visible in synthetic plan.",
+                "source": "visible",
+                "requiresReview": true
+              },
+              "areaM2": {
+                "value": 24,
+                "unit": "m2",
+                "confidence": "medium",
+                "evidence": "Calculated from visible room dimensions.",
+                "source": "calculated",
+                "requiresReview": true
+              }
+            }
+          ],
+          "quantitySeeds": [
+            {
+              "id": "synthetic-floor-area",
+              "category": "flooring",
+              "description": "Synthetic gross floor area",
+              "quantity": 96,
+              "unit": "m2",
+              "source": "system_calculated",
+              "confidence": "medium",
+              "requiresReview": true,
+              "evidence": "Width x depth from synthetic visible dimensions.",
+              "notes": "Benchmark seed only."
+            },
+            {
+              "id": "synthetic-openings",
+              "category": "openings",
+              "description": "Synthetic doors and windows",
+              "quantity": 11,
+              "unit": "un",
+              "source": "ai_visible",
+              "confidence": "medium",
+              "requiresReview": true,
+              "evidence": "Counted from synthetic opening symbols.",
+              "notes": "Benchmark seed only."
+            }
+          ],
+          "questions": [
+            {
+              "id": "finish-level",
+              "question": "Qual padrao de acabamento deseja considerar?",
+              "target": "finishLevel",
+              "requiredBeforeBudget": true
+            }
+          ],
+          "assumptions": [],
+          "missingInformation": ["Confirmar padrao de acabamento."],
+          "warnings": []
+        }
+      },
+      "review": {
+        "task": "plan-review",
+        "provider": "openrouter",
+        "model": "google/gemini-2.0-flash-exp:free",
+        "latencyMs": 1180,
+        "result": {
+          "version": "1.0",
+          "summary": "Second synthetic reading with area divergence.",
+          "confidence": "medium",
+          "extractionStatus": "partial",
+          "extracted": {
+            "city": "Curitiba",
+            "state": "PR",
+            "houseWidthM": 8,
+            "houseDepthM": 12,
+            "builtAreaM2": 98,
+            "floorHeightM": 2.8,
+            "floors": 1,
+            "doorCount": 5,
+            "windowCount": 6,
+            "notes": ["Synthetic fixture; not a real project."]
+          },
+          "fieldConfidence": {
+            "builtAreaM2": "medium"
+          },
+          "assumptions": [],
+          "missingInformation": ["Confirmar area construida divergente."],
+          "warnings": []
+        }
+      },
+      "textSummary": {
+        "task": "text-summary",
+        "provider": "groq",
+        "model": "llama-3.1-8b-instant",
+        "latencyMs": 360,
+        "status": "success"
+      }
+    }
+  },
+  {
+    "id": "synthetic-pdf-plan",
+    "title": "Synthetic PDF plan",
+    "description": "Sanitized mock for PDF handling where OpenRouter review is intentionally skipped because generic PDF support is not promised.",
+    "mimeType": "application/pdf",
+    "fileName": "synthetic-pdf-plan.pdf",
+    "cacheKey": "synthetic-pdf-plan:v1",
+    "sampleFileBase64": "JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9Db3VudCAwID4+CmVuZG9iagp0cmFpbGVyCjw8IC9Sb290IDEgMCBSID4+CiUlRU9G",
+    "expectedFields": ["city", "state", "builtAreaM2", "houseWidthM", "houseDepthM"],
+    "dryRun": {
+      "primary": {
+        "task": "plan-primary",
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "latencyMs": 1320,
+        "result": {
+          "version": "1.0",
+          "summary": "Synthetic PDF reading with partial dimensions.",
+          "confidence": "low",
+          "extractionStatus": "partial",
+          "extracted": {
+            "city": "Sao Paulo",
+            "state": "SP",
+            "houseWidthM": 7.5,
+            "houseDepthM": 10,
+            "builtAreaM2": 75,
+            "floors": 1,
+            "notes": ["Synthetic PDF fixture; not a real project."]
+          },
+          "fieldConfidence": {
+            "builtAreaM2": "low",
+            "houseWidthM": "medium"
+          },
+          "questions": [
+            {
+              "id": "scale-reference",
+              "question": "Qual medida real posso usar como referencia?",
+              "target": "scale",
+              "requiredBeforeBudget": true
+            }
+          ],
+          "assumptions": ["PDF fixture uses partial labels only."],
+          "missingInformation": ["Confirmar escala da prancha.", "Confirmar pe-direito."],
+          "warnings": ["Resultado sintetico para benchmark."]
+        }
+      },
+      "review": {
+        "task": "plan-review",
+        "provider": "openrouter",
+        "model": "google/gemini-2.0-flash-exp:free",
+        "latencyMs": 0,
+        "status": "skipped",
+        "error": "OpenRouter review skipped for application/pdf in this contract."
+      },
+      "textSummary": {
+        "task": "text-summary",
+        "provider": "groq",
+        "model": "llama-3.1-8b-instant",
+        "latencyMs": 410,
+        "status": "success"
+      }
+    }
+  }
+]
