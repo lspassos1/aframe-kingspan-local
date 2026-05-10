@@ -9,6 +9,7 @@ Este diretório documenta o Estudo Construtivo: uma experiência guiada para pr�
 - `setup-ai-and-sinapi.md`: setup operacional de `.env.local`, Vercel, OpenAI API, limites e SINAPI.
 - `free-cloud-ai-routing.md`: política do modo free-cloud, providers gratuitos por tarefa e OpenAI em standby.
 - `sinapi-integration.md`: importação controlada de base SINAPI e regras de status.
+- `pricing-database-architecture.md`: decisão arquitetural para base externa de preços, Supabase Free, sync mensal e proteção do plano Vercel Hobby.
 
 ## Contratos Técnicos
 
