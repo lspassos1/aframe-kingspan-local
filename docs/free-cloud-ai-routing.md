@@ -63,7 +63,7 @@ GEMINI_FREE_TIER_NOTICE=true
 OPENROUTER_API_KEY=
 OPENROUTER_PLAN_REVIEW_MODEL=google/gemini-2.0-flash-exp:free
 GROQ_API_KEY=
-GROQ_TEXT_MODEL=
+GROQ_TEXT_MODEL=llama-3.1-8b-instant
 CEREBRAS_API_KEY=
 CEREBRAS_TEXT_MODEL=
 SAMBANOVA_API_KEY=
@@ -89,6 +89,26 @@ Comportamento esperado:
 - mostrar provider usado e status seguro na UI;
 - quando o provider gratuito falhar ou atingir limite, voltar para preenchimento manual;
 - não acionar OpenAI automaticamente para "salvar" a análise.
+
+## Resumo Textual Gratuito
+
+O resumo textual vive em `src/lib/ai/text-providers.ts` e atua como camada auxiliar de revisão. Ele recebe um `PlanExtractResult` já validado e, opcionalmente, o resumo de comparação multi-modelo. A saída é separada do JSON estruturado:
+
+- `text`;
+- `detected`;
+- `lowConfidence`;
+- `divergences`;
+- `pendingQuestions`;
+- `nextSteps`;
+- `provider`, `model` e `tokens` quando houver provider.
+
+Regras:
+
+- Groq é o provider textual principal (`AI_TEXT_PROVIDER=groq`).
+- Cerebras ou SambaNova podem atuar como fallback textual.
+- Se todos falharem ou estiverem sem chave, o app usa resumo determinístico local.
+- O resumo nunca altera `PlanExtractResult`.
+- Providers textuais não recebem imagem/PDF e não são usados para preço, SINAPI, BDI, H/H, consumo, perda ou aprovação.
 
 ## Privacidade
 
