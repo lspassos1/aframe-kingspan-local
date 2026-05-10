@@ -38,7 +38,7 @@ Variáveis comuns:
 - `GITHUB_FEEDBACK_TOKEN`
 - `GITHUB_FEEDBACK_REPO=lspassos1/aframe-kingspan-local`
 
-Para IA assistiva de planta baixa, use somente OpenAI API nesta entrega:
+Para IA assistiva de planta baixa, o runtime atual usa OpenAI quando habilitado. No ciclo free-cloud, OpenAI fica em standby e providers gratuitos entram por tarefa nos próximos PRs.
 
 ```txt
 AI_PLAN_EXTRACT_ENABLED=true
@@ -55,7 +55,18 @@ AI_RATE_LIMIT_SALT=valor_secreto_forte
 
 `OPENAI_API_KEY` é server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY`, nunca exponha a chave no frontend, em logs ou respostas de API. Assinatura ChatGPT não configura automaticamente a API deste app; é preciso uma chave de API da plataforma OpenAI.
 
-Veja [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md) para setup completo de OpenAI, Vercel, limites diários e SINAPI.
+Modo free-cloud planejado:
+
+```txt
+AI_MODE=free-cloud
+AI_PAID_FALLBACK_ENABLED=false
+AI_PLAN_PRIMARY_PROVIDER=gemini
+AI_PLAN_REVIEW_PROVIDER=openrouter
+AI_TEXT_PROVIDER=groq
+AI_TEXT_FALLBACK_PROVIDER=cerebras
+```
+
+Essas variáveis não expõem chaves no client e não habilitam fallback pago automático. Veja [docs/free-cloud-ai-routing.md](docs/free-cloud-ai-routing.md) e [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md) para setup completo de IA, Vercel, limites diários e SINAPI.
 
 ### Slack GitHub Review Bridge
 
@@ -76,7 +87,7 @@ See [docs/slack-github-review-bridge.md](docs/slack-github-review-bridge.md).
 
 ## IA Assistiva
 
-A IA é opcional, sob demanda e limitada por cota diária. Ela pode ler planta baixa em PDF/imagem quando o modelo OpenAI configurado suportar visão/documento, extrair campos preliminares e sugerir pendências.
+A IA é opcional, sob demanda e limitada por cota diária. Ela pode ler planta baixa em PDF/imagem quando o provider configurado suportar visão/documento, extrair campos preliminares e sugerir pendências.
 
 A IA nunca deve:
 
@@ -100,6 +111,7 @@ Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 - [docs/product-experience.md](docs/product-experience.md): direção de produto e experiência.
 - [docs/onboarding-ux.md](docs/onboarding-ux.md): fluxo guiado de entrada.
 - [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md): variáveis locais, Vercel, OpenAI API e SINAPI.
+- [docs/free-cloud-ai-routing.md](docs/free-cloud-ai-routing.md): modo free-cloud, providers gratuitos e OpenAI em standby.
 - [docs/sinapi-integration.md](docs/sinapi-integration.md): regras da base SINAPI controlada.
 - [docs/AI_PLAN_EXTRACT.md](docs/AI_PLAN_EXTRACT.md): contrato técnico da extração de planta por IA.
 - [docs/budget-assistant.md](docs/budget-assistant.md): Assistente de orçamento e revisão humana.

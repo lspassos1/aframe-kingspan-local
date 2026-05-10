@@ -1,6 +1,6 @@
-# Extração De Planta Com OpenAI API
+# Extração De Planta Com IA
 
-Este documento cobre a configuração técnica da extração assistida de planta baixa. A feature é opcional, server-side e desligada por padrão em ambientes sem OpenAI configurado.
+Este documento cobre a configuração técnica da extração assistida de planta baixa no runtime atual. A feature é opcional, server-side e desligada por padrão em ambientes sem provider configurado.
 
 ## Objetivo
 
@@ -8,9 +8,9 @@ O fluxo lê imagem ou PDF de planta baixa e retorna JSON preliminar com campos l
 
 O resultado sempre passa por revisão humana antes de ser aplicado ao projeto. A extração não substitui projeto arquitetônico, projeto estrutural, ART/RRT, aprovação municipal, sondagem, orçamento formal ou validação técnica de fornecedor.
 
-## Provider Oficial
+## Provider Atual E Modo Free-cloud
 
-Nesta entrega, o provider oficial é somente OpenAI API.
+O runtime atual de `/api/ai/plan-extract` continua usando OpenAI API quando a feature estiver habilitada:
 
 ```txt
 AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
@@ -18,7 +18,7 @@ OPENAI_API_KEY=...
 AI_OPENAI_MODEL=gpt-4o-mini
 ```
 
-A abstração interna de providers pode existir por compatibilidade, mas a configuração documentada, os testes novos e a UI operacional não devem exigir Gemini, Groq, OpenRouter ou endpoint genérico.
+O ciclo `#182` introduz uma política de modo `free-cloud` com OpenAI em standby. Neste PR, essa política é documentação/env apenas; o router free-cloud será implementado nos PRs seguintes. Veja `free-cloud-ai-routing.md`.
 
 `OPENAI_API_KEY` deve ser lida apenas no servidor. Nunca use `NEXT_PUBLIC_OPENAI_API_KEY`; variáveis com prefixo `NEXT_PUBLIC_` entram no bundle do navegador.
 
@@ -26,7 +26,7 @@ A abstração interna de providers pode existir por compatibilidade, mas a confi
 
 Copie `.env.example` para `.env.local` no desenvolvimento local. Em Vercel, configure as mesmas variáveis em Project Settings > Environment Variables.
 
-Obrigatórias para habilitar:
+Obrigatórias para habilitar o runtime OpenAI atual:
 
 - `AI_PLAN_EXTRACT_ENABLED=true`
 - `AI_PLAN_EXTRACT_PROVIDER_ORDER=openai`
@@ -102,7 +102,7 @@ Todo valor avançado retornado pela IA deve ter `value`, `unit`, `confidence`, `
 2. O servidor valida tipo e tamanho.
 3. O cache por hash é consultado antes de consumir quota.
 4. Em cache miss, o rate limit consome quota diária por usuário/IP/global.
-5. OpenAI processa o arquivo.
+5. O provider configurado processa o arquivo.
 6. O retorno é validado por Zod como `PlanExtractResult`.
 7. A UI mostra campos, confiança, incertezas e alertas.
 8. O usuário escolhe quais campos aplicar.
@@ -118,7 +118,7 @@ npm install
 npm run dev
 ```
 
-Para testar sem custo, mantenha `AI_PLAN_EXTRACT_ENABLED=false`. Para testar com OpenAI real, configure limites pequenos:
+Para testar sem custo no runtime atual, mantenha `AI_PLAN_EXTRACT_ENABLED=false`. Para testar com OpenAI real, configure limites pequenos:
 
 ```txt
 AI_PLAN_EXTRACT_ENABLED=true
