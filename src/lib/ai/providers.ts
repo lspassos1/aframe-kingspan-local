@@ -1,7 +1,8 @@
 import { planExtractSystemPrompt, planExtractUserPrompt } from "@/lib/ai/prompts";
+import { mergePlanExtractionResults, type PlanExtractComparisonSummary } from "@/lib/ai/plan-result-merge";
 import { parsePlanExtractResult, type PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import { AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
-import { getAiTaskProviderId, resolveAiTaskProvider, type AiCloudProviderId } from "@/lib/ai/free-cloud-router";
+import { AiRouterError, getAiTaskProviderId, resolveAiTaskProvider, type AiCloudProviderId } from "@/lib/ai/free-cloud-router";
 
 export type AiPlanExtractProviderId = "gemini" | "openai" | "openrouter" | "groq" | "generic";
 
@@ -30,6 +31,20 @@ export type AiPlanExtractProviderResult = {
   provider: AiPlanExtractProviderId;
   model: string;
   tokens?: number;
+  review?: AiPlanReviewResult;
+};
+
+export type AiPlanReviewResult = {
+  status: "completed" | "skipped" | "unavailable";
+  provider?: AiPlanExtractProviderId;
+  model?: string;
+  tokens?: number;
+  comparison?: PlanExtractComparisonSummary;
+  error?: {
+    message: string;
+    code?: string;
+    retryable?: boolean;
+  };
 };
 
 const officialProviderOrder: AiPlanExtractProviderId[] = ["openai"];
@@ -50,11 +65,11 @@ const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyE
     supports: ["image/png", "image/jpeg", "image/webp", "application/pdf"],
   },
   openrouter: {
-    modelEnv: "AI_OPENROUTER_MODEL",
+    modelEnv: "OPENROUTER_PLAN_REVIEW_MODEL",
     keyEnv: "OPENROUTER_API_KEY",
-    defaultModel: "google/gemini-2.5-flash",
+    defaultModel: "",
     baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-    supports: ["image/png", "image/jpeg", "image/webp", "application/pdf"],
+    supports: ["image/png", "image/jpeg", "image/webp"],
   },
   groq: {
     modelEnv: "AI_GROQ_MODEL",
@@ -70,6 +85,16 @@ const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyE
     supports: ["image/png", "image/jpeg", "image/webp"],
   },
 };
+
+class AiProviderHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "AiProviderHttpError";
+  }
+}
 
 function getBooleanEnv(env: AiPlanExtractEnv, key: string, fallback = false) {
   const value = env[key];
@@ -117,6 +142,27 @@ export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.
   });
 }
 
+export function getAiPlanReviewProviderConfig(env: AiPlanExtractEnv = process.env): AiPlanExtractProviderConfig | undefined {
+  if (!isFreeCloudMode(env)) return undefined;
+
+  const resolved = resolveAiTaskProvider("plan-review", { env });
+  const id = toPlanExtractProviderId(resolved.id);
+  if (!id) throw new AiProviderUnavailableError(`Provider ${resolved.id} nao suporta revisao de planta.`);
+
+  const defaults = providerDefaults[id];
+  const model = resolved.modelEnv ? env[resolved.modelEnv] || defaults.defaultModel : defaults.defaultModel;
+  const baseUrl = id === "generic" ? env.LLM_API_URL : defaults.baseUrl;
+  const apiKey = defaults.keyEnv ? env[defaults.keyEnv] : undefined;
+  return {
+    id,
+    model,
+    baseUrl,
+    apiKey,
+    configured: Boolean(model && baseUrl && apiKey),
+    supports: getProviderSupportedMimeTypes(id, env, defaults),
+  };
+}
+
 export function getConfiguredAiPlanExtractProviders(env: AiPlanExtractEnv = process.env) {
   return getAiPlanExtractProviderConfigs(env).filter((provider) => provider.configured);
 }
@@ -148,7 +194,11 @@ function buildMessageContent(input: AiPlanExtractInput) {
   ];
 }
 
-async function callOpenAiCompatibleProvider(config: AiPlanExtractProviderConfig, input: AiPlanExtractInput): Promise<AiPlanExtractProviderResult> {
+async function callOpenAiCompatibleProvider(
+  config: AiPlanExtractProviderConfig,
+  input: AiPlanExtractInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<AiPlanExtractProviderResult> {
   if (!config.baseUrl || !config.apiKey) {
     throw new AiProviderUnavailableError(`Provider ${config.id} nao esta configurado.`);
   }
@@ -158,7 +208,7 @@ async function callOpenAiCompatibleProvider(config: AiPlanExtractProviderConfig,
 
   const timeout = createAbortSignal(input.timeoutMs ?? 30_000);
   try {
-    const response = await fetch(config.baseUrl, {
+    const response = await fetchImpl(config.baseUrl, {
       method: "POST",
       signal: timeout.signal,
       headers: {
@@ -178,9 +228,7 @@ async function callOpenAiCompatibleProvider(config: AiPlanExtractProviderConfig,
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Provider ${config.id} respondeu ${response.status}.`);
-    }
+    if (!response.ok) throw new AiProviderHttpError(`Provider ${config.id} respondeu ${response.status}.`, response.status);
 
     const payload = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
@@ -206,6 +254,17 @@ async function callOpenAiCompatibleProvider(config: AiPlanExtractProviderConfig,
   } finally {
     timeout.clear();
   }
+}
+
+export async function callOpenRouterPlanReviewProvider(
+  config: AiPlanExtractProviderConfig,
+  input: AiPlanExtractInput,
+  fetchImpl: typeof fetch = fetch
+) {
+  if (config.id !== "openrouter") {
+    throw new AiProviderUnavailableError(`Provider ${config.id} nao suporta revisao OpenRouter.`);
+  }
+  return callOpenAiCompatibleProvider(config, input, fetchImpl);
 }
 
 function buildGeminiMessageParts(input: AiPlanExtractInput) {
@@ -316,11 +375,102 @@ async function callPlanExtractProvider(config: AiPlanExtractProviderConfig, inpu
   return callOpenAiCompatibleProvider(config, input);
 }
 
+function isRetryableReviewError(error: unknown) {
+  if (error instanceof AiProviderHttpError) return error.status === 408 || error.status === 409 || error.status === 425 || error.status === 429 || error.status >= 500;
+  if (error instanceof AiRouterError || error instanceof AiProviderUnavailableError) return false;
+  return true;
+}
+
+function serializeReviewError(error: unknown, retryable: boolean) {
+  return {
+    message: error instanceof Error ? error.message : "Erro desconhecido.",
+    code: error instanceof AiRouterError ? error.code : error instanceof AiProviderUnavailableError ? error.code : undefined,
+    retryable,
+  };
+}
+
+async function attachPlanReview(
+  primary: AiPlanExtractProviderResult,
+  input: AiPlanExtractInput,
+  env: AiPlanExtractEnv,
+  callReviewProvider: (config: AiPlanExtractProviderConfig, input: AiPlanExtractInput) => Promise<AiPlanExtractProviderResult>
+): Promise<AiPlanExtractProviderResult> {
+  if (!isFreeCloudMode(env)) return primary;
+
+  let reviewProvider: AiPlanExtractProviderConfig | undefined;
+  try {
+    reviewProvider = getAiPlanReviewProviderConfig(env);
+  } catch (error) {
+    return {
+      ...primary,
+      review: {
+        status: "unavailable",
+        error: serializeReviewError(error, false),
+      },
+    };
+  }
+
+  if (!reviewProvider) return primary;
+  if (!reviewProvider.configured) {
+    return {
+      ...primary,
+      review: {
+        status: "unavailable",
+        provider: reviewProvider.id,
+        model: reviewProvider.model,
+        error: serializeReviewError(new AiProviderUnavailableError(`Provider ${reviewProvider.id} nao esta configurado para segunda leitura.`), false),
+      },
+    };
+  }
+  if (!reviewProvider.supports.includes(input.mimeType)) {
+    return {
+      ...primary,
+      review: {
+        status: "skipped",
+        provider: reviewProvider.id,
+        model: reviewProvider.model,
+        error: {
+          message: `Provider ${reviewProvider.id} nao suporta ${input.mimeType} para segunda leitura.`,
+          code: "ai-provider-capability-mismatch",
+          retryable: false,
+        },
+      },
+    };
+  }
+
+  try {
+    const review = await callReviewProvider(reviewProvider, input);
+    const merged = mergePlanExtractionResults(primary.result, review.result);
+    return {
+      ...primary,
+      result: merged.result,
+      review: {
+        status: "completed",
+        provider: review.provider,
+        model: review.model,
+        tokens: review.tokens,
+        comparison: merged.comparison,
+      },
+    };
+  } catch (error) {
+    return {
+      ...primary,
+      review: {
+        status: "unavailable",
+        provider: reviewProvider.id,
+        model: reviewProvider.model,
+        error: serializeReviewError(error, isRetryableReviewError(error)),
+      },
+    };
+  }
+}
+
 export async function extractPlanWithProviderChain(
   input: AiPlanExtractInput,
   options: {
     env?: AiPlanExtractEnv;
     callProvider?: (config: AiPlanExtractProviderConfig, input: AiPlanExtractInput) => Promise<AiPlanExtractProviderResult>;
+    callReviewProvider?: (config: AiPlanExtractProviderConfig, input: AiPlanExtractInput) => Promise<AiPlanExtractProviderResult>;
   } = {}
 ): Promise<AiPlanExtractProviderResult> {
   const env = options.env ?? process.env;
@@ -331,9 +481,11 @@ export async function extractPlanWithProviderChain(
 
   const errors: Array<{ provider: string; message: string }> = [];
   const callProvider = options.callProvider ?? callPlanExtractProvider;
+  const callReviewProvider = options.callReviewProvider ?? callProvider;
   for (const provider of providers) {
     try {
-      return await callProvider(provider, input);
+      const primary = await callProvider(provider, input);
+      return await attachPlanReview(primary, input, env, callReviewProvider);
     } catch (error) {
       errors.push({ provider: provider.id, message: error instanceof Error ? error.message : "Erro desconhecido." });
     }

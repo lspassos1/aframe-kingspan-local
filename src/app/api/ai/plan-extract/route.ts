@@ -3,7 +3,12 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
 import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders } from "@/lib/ai/rate-limit";
-import { createMemoryPlanExtractCacheStore, createPlanExtractCacheKey, getPlanExtractCacheTtlSeconds } from "@/lib/ai/plan-extract-cache";
+import {
+  createMemoryPlanExtractCacheStore,
+  createPlanExtractCacheKey,
+  getPlanExtractCacheTtlSeconds,
+  shouldCachePlanExtractResult,
+} from "@/lib/ai/plan-extract-cache";
 import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtractFile } from "@/lib/ai/plan-extract-request";
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError } from "@/lib/ai/free-cloud-router";
@@ -82,6 +87,7 @@ export async function POST(request: NextRequest) {
         provider: cachedExtraction.provider,
         model: cachedExtraction.model,
         tokens: cachedExtraction.tokens,
+        review: cachedExtraction.review,
         cached: true,
       },
       { headers: { "X-AI-Cache": "HIT" } }
@@ -108,7 +114,9 @@ export async function POST(request: NextRequest) {
       fileName: sanitizePlanExtractFileName(file.name),
       timeoutMs: 45_000,
     });
-    await cacheStore.set(cacheKey.key, extraction, getPlanExtractCacheTtlSeconds()).catch(() => undefined);
+    if (shouldCachePlanExtractResult(extraction)) {
+      await cacheStore.set(cacheKey.key, extraction, getPlanExtractCacheTtlSeconds()).catch(() => undefined);
+    }
 
     return jsonResponse(
       {
@@ -116,6 +124,7 @@ export async function POST(request: NextRequest) {
         provider: extraction.provider,
         model: extraction.model,
         tokens: extraction.tokens,
+        review: extraction.review,
       },
       { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS" } }
     );
