@@ -18,7 +18,7 @@ OPENAI_API_KEY=...
 AI_OPENAI_MODEL=gpt-4o-mini
 ```
 
-O ciclo `#182` introduz uma política de modo `free-cloud` com OpenAI em standby. Neste PR, essa política é documentação/env apenas; o router free-cloud será implementado nos PRs seguintes. Veja `free-cloud-ai-routing.md`.
+O ciclo `#182` introduz `AI_MODE=free-cloud` com OpenAI em standby. Nesse modo, o router usa providers gratuitos por tarefa quando configurados: Gemini para extração principal, OpenRouter Free para segunda leitura e Groq/Cerebras/SambaNova para resumo textual auxiliar. Veja `free-cloud-ai-routing.md`.
 
 `OPENAI_API_KEY` deve ser lida apenas no servidor. Nunca use `NEXT_PUBLIC_OPENAI_API_KEY`; variáveis com prefixo `NEXT_PUBLIC_` entram no bundle do navegador.
 

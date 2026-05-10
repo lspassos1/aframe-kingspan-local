@@ -62,9 +62,9 @@ AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
 AI_OPENAI_MODEL=gpt-4o-mini
 ```
 
-## Modo Free-cloud Planejado
+## Modo Free-cloud
 
-O ciclo `#182` define `AI_MODE=free-cloud` para uso pessoal/testes sem custo. Neste PR, as variáveis são política operacional e documentação; o router que efetivamente troca providers será implementado em PRs seguintes.
+O ciclo `#182` define `AI_MODE=free-cloud` para uso pessoal/testes sem custo. O router separa análise visual, segunda leitura e resumo textual por tarefa, mantendo OpenAI em standby para modo pago explícito.
 
 ```txt
 AI_MODE=free-cloud
@@ -76,6 +76,7 @@ AI_TEXT_FALLBACK_PROVIDER=cerebras
 GEMINI_API_KEY=...
 OPENROUTER_API_KEY=...
 GROQ_API_KEY=...
+GROQ_TEXT_MODEL=llama-3.1-8b-instant
 CEREBRAS_API_KEY=...
 SAMBANOVA_API_KEY=...
 ```
@@ -85,6 +86,7 @@ Regras:
 - OpenAI permanece em standby; não remova `OPENAI_API_KEY`.
 - `AI_PAID_FALLBACK_ENABLED=false` significa que OpenAI e providers pagos não podem ser usados como fallback automático.
 - Chaves de Gemini, OpenRouter, Groq, Cerebras e SambaNova são server-side. Nunca use `NEXT_PUBLIC_*` para essas chaves.
+- Groq/Cerebras/SambaNova são auxiliares textuais: resumem pendências e próximos passos, mas não alteram o JSON estruturado da análise.
 - Limites gratuitos podem mudar por provider. Quando todos falharem ou atingirem limite, o app deve manter fallback manual claro.
 
 Veja `docs/free-cloud-ai-routing.md`.
