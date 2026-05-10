@@ -7,11 +7,12 @@ Este diretório documenta o Estudo Construtivo: uma experiência guiada para pr�
 - `product-experience.md`: direção do produto, regra central de fluxo e limites da IA.
 - `onboarding-ux.md`: contrato do assistente `/start` e da revisão guiada.
 - `setup-ai-and-sinapi.md`: setup operacional de `.env.local`, Vercel, OpenAI API, limites e SINAPI.
+- `free-cloud-ai-routing.md`: política do modo free-cloud, providers gratuitos por tarefa e OpenAI em standby.
 - `sinapi-integration.md`: importação controlada de base SINAPI e regras de status.
 
 ## Contratos Técnicos
 
-- `AI_PLAN_EXTRACT.md`: configuração, custo, limites e privacidade da extração de planta baixa com OpenAI API.
+- `AI_PLAN_EXTRACT.md`: configuração, custo, limites e privacidade da extração de planta baixa com o runtime atual.
 - `budget-assistant.md`: contrato técnico do Assistente de orçamento para fontes, matches, composições, revisão humana, cache e limites.
 - `lucas-design-authority-protocol.md`: autoridade de revisão visual/produto e regra de comentários `Lucas Review`.
 - `slack-github-review-bridge.md`: setup do `/lucas-review` no Slack para comentar em PRs do GitHub.
