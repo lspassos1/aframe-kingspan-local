@@ -7,6 +7,29 @@ export type PlanImportStateCopy = {
   progress?: number;
 };
 
+export type PlanImportAiMode = "free-cloud" | "openai";
+
+export type PlanImportProviderUiStatus = {
+  mode: PlanImportAiMode;
+  modeLabel: string;
+  primaryProviderLabel: string;
+  reviewProviderLabel?: string;
+  textProviderLabel?: string;
+  textFallbackProviderLabel?: string;
+  paidFallbackEnabled: boolean;
+  primaryConfigured: boolean;
+  reviewConfigured: boolean;
+};
+
+export const defaultPlanImportProviderUiStatus: PlanImportProviderUiStatus = {
+  mode: "openai",
+  modeLabel: "OpenAI API",
+  primaryProviderLabel: "OpenAI",
+  paidFallbackEnabled: false,
+  primaryConfigured: false,
+  reviewConfigured: false,
+};
+
 export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> = {
   idle: {
     badge: "OpenAI sob demanda",
@@ -52,6 +75,44 @@ export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> =
   },
 };
 
+export function getPlanImportStateCopy(state: PlanImportState, providerStatus: PlanImportProviderUiStatus = defaultPlanImportProviderUiStatus): PlanImportStateCopy {
+  if (providerStatus.mode !== "free-cloud") return planImportStateCopy[state];
+
+  const freeCloudCopy: Partial<Record<PlanImportState, PlanImportStateCopy>> = {
+    idle: {
+      badge: "Modo gratuito",
+      title: "Arraste a planta aqui",
+      description: "PDF, PNG, JPG ou WebP. Providers gratuitos sugerem; voce revisa antes de aplicar.",
+    },
+    uploading: {
+      badge: "Enviando",
+      title: "Enviando arquivo",
+      description: "As chaves dos providers ficam somente no servidor.",
+      progress: 32,
+    },
+    analyzing: {
+      badge: "Analisando",
+      title: `Analisando com ${providerStatus.primaryProviderLabel}`,
+      description: providerStatus.reviewProviderLabel
+        ? `Segunda leitura opcional com ${providerStatus.reviewProviderLabel}; divergencias ficam pendentes.`
+        : "Extraindo campos preliminares, evidencias e incertezas.",
+      progress: 68,
+    },
+    error: {
+      badge: "Fallback manual",
+      title: "Provider gratuito indisponivel",
+      description: "Continue pelo preenchimento manual ou tente outro arquivo quando o limite externo liberar.",
+    },
+    "limit-exceeded": {
+      badge: "Limite gratuito",
+      title: "Limite gratuito atingido",
+      description: "O preenchimento manual continua disponivel sem chamar provider pago.",
+    },
+  };
+
+  return freeCloudCopy[state] ?? planImportStateCopy[state];
+}
+
 export function getPlanImportStateFromResponse({
   ok,
   status,
@@ -76,4 +137,17 @@ export function getPlanImportPayloadMessage(payload: unknown, state: PlanImportS
   if (state === "cache-hit") return planImportStateCopy["cache-hit"].description;
   if (state === "review-ready") return "Extracao concluida. Revise os campos antes de aplicar.";
   return "Nao foi possivel analisar a planta agora.";
+}
+
+export function formatPlanImportProviderName(provider?: string) {
+  if (!provider) return undefined;
+  const labels: Record<string, string> = {
+    gemini: "Gemini Free",
+    openrouter: "OpenRouter Free",
+    groq: "Groq Free",
+    cerebras: "Cerebras Free",
+    sambanova: "SambaNova Free",
+    openai: "OpenAI",
+  };
+  return labels[provider] ?? provider;
 }

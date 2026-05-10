@@ -8,6 +8,7 @@ import { StartProjectForm } from "@/components/onboarding/StartProjectForm";
 import { ActionCard, InlineHelp, PageFrame, PageHeader, SectionHeader, StepProgress, StatusPill, StickySummary } from "@/components/shared/design-system";
 import { Button } from "@/components/ui/button";
 import { defaultProject } from "@/data/defaultProject";
+import { defaultPlanImportProviderUiStatus, type PlanImportProviderUiStatus } from "@/lib/ai/plan-import-ui";
 import { createStartAssistantViewModel, type StartAssistantMode } from "@/lib/onboarding/start-guided-assistant";
 import type { StartRedirectReason } from "@/lib/routes/shell";
 import { cloneProject } from "@/lib/store/project-normalization";
@@ -32,21 +33,35 @@ const nextSteps = [
   "Gerar quantitativos e orçamento preliminar com fonte.",
 ];
 
-const aiOperationalFacts = [
-  { label: "Provider", value: "OpenAI API" },
-  { label: "Arquivo", value: "PDF, PNG ou JPG até o limite configurado" },
-  { label: "Limite diário", value: "Validado no servidor por usuário e IP" },
-  { label: "Cache", value: "Hash do arquivo evita análise repetida" },
-  { label: "Fallback", value: "Preenchimento manual continua disponível" },
-];
+function getAiOperationalFacts(aiProviderStatus: PlanImportProviderUiStatus) {
+  if (aiProviderStatus.mode === "free-cloud") {
+    return [
+      { label: "Modo", value: aiProviderStatus.modeLabel },
+      { label: "Provider principal", value: aiProviderStatus.primaryProviderLabel },
+      { label: "Comparação", value: aiProviderStatus.reviewProviderLabel ? `${aiProviderStatus.reviewProviderLabel} quando disponível` : "Sem segunda leitura" },
+      { label: "Fallback pago", value: aiProviderStatus.paidFallbackEnabled ? "Configurado, mas não acionado automaticamente" : "Desligado" },
+      { label: "Fallback manual", value: "Sempre disponível se limite externo falhar" },
+    ];
+  }
+
+  return [
+    { label: "Provider", value: aiProviderStatus.modeLabel },
+    { label: "Arquivo", value: "PDF, PNG ou JPG até o limite configurado" },
+    { label: "Limite diário", value: "Validado no servidor por usuário e IP" },
+    { label: "Cache", value: "Hash do arquivo evita análise repetida" },
+    { label: "Fallback", value: "Preenchimento manual continua disponível" },
+  ];
+}
 
 export function StartGuidedAssistant({
   planExtractEnabled,
+  aiProviderStatus = defaultPlanImportProviderUiStatus,
   initialMode = "choose",
   redirectReason,
   redirectNext,
 }: {
   planExtractEnabled: boolean;
+  aiProviderStatus?: PlanImportProviderUiStatus;
   initialMode?: StartAssistantMode;
   redirectReason?: StartRedirectReason;
   redirectNext?: string;
@@ -56,7 +71,10 @@ export function StartGuidedAssistant({
   const setOnboardingCompleted = useProjectStore((state) => state.setOnboardingCompleted);
   const [mode, setMode] = useState<StartAssistantMode>(initialMode);
   const openedInitialExampleRef = useRef(false);
-  const viewModel = useMemo(() => createStartAssistantViewModel({ mode, planExtractEnabled }), [mode, planExtractEnabled]);
+  const viewModel = useMemo(() => createStartAssistantViewModel({ mode, planExtractEnabled, aiMode: aiProviderStatus.mode }), [aiProviderStatus.mode, mode, planExtractEnabled]);
+  const aiOperationalFacts = useMemo(() => getAiOperationalFacts(aiProviderStatus), [aiProviderStatus]);
+  const aiReadyLabel = aiProviderStatus.mode === "free-cloud" ? aiProviderStatus.modeLabel : "OpenAI pronta";
+  const aiConfiguredLabel = aiProviderStatus.mode === "free-cloud" ? aiProviderStatus.modeLabel : "OpenAI configurada";
 
   const loadExampleProject = useCallback(() => {
     setProject({
@@ -117,7 +135,7 @@ export function StartGuidedAssistant({
           eyebrow="Novo estudo"
           title={viewModel.title}
           description={viewModel.subtitle}
-          status={<StatusPill tone={planExtractEnabled ? "success" : "warning"}>{planExtractEnabled ? "OpenAI pronta" : "IA desligada"}</StatusPill>}
+          status={<StatusPill tone={planExtractEnabled ? "success" : "warning"}>{planExtractEnabled ? aiReadyLabel : "IA desligada"}</StatusPill>}
           className="bg-[radial-gradient(circle_at_18%_18%,hsl(var(--primary)/0.09),transparent_32%),linear-gradient(180deg,hsl(var(--card)),hsl(var(--background)))]"
         />
 
@@ -182,7 +200,7 @@ export function StartGuidedAssistant({
         description={viewModel.subtitle}
         status={
           mode === "ai" ? (
-            <StatusPill tone={planExtractEnabled ? "success" : "warning"}>{planExtractEnabled ? "OpenAI configurada" : "IA desligada"}</StatusPill>
+            <StatusPill tone={planExtractEnabled ? "success" : "warning"}>{planExtractEnabled ? aiConfiguredLabel : "IA desligada"}</StatusPill>
           ) : (
             <StatusPill tone="info">Entrada manual</StatusPill>
           )
@@ -199,8 +217,9 @@ export function StartGuidedAssistant({
 
       {viewModel.showAiDisabledNotice ? (
         <InlineHelp tone="warning">
-          A leitura por IA está desligada neste ambiente. Configure `AI_PLAN_EXTRACT_ENABLED=true` e `OPENAI_API_KEY` no servidor para habilitar upload,
-          ou continue preenchendo manualmente.
+          {aiProviderStatus.mode === "free-cloud"
+            ? "A leitura por IA está desligada neste ambiente. Configure `AI_PLAN_EXTRACT_ENABLED=true`, `AI_MODE=free-cloud` e providers gratuitos no servidor, ou continue preenchendo manualmente."
+            : "A leitura por IA está desligada neste ambiente. Configure `AI_PLAN_EXTRACT_ENABLED=true` e `OPENAI_API_KEY` no servidor para habilitar upload, ou continue preenchendo manualmente."}
         </InlineHelp>
       ) : null}
 
@@ -211,12 +230,19 @@ export function StartGuidedAssistant({
               eyebrow="Caminho principal"
               title="Enviar planta baixa"
               description="Arraste ou selecione um arquivo. O app mostra cache, limite, análise e revisão antes de aplicar qualquer dado."
-              action={<StatusPill tone="pending">Revisão obrigatória</StatusPill>}
+              action={<StatusPill tone="pending">{aiProviderStatus.mode === "free-cloud" ? "Free cloud + revisão" : "Revisão obrigatória"}</StatusPill>}
             />
-            <PlanImportCard planExtractEnabled={planExtractEnabled} onManualFallback={openManualCompletion} />
+            <PlanImportCard planExtractEnabled={planExtractEnabled} aiProviderStatus={aiProviderStatus} onManualFallback={openManualCompletion} />
           </div>
 
-          <StickySummary title="Status da IA" description="Somente metadados seguros aparecem nesta tela. A chave da OpenAI fica no servidor.">
+          <StickySummary
+            title="Status da IA"
+            description={
+              aiProviderStatus.mode === "free-cloud"
+                ? "Somente metadados seguros aparecem nesta tela. Chaves ficam no servidor e o OpenAI permanece em standby."
+                : "Somente metadados seguros aparecem nesta tela. A chave da OpenAI fica no servidor."
+            }
+          >
             <div className="space-y-2">
               {aiOperationalFacts.map((fact) => (
                 <div key={fact.label} className="rounded-2xl border bg-background/70 p-3">
@@ -230,6 +256,9 @@ export function StartGuidedAssistant({
                 {planExtractEnabled ? "Upload habilitado" : "Upload aguardando configuração"}
               </StatusPill>
               <StatusPill tone="pending" icon={Clock3}>Cache por hash ativo quando houver resultado</StatusPill>
+              {aiProviderStatus.mode === "free-cloud" ? (
+                <StatusPill tone="warning" icon={ShieldCheck}>Custo zero depende dos limites externos</StatusPill>
+              ) : null}
               <StatusPill tone="info" icon={RotateCcw}>Fallback manual disponível</StatusPill>
             </div>
             <InlineHelp tone="warning" className="mt-3">

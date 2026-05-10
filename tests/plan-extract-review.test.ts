@@ -135,6 +135,21 @@ describe("PlanExtractReview", () => {
         result: reviewResult,
         selectedFields,
         currentValues,
+        analysisStatus: {
+          modeLabel: "Modo gratuito",
+          primaryProviderLabel: "Gemini Free",
+          reviewProviderLabel: "OpenRouter Free",
+          cached: true,
+          paidFallbackEnabled: false,
+          review: {
+            status: "completed",
+            comparison: {
+              agreements: [{ field: "city", primaryValue: "Salvador", reviewValue: "Salvador" }],
+              divergences: [{ field: "houseWidthM", primaryValue: 8, reviewValue: 8.4 }],
+              unresolved: [],
+            },
+          },
+        },
         modifiedValues: {},
         questionAnswers: { "q-scale": "Usar a cota frontal de 8 m." },
         onSelectedFieldsChange: vi.fn(),
@@ -166,6 +181,11 @@ describe("PlanExtractReview", () => {
     expect(html).toContain("Usar a cota frontal de 8 m.");
     expect(html).toContain("Resposta registrada nesta revisao");
     expect(html).toContain("Alertas estruturados");
+    expect(html).toContain("Modo gratuito");
+    expect(html).toContain("Gemini Free");
+    expect(html).toContain("1 pendências para revisão");
+    expect(html).toContain("Resultado veio do cache");
+    expect(html).toContain("Divergências ficam pendentes");
     expect(html).toContain("Proximo passo");
     expect(html).toContain("Descartar extracao");
     expect(html).toContain("Voltar para manual");
