@@ -1,8 +1,9 @@
 import { planExtractSystemPrompt, planExtractUserPrompt } from "@/lib/ai/prompts";
 import { parsePlanExtractResult, type PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import { AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
+import { getAiTaskProviderId, resolveAiTaskProvider, type AiCloudProviderId } from "@/lib/ai/free-cloud-router";
 
-export type AiPlanExtractProviderId = "openai" | "openrouter" | "groq" | "generic";
+export type AiPlanExtractProviderId = "gemini" | "openai" | "openrouter" | "groq" | "generic";
 
 export type AiPlanExtractMimeType = "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
 
@@ -34,6 +35,13 @@ export type AiPlanExtractProviderResult = {
 const officialProviderOrder: AiPlanExtractProviderId[] = ["openai"];
 
 const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyEnv?: string; defaultModel: string; baseUrl?: string; supports: AiPlanExtractMimeType[] }> = {
+  gemini: {
+    modelEnv: "GEMINI_MODEL",
+    keyEnv: "GEMINI_API_KEY",
+    defaultModel: "gemini-2.5-flash",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
+    supports: ["image/png", "image/jpeg", "image/webp", "application/pdf"],
+  },
   openai: {
     modelEnv: "AI_OPENAI_MODEL",
     keyEnv: "OPENAI_API_KEY",
@@ -69,9 +77,21 @@ function getBooleanEnv(env: AiPlanExtractEnv, key: string, fallback = false) {
   return value.toLowerCase() === "true";
 }
 
+function isFreeCloudMode(env: AiPlanExtractEnv) {
+  return env.AI_MODE === "free-cloud";
+}
+
+function toPlanExtractProviderId(providerId: AiCloudProviderId): AiPlanExtractProviderId | undefined {
+  if (providerId === "gemini" || providerId === "openai" || providerId === "openrouter" || providerId === "groq") return providerId;
+  return undefined;
+}
+
 export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.env) {
-  void env;
-  // OpenAI is the only official provider for plan extraction in this execution.
+  if (isFreeCloudMode(env)) {
+    const providerId = toPlanExtractProviderId(getAiTaskProviderId("plan-primary", env));
+    return providerId ? [providerId] : [];
+  }
+
   return officialProviderOrder;
 }
 
@@ -188,6 +208,114 @@ async function callOpenAiCompatibleProvider(config: AiPlanExtractProviderConfig,
   }
 }
 
+function buildGeminiMessageParts(input: AiPlanExtractInput) {
+  return [
+    { text: `${planExtractSystemPrompt}\n\n${planExtractUserPrompt}` },
+    {
+      inline_data: {
+        mime_type: input.mimeType,
+        data: input.fileBase64,
+      },
+    },
+  ];
+}
+
+export function createGeminiPlanExtractRequest(input: AiPlanExtractInput) {
+  return {
+    contents: [
+      {
+        role: "user",
+        parts: buildGeminiMessageParts(input),
+      },
+    ],
+    generationConfig: {
+      temperature: 0,
+      response_mime_type: "application/json",
+    },
+  };
+}
+
+function createGeminiGenerateContentUrl(config: AiPlanExtractProviderConfig) {
+  if (!config.baseUrl) throw new AiProviderUnavailableError("Provider gemini nao esta configurado.");
+  return `${config.baseUrl}/${encodeURIComponent(config.model)}:generateContent`;
+}
+
+function readGeminiResponseText(payload: unknown) {
+  const response = payload as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const parts = response.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((part) => part.text)
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+export async function callGeminiPlanExtractProvider(
+  config: AiPlanExtractProviderConfig,
+  input: AiPlanExtractInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<AiPlanExtractProviderResult> {
+  if (!config.apiKey || !config.baseUrl) {
+    throw new AiProviderUnavailableError("Provider gemini nao esta configurado.");
+  }
+  if (!config.supports.includes(input.mimeType)) {
+    throw new AiProviderUnavailableError(`Provider gemini nao suporta ${input.mimeType}.`);
+  }
+
+  const timeout = createAbortSignal(input.timeoutMs ?? 30_000);
+  try {
+    const response = await fetchImpl(createGeminiGenerateContentUrl(config), {
+      method: "POST",
+      signal: timeout.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": config.apiKey,
+      },
+      body: JSON.stringify(createGeminiPlanExtractRequest(input)),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Provider gemini respondeu ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as {
+      usageMetadata?: { totalTokenCount?: number };
+    };
+    const content = readGeminiResponseText(payload);
+    if (!content) throw new Error("Provider gemini nao retornou conteudo.");
+
+    const result = parsePlanExtractResult(content);
+    return {
+      result: {
+        ...result,
+        providerMeta: {
+          provider: config.id,
+          model: config.model,
+          tokens: payload.usageMetadata?.totalTokenCount,
+        },
+      },
+      provider: config.id,
+      model: config.model,
+      tokens: payload.usageMetadata?.totalTokenCount,
+    };
+  } finally {
+    timeout.clear();
+  }
+}
+
+function assertFreeCloudPlanPrimaryProvider(env: AiPlanExtractEnv) {
+  if (!isFreeCloudMode(env)) return;
+  resolveAiTaskProvider("plan-primary", { env });
+}
+
+async function callPlanExtractProvider(config: AiPlanExtractProviderConfig, input: AiPlanExtractInput) {
+  if (config.id === "gemini") return callGeminiPlanExtractProvider(config, input);
+  return callOpenAiCompatibleProvider(config, input);
+}
+
 export async function extractPlanWithProviderChain(
   input: AiPlanExtractInput,
   options: {
@@ -195,11 +323,14 @@ export async function extractPlanWithProviderChain(
     callProvider?: (config: AiPlanExtractProviderConfig, input: AiPlanExtractInput) => Promise<AiPlanExtractProviderResult>;
   } = {}
 ): Promise<AiPlanExtractProviderResult> {
-  const providers = getConfiguredAiPlanExtractProviders(options.env).filter((provider) => provider.supports.includes(input.mimeType));
+  const env = options.env ?? process.env;
+  assertFreeCloudPlanPrimaryProvider(env);
+
+  const providers = getConfiguredAiPlanExtractProviders(env).filter((provider) => provider.supports.includes(input.mimeType));
   if (providers.length === 0) throw new AiProviderUnavailableError();
 
   const errors: Array<{ provider: string; message: string }> = [];
-  const callProvider = options.callProvider ?? callOpenAiCompatibleProvider;
+  const callProvider = options.callProvider ?? callPlanExtractProvider;
   for (const provider of providers) {
     try {
       return await callProvider(provider, input);
