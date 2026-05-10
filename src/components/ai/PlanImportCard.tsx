@@ -6,7 +6,15 @@ import { PlanExtractReview, type PlanExtractCurrentValues, type PlanExtractModif
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { applyPlanExtractToProject, getDefaultPlanExtractSelectedFields, type PlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
-import { getPlanImportPayloadMessage, getPlanImportStateFromResponse, planImportStateCopy, type PlanImportState } from "@/lib/ai/plan-import-ui";
+import {
+  defaultPlanImportProviderUiStatus,
+  formatPlanImportProviderName,
+  getPlanImportPayloadMessage,
+  getPlanImportStateCopy,
+  getPlanImportStateFromResponse,
+  type PlanImportProviderUiStatus,
+  type PlanImportState,
+} from "@/lib/ai/plan-import-ui";
 import { planExtractResultSchema, type PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import { supportedPlanExtractMimeTypes } from "@/lib/ai/plan-extract-request";
 import { calculateAFrameGeometry } from "@/lib/calculations/geometry";
@@ -21,10 +29,28 @@ type PlanExtractApiPayload = {
   model?: string;
   tokens?: number;
   cached?: boolean;
+  review?: PlanExtractReviewPayload;
+};
+
+type PlanExtractReviewPayload = {
+  status?: "completed" | "skipped" | "unavailable";
+  provider?: string;
+  model?: string;
+  error?: {
+    message?: string;
+    code?: string;
+    retryable?: boolean;
+  };
+  comparison?: {
+    agreements?: unknown[];
+    divergences?: unknown[];
+    unresolved?: unknown[];
+  };
 };
 
 type PlanImportCardProps = {
   planExtractEnabled?: boolean;
+  aiProviderStatus?: PlanImportProviderUiStatus;
   onManualFallback?: () => void;
 };
 
@@ -74,11 +100,6 @@ function mergeModifiedValues(result: PlanExtractResult, modifiedValues: PlanExtr
   };
 }
 
-function formatProviderName(provider?: string) {
-  if (!provider) return undefined;
-  return provider === "openai" ? "OpenAI" : provider;
-}
-
 function waitForNextPaint() {
   return new Promise<void>((resolve) => {
     if (typeof requestAnimationFrame === "function") {
@@ -89,7 +110,24 @@ function waitForNextPaint() {
   });
 }
 
-export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: PlanImportCardProps) {
+function getReviewStatusLabel(review?: PlanExtractReviewPayload, providerStatus: PlanImportProviderUiStatus = defaultPlanImportProviderUiStatus) {
+  if (!review && providerStatus.mode === "free-cloud") {
+    return providerStatus.reviewProviderLabel ? `${providerStatus.reviewProviderLabel}: aguardando upload.` : "Comparação: não configurada.";
+  }
+  if (!review) return undefined;
+  const providerLabel = formatPlanImportProviderName(review.provider) ?? providerStatus.reviewProviderLabel ?? "Provider de comparação";
+  if (review.status === "completed") {
+    const divergences = review.comparison?.divergences?.length ?? 0;
+    const unresolved = review.comparison?.unresolved?.length ?? 0;
+    if (divergences || unresolved) return `${providerLabel}: divergências marcadas para revisão (${divergences + unresolved}).`;
+    return `${providerLabel}: segunda leitura concluída.`;
+  }
+  if (review.status === "skipped") return `${providerLabel}: comparação indisponível para este arquivo.`;
+  if (review.status === "unavailable") return `${providerLabel}: indisponível; fluxo manual/revisão continuam.`;
+  return undefined;
+}
+
+export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = defaultPlanImportProviderUiStatus, onManualFallback }: PlanImportCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const project = useProjectStore((state) => state.project);
   const setProject = useProjectStore((state) => state.setProject);
@@ -100,19 +138,27 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
   const [modifiedValues, setModifiedValues] = useState<PlanExtractModifiedValues>({});
   const [questionAnswers, setQuestionAnswers] = useState<PlanExtractQuestionAnswers>({});
   const [message, setMessage] = useState("");
-  const [providerMeta, setProviderMeta] = useState<{ provider?: string; model?: string; remaining?: string; limit?: string; cached?: boolean }>({});
+  const [providerMeta, setProviderMeta] = useState<{ provider?: string; model?: string; remaining?: string; limit?: string; cached?: boolean; review?: PlanExtractReviewPayload }>({});
 
   const copy = planExtractEnabled
-    ? planImportStateCopy[state]
+    ? getPlanImportStateCopy(state, aiProviderStatus)
     : {
         badge: "IA desligada",
         title: "Upload assistido indisponivel",
-        description: "Configure AI_PLAN_EXTRACT_ENABLED=true e OPENAI_API_KEY no servidor para habilitar OpenAI.",
+        description:
+          aiProviderStatus.mode === "free-cloud"
+            ? "Configure AI_PLAN_EXTRACT_ENABLED=true, AI_MODE=free-cloud e providers gratuitos no servidor."
+            : "Configure AI_PLAN_EXTRACT_ENABLED=true e OPENAI_API_KEY no servidor para habilitar OpenAI.",
       };
   const isBusy = state === "uploading" || state === "analyzing";
   const canUpload = planExtractEnabled && !isBusy;
   const currentValues = getCurrentPlanExtractValues(project);
   const showReview = (state === "review-ready" || state === "cache-hit") && result;
+  const reviewStatusLabel = getReviewStatusLabel(providerMeta.review, aiProviderStatus);
+  const providerCopy =
+    aiProviderStatus.mode === "free-cloud"
+      ? `${aiProviderStatus.primaryProviderLabel} sugere campos preliminares; o sistema não aplica nada sem revisão humana.`
+      : "OpenAI sugere campos preliminares; o sistema não aplica nada sem revisão humana.";
 
   function openManualFallback() {
     if (onManualFallback) {
@@ -173,6 +219,7 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
       setProviderMeta({
         provider: payload?.provider,
         model: payload?.model,
+        review: payload?.review,
         cached: nextState === "cache-hit",
         remaining: response.headers.get("X-RateLimit-Remaining") ?? undefined,
         limit: response.headers.get("X-RateLimit-Limit") ?? undefined,
@@ -306,9 +353,7 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
               </span>
               <div className="min-w-0">
                 <h2 className="font-semibold">Enviar planta baixa</h2>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  OpenAI sugere campos preliminares; o sistema nao aplica nada sem revisao humana.
-                </p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{providerCopy}</p>
               </div>
             </div>
 
@@ -332,11 +377,40 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
           </div>
 
           <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-            <p>Provider configurado: OpenAI.</p>
-            {providerMeta.provider ? <p>Resposta: {formatProviderName(providerMeta.provider)}{providerMeta.model ? `/${providerMeta.model}` : ""}.</p> : null}
+            <p>
+              {aiProviderStatus.mode === "free-cloud"
+                ? `Modo gratuito: ${aiProviderStatus.primaryProviderLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando chave no servidor"}.`
+                : "Provider configurado: OpenAI."}
+            </p>
+            {aiProviderStatus.mode === "free-cloud" && aiProviderStatus.reviewProviderLabel ? (
+              <p>
+                Comparação: {aiProviderStatus.reviewProviderLabel}
+                {aiProviderStatus.reviewConfigured ? "" : " aguardando chave no servidor"}.
+              </p>
+            ) : null}
+            {providerMeta.provider ? (
+              <p>
+                Resposta: {formatPlanImportProviderName(providerMeta.provider)}
+                {aiProviderStatus.mode === "openai" && providerMeta.model ? `/${providerMeta.model}` : ""}.
+              </p>
+            ) : null}
+            {reviewStatusLabel ? <p>{reviewStatusLabel}</p> : null}
             {providerMeta.cached ? <p>Cache reaproveitado; limite diario nao foi consumido.</p> : null}
             {providerMeta.remaining && providerMeta.limit ? <p>Limite restante hoje: {providerMeta.remaining}/{providerMeta.limit}.</p> : null}
-            {!planExtractEnabled ? <p>Assinatura ChatGPT nao configura esta API automaticamente; use uma API key da OpenAI no ambiente do servidor.</p> : null}
+            {aiProviderStatus.mode === "free-cloud" ? (
+              aiProviderStatus.paidFallbackEnabled ? (
+                <p>Fallback pago configurado, mas não é acionado automaticamente neste fluxo.</p>
+              ) : (
+                <p>Sem fallback pago automatico; custo zero depende dos limites externos dos providers.</p>
+              )
+            ) : null}
+            {!planExtractEnabled ? (
+              <p>
+                {aiProviderStatus.mode === "free-cloud"
+                  ? "Configure chaves server-side dos providers gratuitos; nenhuma chave deve usar NEXT_PUBLIC_."
+                  : "Assinatura ChatGPT nao configura esta API automaticamente; use uma API key da OpenAI no ambiente do servidor."}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -354,6 +428,14 @@ export function PlanImportCard({ planExtractEnabled = true, onManualFallback }: 
           onApply={applyExtractedFields}
           onDismiss={resetReview}
           onBackToManual={returnToManual}
+          analysisStatus={{
+            modeLabel: aiProviderStatus.modeLabel,
+            primaryProviderLabel: formatPlanImportProviderName(providerMeta.provider) ?? aiProviderStatus.primaryProviderLabel,
+            reviewProviderLabel: aiProviderStatus.reviewProviderLabel,
+            cached: providerMeta.cached,
+            review: providerMeta.review,
+            paidFallbackEnabled: aiProviderStatus.paidFallbackEnabled,
+          }}
         />
       ) : null}
     </div>

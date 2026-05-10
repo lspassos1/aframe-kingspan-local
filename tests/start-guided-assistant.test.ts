@@ -1,10 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { PlanImportProviderUiStatus } from "@/lib/ai/plan-import-ui";
 import { createStartAssistantViewModel, normalizeStartAssistantModeParam } from "@/lib/onboarding/start-guided-assistant";
 
 const planImportCardProps = vi.hoisted(() => ({
-  latest: undefined as { onManualFallback?: () => void } | undefined,
+  latest: undefined as { onManualFallback?: () => void; aiProviderStatus?: unknown } | undefined,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -20,7 +21,7 @@ vi.mock("@/lib/store/project-store", () => ({
 }));
 
 vi.mock("@/components/ai/PlanImportCard", () => ({
-  PlanImportCard: (props: { onManualFallback?: () => void }) => {
+  PlanImportCard: (props: { onManualFallback?: () => void; aiProviderStatus?: unknown }) => {
     planImportCardProps.latest = props;
     return createElement("div", { "data-testid": "plan-import" }, "Enviar planta baixa");
   },
@@ -31,6 +32,18 @@ vi.mock("@/components/onboarding/StartProjectForm", () => ({
 }));
 
 import { StartGuidedAssistant } from "@/components/onboarding/StartGuidedAssistant";
+
+const freeCloudStatus: PlanImportProviderUiStatus = {
+  mode: "free-cloud",
+  modeLabel: "Modo gratuito",
+  primaryProviderLabel: "Gemini Free",
+  reviewProviderLabel: "OpenRouter Free",
+  textProviderLabel: "Groq Free",
+  textFallbackProviderLabel: "Cerebras Free",
+  paidFallbackEnabled: false,
+  primaryConfigured: true,
+  reviewConfigured: true,
+};
 
 describe("createStartAssistantViewModel", () => {
   it("normalizes optional start mode query params", () => {
@@ -67,6 +80,12 @@ describe("createStartAssistantViewModel", () => {
     expect(viewModel.showManualForm).toBe(false);
     expect(viewModel.showAiDisabledNotice).toBe(true);
     expect(viewModel.options.find((option) => option.id === "ai")?.disabledReason).toBe("IA desligada");
+  });
+
+  it("describes the AI option as free-cloud when requested", () => {
+    const viewModel = createStartAssistantViewModel({ mode: "choose", planExtractEnabled: true, aiMode: "free-cloud" });
+
+    expect(viewModel.options.find((option) => option.id === "ai")?.description).toContain("Providers gratuitos");
   });
 
   it("supports manual and example modes explicitly", () => {
@@ -124,6 +143,20 @@ describe("StartGuidedAssistant", () => {
     expect(html).toContain("Cache por hash ativo");
     expect(html).toContain("Fallback manual disponível");
     expect(html).toContain("Abrir preenchimento manual");
+  });
+
+  it("renders free-cloud status without exposing provider keys", () => {
+    planImportCardProps.latest = undefined;
+    const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true, initialMode: "ai", aiProviderStatus: freeCloudStatus }));
+
+    expect(html).toContain("Modo gratuito");
+    expect(html).toContain("Provider principal");
+    expect(html).toContain("Gemini Free");
+    expect(html).toContain("OpenRouter Free quando disponível");
+    expect(html).toContain("OpenAI permanece em standby");
+    expect(html).toContain("Custo zero depende dos limites externos");
+    expect(planImportCardProps.latest?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Gemini Free" });
+    expect(html).not.toContain("OPENAI_API_KEY");
   });
 
   it("renders the manual fallback when AI mode is selected but disabled", () => {

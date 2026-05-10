@@ -26,6 +26,28 @@ export type PlanExtractModifiedValues = Partial<Record<PlanExtractEditableField,
 export type PlanExtractCurrentValues = Partial<Record<PlanExtractEditableField, string | number | ConstructionMethodId>>;
 export type PlanExtractQuestionAnswers = Record<string, string>;
 
+export type PlanExtractAnalysisStatus = {
+  modeLabel: string;
+  primaryProviderLabel: string;
+  reviewProviderLabel?: string;
+  cached?: boolean;
+  paidFallbackEnabled?: boolean;
+  review?: {
+    status?: "completed" | "skipped" | "unavailable";
+    provider?: string;
+    error?: {
+      message?: string;
+      code?: string;
+      retryable?: boolean;
+    };
+    comparison?: {
+      agreements?: unknown[];
+      divergences?: unknown[];
+      unresolved?: unknown[];
+    };
+  };
+};
+
 const fieldOrder: PlanExtractEditableField[] = [
   "constructionMethod",
   "projectName",
@@ -411,6 +433,7 @@ function getGroupedFields(fields: PlanExtractEditableField[]) {
 
 type PlanExtractReviewProps = {
   result: PlanExtractResult;
+  analysisStatus?: PlanExtractAnalysisStatus;
   selectedFields: PlanExtractSelectedFields;
   currentValues: PlanExtractCurrentValues;
   modifiedValues: PlanExtractModifiedValues;
@@ -426,6 +449,7 @@ type PlanExtractReviewProps = {
 
 export function PlanExtractReview({
   result,
+  analysisStatus,
   selectedFields,
   currentValues,
   modifiedValues,
@@ -456,6 +480,8 @@ export function PlanExtractReview({
   const effectiveQuestionAnswers = questionAnswers ?? localQuestionAnswers;
   const methodConfidence = result.fieldConfidence.constructionMethod ?? result.confidence;
   const hasUncertainMethod = Boolean(result.extracted.constructionMethod && methodConfidence !== "high");
+  const comparisonDivergences =
+    (analysisStatus?.review?.comparison?.divergences?.length ?? 0) + (analysisStatus?.review?.comparison?.unresolved?.length ?? 0);
 
   function updateModifiedValue(
     field: PlanExtractEditableField,
@@ -517,6 +543,41 @@ export function PlanExtractReview({
       <InlineHelp tone="info" className="mt-4">
         A IA apenas sugere. Edite, marque ou descarte cada campo antes de aplicar ao estudo.
       </InlineHelp>
+
+      {analysisStatus ? (
+        <div className="mt-4 grid gap-2 rounded-2xl border bg-muted/20 p-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Modo</p>
+            <p className="mt-1 font-medium">{analysisStatus.modeLabel}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Provider principal</p>
+            <p className="mt-1 font-medium">{analysisStatus.primaryProviderLabel}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Comparação</p>
+            <p className="mt-1 font-medium">
+              {analysisStatus.review?.status === "completed"
+                ? comparisonDivergences > 0
+                  ? `${comparisonDivergences} pendências para revisão`
+                  : "Segunda leitura concluída"
+                : analysisStatus.review?.status === "skipped"
+                  ? "Indisponível para este arquivo"
+                  : analysisStatus.review?.status === "unavailable"
+                    ? "Provider indisponível"
+                    : analysisStatus.reviewProviderLabel
+                      ? `${analysisStatus.reviewProviderLabel} quando disponível`
+                      : "Sem segunda leitura"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Fallback pago</p>
+            <p className="mt-1 font-medium">{analysisStatus.paidFallbackEnabled ? "Não automático" : "Desligado"}</p>
+          </div>
+          {analysisStatus.cached ? <StatusPill tone="info">Resultado veio do cache</StatusPill> : null}
+          {comparisonDivergences > 0 ? <StatusPill tone="warning">Divergências ficam pendentes</StatusPill> : null}
+        </div>
+      ) : null}
 
       {highlights.length > 0 ? (
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
