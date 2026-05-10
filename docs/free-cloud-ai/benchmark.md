@@ -22,8 +22,10 @@ npm run ai:free-cloud:benchmark -- --dry-run
 Write a Markdown report:
 
 ```bash
-npm run ai:free-cloud:benchmark -- --dry-run --output docs/free-cloud-ai/benchmark.md --format markdown
+npm run ai:free-cloud:benchmark -- --dry-run --output docs/free-cloud-ai/benchmark-report.md --format markdown
 ```
+
+Use a generated report path such as `benchmark-report.md`; do not write output over this guide.
 
 Optional real run against a local or preview app endpoint:
 
@@ -31,7 +33,15 @@ Optional real run against a local or preview app endpoint:
 npm run ai:free-cloud:benchmark -- --real --endpoint http://localhost:3000/api/ai/plan-extract
 ```
 
-Real mode is not part of CI. It requires the app endpoint to be running with free-cloud server env vars configured. It does not read or print provider API keys.
+If the endpoint is protected, pass authentication through server-side environment variables, not command output:
+
+```bash
+AI_FREE_CLOUD_BENCHMARK_COOKIE="__session=<local-session-cookie>" \
+AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS=30000 \
+npm run ai:free-cloud:benchmark -- --real --endpoint http://localhost:3000/api/ai/plan-extract
+```
+
+Real mode is not part of CI. It requires the app endpoint to be running with free-cloud server env vars configured. It does not read or print provider API keys or authentication headers.
 
 ## Current dry-run baseline
 

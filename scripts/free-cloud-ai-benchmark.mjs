@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultFixturePath = path.join(repoRoot, "docs/free-cloud-ai/fixtures/synthetic-plan-benchmark.json");
+const defaultFetchTimeoutMs = 30_000;
 const comparableFields = [
   "city",
   "state",
@@ -37,7 +38,11 @@ function parseArgs(argv) {
     else if (arg === "--fixtures") args.fixtures = path.resolve(argv[++index] || "");
     else if (arg === "--output") args.output = path.resolve(argv[++index] || "");
     else if (arg === "--endpoint") args.endpoint = argv[++index] || args.endpoint;
-    else if (arg === "--format") args.format = argv[++index] || args.format;
+    else if (arg === "--format") {
+      const format = argv[++index] || args.format;
+      if (!["json", "markdown"].includes(format)) throw new Error(`Unsupported format "${format}". Use json or markdown.`);
+      args.format = format;
+    }
     else if (arg === "--help") args.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -46,10 +51,13 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Usage: npm run ai:free-cloud:benchmark -- [--dry-run|--real] [--output docs/free-cloud-ai/benchmark.md]
+  console.log(`Usage: npm run ai:free-cloud:benchmark -- [--dry-run|--real] [--output docs/free-cloud-ai/benchmark-report.md]
 
 Default mode is --dry-run. It uses sanitized fixture outputs and performs no network calls.
 Use --real only against a local/preview endpoint configured with free-cloud providers.
+Protected endpoints can receive auth through AI_FREE_CLOUD_BENCHMARK_COOKIE,
+AI_FREE_CLOUD_BENCHMARK_AUTH_BEARER or AI_FREE_CLOUD_BENCHMARK_AUTH_HEADER.
+AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS controls real-mode request timeout. Default: 30000.
 `);
 }
 
@@ -78,6 +86,25 @@ function countExtractedFields(result, expectedFields = []) {
 
 function isSchemaValid(result) {
   return Boolean(result && result.version === "1.0" && result.extracted && typeof result.extracted === "object");
+}
+
+function readFetchTimeoutMs() {
+  const value = Number(process.env.AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS);
+  if (!Number.isFinite(value) || value <= 0) return defaultFetchTimeoutMs;
+  return Math.round(value);
+}
+
+function createRealBenchmarkHeaders() {
+  const headers = {};
+  const cookie = process.env.AI_FREE_CLOUD_BENCHMARK_COOKIE?.trim();
+  const bearer = process.env.AI_FREE_CLOUD_BENCHMARK_AUTH_BEARER?.trim();
+  const authHeader = process.env.AI_FREE_CLOUD_BENCHMARK_AUTH_HEADER?.trim();
+
+  if (cookie) headers.Cookie = cookie;
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
+  else if (authHeader) headers.Authorization = authHeader;
+
+  return headers;
 }
 
 function compareResults(primary, review) {
@@ -200,15 +227,31 @@ async function runRealBenchmark(fixtures, endpoint) {
 
     const start = performance.now();
     let payload = {};
-    let status = "failed";
     let httpStatus = 0;
+    const timeoutMs = readFetchTimeoutMs();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(endpoint, { method: "POST", body: form });
+      const headers = createRealBenchmarkHeaders();
+      const response = await fetch(endpoint, {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
+        ...(Object.keys(headers).length ? { headers } : {}),
+      });
       httpStatus = response.status;
       payload = await response.json().catch(() => ({}));
-      status = response.ok ? "success" : "failed";
     } catch (error) {
-      payload = { error: error instanceof Error ? error.message : "Unknown request failure." };
+      payload = {
+        error:
+          error instanceof Error && error.name === "AbortError"
+            ? `Benchmark request timed out after ${timeoutMs}ms.`
+            : error instanceof Error
+              ? error.message
+              : "Unknown request failure.",
+      };
+    } finally {
+      clearTimeout(timeout);
     }
 
     const latencyMs = Math.round(performance.now() - start);
@@ -216,6 +259,9 @@ async function runRealBenchmark(fixtures, endpoint) {
     const review = payload.review;
     const comparison = review?.comparison || { agreements: [], divergences: [], unresolved: [] };
     const pending = collectPending(result, comparison);
+    const schemaValid = isSchemaValid(result);
+    const requestSucceeded = httpStatus >= 200 && httpStatus < 300;
+    const schemaError = requestSucceeded && !schemaValid ? "Endpoint returned a 2xx response without a valid PlanExtractResult." : undefined;
 
     fixtureReports.push({
       id: fixture.id,
@@ -226,14 +272,14 @@ async function runRealBenchmark(fixtures, endpoint) {
         task: "plan-primary",
         provider: payload.provider || "api",
         model: payload.model || "",
-        status,
+        status: requestSucceeded && schemaValid ? "success" : "failed",
         latencyMs,
-        schemaValid: isSchemaValid(result),
+        schemaValid,
         fieldsExtracted: countExtractedFields(result, fixture.expectedFields),
         cacheStatus: payload.cached ? "hit" : "miss",
         zeroCost: true,
         httpStatus,
-        error: responseError(payload),
+        error: responseError(payload) || schemaError,
       },
       review: review
         ? {
@@ -357,6 +403,11 @@ function renderMarkdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
+function serializeReport(report, format) {
+  if (format === "markdown") return renderMarkdown(report);
+  return `${JSON.stringify(report, null, 2)}\n`;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -366,14 +417,14 @@ async function main() {
 
   const fixtures = await loadFixtures(args.fixtures);
   const report = args.mode === "real" ? await runRealBenchmark(fixtures, args.endpoint) : runDryBenchmark(fixtures);
+  const serializedReport = serializeReport(report, args.format);
 
   if (args.output) {
     await mkdir(path.dirname(args.output), { recursive: true });
-    await writeFile(args.output, renderMarkdown(report));
+    await writeFile(args.output, serializedReport);
   }
 
-  if (args.format === "markdown") console.log(renderMarkdown(report));
-  else console.log(JSON.stringify(report, null, 2));
+  process.stdout.write(serializedReport);
 }
 
 main().catch((error) => {
