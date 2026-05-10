@@ -6,6 +6,7 @@ import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromH
 import { createMemoryPlanExtractCacheStore, createPlanExtractCacheKey, getPlanExtractCacheTtlSeconds } from "@/lib/ai/plan-extract-cache";
 import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtractFile } from "@/lib/ai/plan-extract-request";
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
+import { AiRouterError } from "@/lib/ai/free-cloud-router";
 
 export const runtime = "nodejs";
 
@@ -16,13 +17,22 @@ function jsonResponse(body: Record<string, unknown>, init?: ResponseInit) {
 function getErrorMessage(error: unknown) {
   if (error instanceof AiProviderUnavailableError) {
     return {
-      message: "OpenAI API nao esta configurada no servidor. Defina OPENAI_API_KEY e AI_OPENAI_MODEL para habilitar a extracao.",
+      message:
+        process.env.AI_MODE === "free-cloud"
+          ? "Provider gratuito de IA nao esta configurado no servidor. Verifique GEMINI_API_KEY e GEMINI_MODEL."
+          : "OpenAI API nao esta configurada no servidor. Defina OPENAI_API_KEY e AI_OPENAI_MODEL para habilitar a extracao.",
       code: error.code,
     };
   }
+  if (error instanceof AiRouterError) {
+    return { message: error.message, code: error.code };
+  }
   if (error instanceof AiProviderChainError) {
     return {
-      message: "Nao foi possivel extrair a planta com OpenAI neste momento.",
+      message:
+        process.env.AI_MODE === "free-cloud"
+          ? "Nao foi possivel extrair a planta com provider gratuito neste momento."
+          : "Nao foi possivel extrair a planta com OpenAI neste momento.",
       providers: error.providerErrors,
     };
   }
