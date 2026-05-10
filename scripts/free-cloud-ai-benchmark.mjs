@@ -69,9 +69,13 @@ async function loadFixtures(filePath) {
 }
 
 function assertNoPaidProvider(run) {
-  if (run?.provider === "openai") {
-    throw new Error("OpenAI is blocked in free-cloud benchmark fixtures.");
-  }
+  const error = paidProviderError(run?.provider);
+  if (error) throw new Error(error);
+}
+
+function paidProviderError(provider) {
+  if (provider === "openai") return "OpenAI is blocked in free-cloud benchmark runs.";
+  return undefined;
 }
 
 function countExtractedFields(result, expectedFields = []) {
@@ -261,7 +265,11 @@ async function runRealBenchmark(fixtures, endpoint) {
     const pending = collectPending(result, comparison);
     const schemaValid = isSchemaValid(result);
     const requestSucceeded = httpStatus >= 200 && httpStatus < 300;
+    const primaryProvider = payload.provider || "api";
+    const primaryPaidProviderError = paidProviderError(primaryProvider);
     const schemaError = requestSucceeded && !schemaValid ? "Endpoint returned a 2xx response without a valid PlanExtractResult." : undefined;
+    const reviewProvider = review?.provider || "unknown";
+    const reviewPaidProviderError = paidProviderError(reviewProvider);
 
     fixtureReports.push({
       id: fixture.id,
@@ -270,29 +278,29 @@ async function runRealBenchmark(fixtures, endpoint) {
       mode: "real",
       primary: {
         task: "plan-primary",
-        provider: payload.provider || "api",
+        provider: primaryProvider,
         model: payload.model || "",
-        status: requestSucceeded && schemaValid ? "success" : "failed",
+        status: requestSucceeded && schemaValid && !primaryPaidProviderError ? "success" : "failed",
         latencyMs,
         schemaValid,
         fieldsExtracted: countExtractedFields(result, fixture.expectedFields),
         cacheStatus: payload.cached ? "hit" : "miss",
-        zeroCost: true,
+        zeroCost: !primaryPaidProviderError,
         httpStatus,
-        error: responseError(payload) || schemaError,
+        error: primaryPaidProviderError || responseError(payload) || schemaError,
       },
       review: review
         ? {
             task: "plan-review",
-            provider: review.provider || "unknown",
+            provider: reviewProvider,
             model: review.model || "",
-            status: review.status || "unknown",
+            status: reviewPaidProviderError ? "failed" : review.status || "unknown",
             latencyMs: 0,
-            schemaValid: review.status === "completed",
+            schemaValid: !reviewPaidProviderError && review.status === "completed",
             fieldsExtracted: 0,
             cacheStatus: payload.cached ? "hit" : "miss",
-            zeroCost: true,
-            error: review.error?.message,
+            zeroCost: !reviewPaidProviderError,
+            error: reviewPaidProviderError || review.error?.message,
           }
         : undefined,
       comparison,

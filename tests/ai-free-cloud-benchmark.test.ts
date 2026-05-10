@@ -9,11 +9,13 @@ import { describe, expect, it } from "vitest";
 const scriptPath = "scripts/free-cloud-ai-benchmark.mjs";
 const fixturePath = "docs/free-cloud-ai/fixtures/synthetic-plan-benchmark.json";
 const execFileAsync = promisify(execFile);
+const childProcessTimeoutMs = 30_000;
 
 function runBenchmark(args: string[] = []) {
   const output = execFileSync(process.execPath, [scriptPath, "--dry-run", ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
+    timeout: childProcessTimeoutMs,
   });
   return JSON.parse(output);
 }
@@ -87,11 +89,12 @@ describe("free-cloud benchmark harness", () => {
 
   it("keeps fixtures sanitized and writes markdown reports", () => {
     const fixtures = readFileSync(fixturePath, "utf8");
-    expect(fixtures).not.toMatch(/api[_-]?key|secret|cliente|client plan/i);
+    expect(fixtures).not.toMatch(/api[_-]?key|secret|cliente|client[- ]plan/i);
 
     const markdown = execFileSync(process.execPath, [scriptPath, "--dry-run", "--format", "markdown"], {
       cwd: process.cwd(),
       encoding: "utf8",
+      timeout: childProcessTimeoutMs,
     });
 
     expect(markdown).toContain("# Free-cloud AI benchmark");
@@ -106,6 +109,7 @@ describe("free-cloud benchmark harness", () => {
       const jsonStdout = execFileSync(process.execPath, [scriptPath, "--dry-run", "--output", jsonPath], {
         cwd: process.cwd(),
         encoding: "utf8",
+        timeout: childProcessTimeoutMs,
       });
       const jsonFile = readFileSync(jsonPath, "utf8");
       expect(jsonFile).toBe(jsonStdout);
@@ -115,6 +119,7 @@ describe("free-cloud benchmark harness", () => {
       const markdownStdout = execFileSync(process.execPath, [scriptPath, "--dry-run", "--format", "markdown", "--output", markdownPath], {
         cwd: process.cwd(),
         encoding: "utf8",
+        timeout: childProcessTimeoutMs,
       });
       const markdownFile = readFileSync(markdownPath, "utf8");
       expect(markdownFile).toBe(markdownStdout);
@@ -136,6 +141,7 @@ describe("free-cloud benchmark harness", () => {
       const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--real", "--endpoint", server.endpoint], {
         cwd: process.cwd(),
         encoding: "utf8",
+        timeout: childProcessTimeoutMs,
         env: {
           ...process.env,
           AI_FREE_CLOUD_BENCHMARK_COOKIE: "__session=test-session",
@@ -163,6 +169,7 @@ describe("free-cloud benchmark harness", () => {
       const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--real", "--endpoint", server.endpoint], {
         cwd: process.cwd(),
         encoding: "utf8",
+        timeout: childProcessTimeoutMs,
         env: { ...process.env, AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS: "5000" },
       });
       const report = JSON.parse(stdout);
@@ -186,12 +193,35 @@ describe("free-cloud benchmark harness", () => {
       const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--real", "--endpoint", server.endpoint], {
         cwd: process.cwd(),
         encoding: "utf8",
+        timeout: childProcessTimeoutMs,
         env: { ...process.env, AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS: "20" },
       });
       const report = JSON.parse(stdout);
 
       expect(report.fixtures[0].primary.status).toBe("failed");
       expect(report.fixtures[0].primary.error).toContain("timed out after 20ms");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("fails real benchmark responses that use paid providers", async () => {
+    const server = await startJsonServer((request, response) => {
+      respondJson(request, response, { ...validPlanPayload(), provider: "openai", model: "gpt-4o-mini" });
+    });
+
+    try {
+      const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--real", "--endpoint", server.endpoint], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        timeout: childProcessTimeoutMs,
+        env: { ...process.env, AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS: "5000" },
+      });
+      const report = JSON.parse(stdout);
+
+      expect(report.fixtures[0].primary.status).toBe("failed");
+      expect(report.fixtures[0].primary.zeroCost).toBe(false);
+      expect(report.fixtures[0].primary.error).toContain("OpenAI is blocked");
     } finally {
       await server.close();
     }
