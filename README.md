@@ -1,5 +1,7 @@
 # Estudo Construtivo
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Aplicação para estudo construtivo modular, pré-orçamento assistido e revisão de quantitativos a partir de planta baixa, medidas manuais ou projeto exemplo.
 
 O produto não começa pelo método construtivo. O fluxo principal é:
@@ -115,6 +117,10 @@ Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 - [docs/sinapi-integration.md](docs/sinapi-integration.md): regras da base SINAPI controlada.
 - [docs/AI_PLAN_EXTRACT.md](docs/AI_PLAN_EXTRACT.md): contrato técnico da extração de planta por IA.
 - [docs/budget-assistant.md](docs/budget-assistant.md): Assistente de orçamento e revisão humana.
+
+## Licença
+
+Este repositório está licenciado sob a [MIT License](LICENSE). Código de terceiros e dependências mantêm suas próprias licenças.
 
 ## Limitações
 
