@@ -379,7 +379,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
           <div className="mt-4 space-y-2 text-xs text-muted-foreground">
             <p>
               {aiProviderStatus.mode === "free-cloud"
-                ? `Modo gratuito: ${aiProviderStatus.primaryProviderLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando chave no servidor"}.`
+                ? `Modo gratuito: ${aiProviderStatus.primaryProviderLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando configuração no servidor"}.`
                 : `${aiProviderStatus.modeLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando configuração no servidor"}.`}
             </p>
             {aiProviderStatus.mode === "free-cloud" && aiProviderStatus.reviewProviderLabel ? (
@@ -394,12 +394,12 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
             {reviewStatusLabel ? <p>{reviewStatusLabel}</p> : null}
             {providerMeta.cached ? <p>Cache reaproveitado; limite diario nao foi consumido.</p> : null}
             {providerMeta.remaining && providerMeta.limit ? <p>Limite restante hoje: {providerMeta.remaining}/{providerMeta.limit}.</p> : null}
-            {aiProviderStatus.mode === "free-cloud" ? <p>Sem fallback pago automatico; custo zero depende dos limites externos.</p> : null}
+            {aiProviderStatus.mode === "free-cloud" ? <p>Sem cobrança automática; continue manualmente se a análise não estiver disponível.</p> : null}
             {!planExtractEnabled ? (
               <p>
                 {aiProviderStatus.mode === "free-cloud"
-                  ? "Configure as credenciais server-side; nenhuma chave deve usar NEXT_PUBLIC_."
-                  : "Assinatura ChatGPT nao configura esta API automaticamente; use credencial server-side no ambiente do servidor."}
+                  ? "Configure o modo gratuito no servidor ou continue manualmente."
+                  : "Configure o Modo Pro no servidor ou continue manualmente."}
               </p>
             ) : null}
           </div>

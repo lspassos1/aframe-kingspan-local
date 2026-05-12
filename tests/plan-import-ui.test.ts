@@ -62,7 +62,7 @@ describe("plan import UI state", () => {
     expect(getPlanImportStateCopy("idle", freeCloudStatus).badge).toBe("Modo gratuito");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).title).toContain("Analise rapida");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).description).toContain("Revisao detalhada");
-    expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).description).toContain("sem chamar provider pago");
+    expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).description).toContain("sem acionar cobrança automática");
   });
 
   it("uses safe API messages without exposing provider secrets", () => {
@@ -124,10 +124,11 @@ describe("PlanImportCard", () => {
     expect(html).toContain("Analise rapida sugere campos preliminares");
     expect(html).toContain("Modo gratuito: Analise rapida.");
     expect(html).toContain("Revisão: Revisao detalhada aguardando configuração no servidor.");
-    expect(html).toContain("Sem fallback pago automatico");
+    expect(html).toContain("Sem cobrança automática");
     expect(html).not.toContain("OPENAI_API_KEY");
     expect(html).not.toContain("Gemini");
     expect(html).not.toContain("OpenRouter");
+    expect(html).not.toContain("fallback pago");
   });
 
   it("keeps paid fallback disabled even if the env flag is misconfigured", () => {
@@ -151,8 +152,9 @@ describe("PlanImportCard", () => {
 
     expect(html).toContain("Modo gratuito");
     expect(html).toContain("Analise rapida sugere campos preliminares");
-    expect(html).toContain("Sem fallback pago automatico");
+    expect(html).toContain("Sem cobrança automática");
     expect(html).not.toContain("provider pago");
+    expect(html).not.toContain("fallback pago");
   });
 
   it("renders operational setup copy when AI extraction is disabled", () => {
@@ -160,7 +162,7 @@ describe("PlanImportCard", () => {
 
     expect(html).toContain("Upload assistido indisponivel");
     expect(html).toContain("Configure o Modo Pro no servidor.");
-    expect(html).toContain("Assinatura ChatGPT nao configura esta API automaticamente");
+    expect(html).toContain("Configure o Modo Pro no servidor ou continue manualmente.");
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
   });
@@ -169,7 +171,7 @@ describe("PlanImportCard", () => {
     const html = renderToStaticMarkup(createElement(PlanImportCard, { planExtractEnabled: false, aiProviderStatus: freeCloudStatus }));
 
     expect(html).toContain("Configure o modo gratuito no servidor.");
-    expect(html).toContain("nenhuma chave deve usar NEXT_PUBLIC_");
+    expect(html).toContain("Configure o modo gratuito no servidor ou continue manualmente.");
     expect(html).not.toContain("OPENAI_API_KEY");
   });
 });

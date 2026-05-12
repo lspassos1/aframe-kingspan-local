@@ -223,7 +223,7 @@ function ProductWorkflowPreview() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Estudo Casa Jardim</p>
             <h2 className="mt-1 text-xl font-semibold">Revisão da planta</h2>
           </div>
-          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-950">OpenAI configurado</span>
+          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-950">Análise pronta</span>
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">

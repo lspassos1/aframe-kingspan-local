@@ -32,10 +32,10 @@ export default function HelpPage() {
     {
       title: "Upload/IA não aparece",
       body: operationalEnvironment.aiPlanExtractEnabled
-        ? "Confira chave OpenAI, modelo e limites no ambiente do servidor."
-        : "Ative a flag de extração e configure OpenAI no servidor.",
+        ? "Confira se o modo de análise está pronto e se o limite diário ainda permite envio."
+        : "Ative a análise no servidor ou continue preenchendo manualmente.",
       icon: Bot,
-      status: operationalEnvironment.aiPlanExtractEnabled ? "verificar chave" : "desligada",
+      status: operationalEnvironment.aiPlanExtractEnabled ? "verificar modo" : "desligada",
     },
     {
       title: "Base de preço ausente",

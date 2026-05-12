@@ -35,9 +35,16 @@ describe("HomeAuthExperience", () => {
     expect(html).toContain("Quantitativos");
     expect(html).toContain("Fonte de preço");
     expect(html).toContain("Exportação");
+    expect(html).toContain("Análise pronta");
     expect(html).toContain("planta-baixa.pdf");
     expect(html).toContain("Cache por hash ativo. Nada aplicado automaticamente.");
     expect(html).toContain("SINAPI 87489");
+    expect(html).not.toContain("OpenAI configurado");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
+    expect(html).not.toContain("Groq");
+    expect(html).not.toContain("Cerebras");
+    expect(html).not.toContain("SambaNova");
     expect(html).not.toContain("Escolha o método construtivo");
     expect(html).not.toContain("Comece pelo sistema da obra");
   });

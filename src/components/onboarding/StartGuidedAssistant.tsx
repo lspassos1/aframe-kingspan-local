@@ -39,8 +39,8 @@ function getAiOperationalFacts(aiProviderStatus: PlanImportProviderUiStatus) {
       { label: "Modo", value: aiProviderStatus.modeLabel },
       { label: "Análise", value: aiProviderStatus.primaryProviderLabel },
       { label: "Revisão", value: aiProviderStatus.reviewProviderLabel ? `${aiProviderStatus.reviewProviderLabel} quando disponível` : "Sem segunda leitura" },
-      { label: "Fallback pago", value: "Desligado" },
-      { label: "Fallback manual", value: "Sempre disponível se limite externo falhar" },
+      { label: "Cobrança automática", value: "Desligada" },
+      { label: "Continuar manualmente", value: "Sempre disponível se a análise não concluir" },
     ];
   }
 
@@ -49,7 +49,7 @@ function getAiOperationalFacts(aiProviderStatus: PlanImportProviderUiStatus) {
     { label: "Arquivo", value: "PDF, PNG ou JPG até o limite configurado" },
     { label: "Limite diário", value: "Validado no servidor por usuário e IP" },
     { label: "Cache", value: "Hash do arquivo evita análise repetida" },
-    { label: "Fallback", value: "Preenchimento manual continua disponível" },
+    { label: "Continuar manualmente", value: "Preenchimento manual continua disponível" },
   ];
 }
 
@@ -230,7 +230,7 @@ export function StartGuidedAssistant({
               eyebrow="Caminho principal"
               title="Enviar planta baixa"
               description="Arraste ou selecione um arquivo. O app mostra cache, limite, análise e revisão antes de aplicar qualquer dado."
-              action={<StatusPill tone="pending">{aiProviderStatus.mode === "free-cloud" ? "Free cloud + revisão" : "Revisão obrigatória"}</StatusPill>}
+              action={<StatusPill tone="pending">{aiProviderStatus.mode === "free-cloud" ? "Modo gratuito + revisão" : "Revisão obrigatória"}</StatusPill>}
             />
             <PlanImportCard planExtractEnabled={planExtractEnabled} aiProviderStatus={aiProviderStatus} onManualFallback={openManualCompletion} />
           </div>
@@ -255,9 +255,9 @@ export function StartGuidedAssistant({
               </StatusPill>
               <StatusPill tone="pending" icon={Clock3}>Cache por hash ativo quando houver resultado</StatusPill>
               {aiProviderStatus.mode === "free-cloud" ? (
-                <StatusPill tone="warning" icon={ShieldCheck}>Custo zero depende dos limites externos</StatusPill>
+                <StatusPill tone="warning" icon={ShieldCheck}>Análise gratuita depende de limites externos</StatusPill>
               ) : null}
-              <StatusPill tone="info" icon={RotateCcw}>Fallback manual disponível</StatusPill>
+              <StatusPill tone="info" icon={RotateCcw}>Continuar manualmente disponível</StatusPill>
             </div>
             <InlineHelp tone="warning" className="mt-3">
               Nenhum campo extraído altera o estudo sem revisão humana. Método incerto fica como sugestão.
@@ -272,7 +272,7 @@ export function StartGuidedAssistant({
             title="Preencher manualmente"
             description="Use este caminho se a planta não estiver pronta, se o upload estiver desligado ou se preferir informar medidas por etapas."
             icon={Keyboard}
-            badge={<StatusPill tone="info">Fallback</StatusPill>}
+            badge={<StatusPill tone="info">Manual</StatusPill>}
             onClick={() => setMode("manual")}
             footer={
               <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -288,7 +288,7 @@ export function StartGuidedAssistant({
         <section id="manual-start" className="grid scroll-mt-6 gap-5 xl:grid-cols-[1fr_340px]">
           <div className="space-y-3">
             <SectionHeader
-              eyebrow={mode === "ai" ? "Fallback" : "Caminho manual"}
+              eyebrow={mode === "ai" ? "Complemento manual" : "Caminho manual"}
               title={mode === "ai" ? "Revisar ou completar manualmente" : "Preencher medidas iniciais"}
               description="Use esta etapa quando a planta não estiver disponível ou quando dados extraídos precisarem de complemento."
             />

@@ -39,7 +39,7 @@ export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> =
   uploading: {
     badge: "Enviando",
     title: "Enviando arquivo",
-    description: "As credenciais permanecem somente no servidor.",
+    description: "Arquivo enviado com segurança para análise.",
     progress: 32,
   },
   analyzing: {
@@ -87,7 +87,7 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
     uploading: {
       badge: "Enviando",
       title: "Enviando arquivo",
-      description: "As credenciais ficam somente no servidor.",
+      description: "Arquivo enviado com segurança para análise.",
       progress: 32,
     },
     analyzing: {
@@ -99,14 +99,14 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
       progress: 68,
     },
     error: {
-      badge: "Fallback manual",
+      badge: "Continuar manualmente",
       title: "Análise indisponivel",
       description: "Continue pelo preenchimento manual ou tente outro arquivo quando o limite externo liberar.",
     },
     "limit-exceeded": {
       badge: "Limite gratuito",
       title: "Limite gratuito atingido",
-      description: "O preenchimento manual continua disponivel sem chamar provider pago.",
+      description: "O preenchimento manual continua disponivel sem acionar cobrança automática.",
     },
   };
 

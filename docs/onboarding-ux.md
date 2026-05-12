@@ -30,7 +30,7 @@ Não mostrar na primeira camada:
 
 ## Modo IA
 
-Quando `AI_PLAN_EXTRACT_ENABLED=true` e o provider do modo atual estiver configurado, upload de planta deve ser o caminho principal. Em `AI_MODE=free-cloud`, isso significa Gemini como leitura principal; em `AI_MODE=paid`, OpenAI explícito.
+Quando a análise estiver ativa e o modo atual estiver configurado, upload de planta deve ser o caminho principal. A primeira camada da UX deve mostrar produto, não infraestrutura: `Modo gratuito`, `Modo Pro`, `Análise rápida`, `Revisão detalhada`, `Precisa revisão` e `Continuar manualmente`.
 
 Estados obrigatórios:
 
