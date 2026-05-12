@@ -1,0 +1,63 @@
+{
+  "source": {
+    "id": "sinapi-ba-2026-05-dry-run",
+    "title": "SINAPI BA 2026-05 dry-run",
+    "supplier": "CAIXA",
+    "state": "BA",
+    "city": "",
+    "referenceDate": "2026-05",
+    "regime": "desonerado",
+    "version": "2026-05-dry-run",
+    "notes": "Fixture sanitizada para validar o fluxo mensal sem escrita."
+  },
+  "rows": [
+    {
+      "codigo": "SINAPI-87489",
+      "descricao": "Alvenaria de vedacao com bloco ceramico",
+      "unidade": "m2",
+      "preco_total": 82.45,
+      "material": 48.25,
+      "mao_obra": 30.2,
+      "equipamento": 4,
+      "hh": 0.45,
+      "uf": "BA",
+      "data_base": "2026-05",
+      "regime": "desonerado",
+      "etapa": "civil",
+      "metodo": "conventional-masonry",
+      "tags": "alvenaria;parede"
+    },
+    {
+      "codigo": "SINAPI-96535",
+      "descricao": "Concreto usinado bombeavel",
+      "unidade": "m3",
+      "preco_total": 520,
+      "material": 420,
+      "mao_obra": 80,
+      "equipamento": 20,
+      "hh": 1.2,
+      "uf": "BA",
+      "data_base": "2026-05",
+      "regime": "desonerado",
+      "etapa": "civil",
+      "metodo": "conventional-masonry",
+      "tags": "concreto;fundacao"
+    },
+    {
+      "codigo": "SINAPI-00001",
+      "descricao": "Item zerado para revisao",
+      "unidade": "m2",
+      "preco_total": 0,
+      "material": 0,
+      "mao_obra": 0,
+      "equipamento": 0,
+      "hh": 0,
+      "uf": "BA",
+      "data_base": "2026-05",
+      "regime": "desonerado",
+      "etapa": "civil",
+      "metodo": "conventional-masonry",
+      "tags": "revisao"
+    }
+  ]
+}
