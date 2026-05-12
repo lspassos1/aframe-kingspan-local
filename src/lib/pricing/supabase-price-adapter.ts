@@ -77,16 +77,37 @@ export function createSupabasePriceAdapter(config: RemotePriceDbConfig, options:
         };
       }
 
-      const rows = (await response.json()) as SupabasePriceCandidateRow[];
+      let rows: unknown;
+      try {
+        rows = await response.json();
+      } catch {
+        return {
+          configured: true,
+          candidates: [],
+          error: "Remote price database returned an unreadable payload.",
+        };
+      }
+
+      if (!Array.isArray(rows)) {
+        return {
+          configured: true,
+          candidates: [],
+          error: "Remote price database returned an unexpected payload.",
+        };
+      }
+
       return {
         configured: true,
-        candidates: rows.map((row) => mapSupabasePriceCandidateRow(row, input)),
+        candidates: rows.map((row) => mapSupabasePriceCandidateRow(row as SupabasePriceCandidateRow, input)),
       };
     },
   };
 }
 
 export function mapSupabasePriceCandidateRow(row: SupabasePriceCandidateRow, input: Partial<PriceCandidateSearchInput> = {}): PriceCandidate {
+  const normalizedUnit = toMaterialUnit(row.unit);
+  const priceStatus = normalizedUnit ? toPriceStatus(row.price_status) : "invalid_unit";
+  const pendingReason = normalizedUnit ? row.pending_reason ?? "" : row.pending_reason || `Unidade remota nao suportada: ${row.unit}`;
   const candidate: Omit<PriceCandidate, "quality"> = {
     id: row.id,
     sourceId: row.source_id,
@@ -96,7 +117,7 @@ export function mapSupabasePriceCandidateRow(row: SupabasePriceCandidateRow, inp
     itemType: toItemType(row.item_type),
     code: row.code,
     description: row.description,
-    unit: toMaterialUnit(row.unit),
+    unit: normalizedUnit ?? "lot",
     category: toMaterialCategory(row.category),
     constructionMethod: toConstructionMethod(row.construction_method),
     state: row.state,
@@ -110,10 +131,10 @@ export function mapSupabasePriceCandidateRow(row: SupabasePriceCandidateRow, inp
     thirdPartyCostBRL: toNumber(row.third_party_cost_brl),
     otherCostBRL: toNumber(row.other_cost_brl),
     totalLaborHoursPerUnit: toNumber(row.total_labor_hours_per_unit),
-    priceStatus: toPriceStatus(row.price_status),
+    priceStatus,
     confidence: toConfidence(row.confidence),
     requiresReview: row.requires_review !== false,
-    pendingReason: row.pending_reason ?? "",
+    pendingReason,
     tags: row.tags ?? [],
   };
 
@@ -188,9 +209,9 @@ function toConfidence(value: string): BudgetConfidenceLevel {
   return "unverified";
 }
 
-function toMaterialUnit(value: string): MaterialUnit {
+function toMaterialUnit(value: string): MaterialUnit | undefined {
   if (value === "un" || value === "m" || value === "m2" || value === "m3" || value === "kg" || value === "package" || value === "lot") return value;
-  return "un";
+  return undefined;
 }
 
 function toMaterialCategory(value: string): MaterialCategory {

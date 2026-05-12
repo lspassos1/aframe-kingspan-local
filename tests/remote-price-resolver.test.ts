@@ -9,6 +9,7 @@ import {
   createSupabasePriceAdapter,
   mapSupabasePriceCandidateRow,
   resolvePriceCandidates,
+  type RemotePriceDbAdapter,
   type SupabasePriceCandidateRow,
 } from "@/lib/pricing";
 
@@ -112,6 +113,38 @@ describe("remote price candidate resolver", () => {
     expect(result).toMatchObject({ configured: true, candidates: [expect.objectContaining({ id: "remote-wall" })] });
   });
 
+  it("returns a structured adapter error when the Supabase RPC payload is not an array", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ rows: [createRemoteRow()] }), { status: 200 }));
+    const adapter = createSupabasePriceAdapter(
+      {
+        provider: "supabase",
+        supabaseUrl: "https://prices.example.supabase.co/",
+        supabaseAnonKey: "anon-read-key",
+      },
+      { fetcher }
+    );
+
+    const result = await adapter.searchCandidates({ query: "alvenaria", state: "BA", unit: "m2" });
+
+    expect(result).toMatchObject({
+      configured: true,
+      candidates: [],
+      error: "Remote price database returned an unexpected payload.",
+    });
+  });
+
+  it("marks unknown remote units invalid instead of coercing them to a supported unit", () => {
+    const candidate = mapSupabasePriceCandidateRow(createRemoteRow({ unit: "caixa", price_status: "valid", pending_reason: "" }), { state: "BA", unit: "un" });
+
+    expect(candidate).toMatchObject({
+      unit: "lot",
+      priceStatus: "invalid_unit",
+      pendingReason: "Unidade remota nao suportada: caixa",
+    });
+    expect(candidate.quality).toMatchObject({ status: "invalid", usable: false });
+    expect(candidate.quality.issues.map((issue) => issue.code)).toContain("invalid_unit");
+  });
+
   it("keeps project-local approved prices before remote DB candidates", async () => {
     const composition = createComposition();
     const remote = mapSupabasePriceCandidateRow(createRemoteRow({ id: "remote-alternative", code: "90000" }), { state: "BA", unit: "m2" });
@@ -128,6 +161,85 @@ describe("remote price candidate resolver", () => {
     expect(result.candidates.map((candidate) => candidate.origin)).toEqual(["project-approved", "remote-db", "manual-entry"]);
     expect(result.candidates[0]).toMatchObject({ priority: 1, approvedByUser: true, compositionId: composition.id });
     expect(result.candidates.find((candidate) => candidate.origin === "remote-db")).toMatchObject({ priority: 3, approvedByUser: false, requiresReview: true });
+  });
+
+  it("preserves project manual links even when price sources are not provided", async () => {
+    const manualComposition = createComposition({
+      id: "manual-composition",
+      sourceId: "manual-source",
+      sourceCode: "MANUAL-001",
+      serviceCode: "MANUAL-001",
+      sinapi: undefined,
+    });
+
+    const result = await resolvePriceCandidates({
+      quantities: [quantity],
+      serviceCompositions: [manualComposition],
+      approvedLinks: [{ id: "manual-link", quantityId: quantity.id, compositionId: manualComposition.id, approvedByUser: false }],
+      location: { city: "Cruz das Almas", state: "BA" },
+      remoteDb: createDisabledRemotePriceDbAdapter(),
+    });
+
+    expect(result.candidates[0]).toMatchObject({
+      origin: "project-approved",
+      label: "Preço manual do projeto",
+      compositionId: manualComposition.id,
+      approvedByUser: false,
+    });
+  });
+
+  it("does not promote unapproved non-manual imported links when price sources are not provided", async () => {
+    const supplierComposition = createComposition({
+      id: "supplier-composition",
+      sourceId: "supplier-quote-source",
+      sourceCode: "SUP-001",
+      serviceCode: "SUP-001",
+      sinapi: undefined,
+    });
+
+    const result = await resolvePriceCandidates({
+      quantities: [quantity],
+      serviceCompositions: [supplierComposition],
+      approvedLinks: [{ id: "supplier-link", quantityId: quantity.id, compositionId: supplierComposition.id, approvedByUser: false }],
+      location: { city: "Cruz das Almas", state: "BA" },
+      remoteDb: createDisabledRemotePriceDbAdapter(),
+    });
+
+    expect(result.candidates.map((candidate) => candidate.origin)).toEqual(["project-imported", "manual-entry"]);
+    expect(result.candidates[0]).toMatchObject({
+      origin: "project-imported",
+      priority: 2,
+      compositionId: supplierComposition.id,
+      approvedByUser: false,
+    });
+  });
+
+  it("keeps local and manual candidates when remote DB search throws", async () => {
+    const composition = createComposition();
+    const throwingRemoteDb: RemotePriceDbAdapter = {
+      provider: "supabase",
+      isConfigured: () => true,
+      searchCandidates: vi.fn(async () => {
+        throw new Error("network unavailable");
+      }),
+    };
+
+    const result = await resolvePriceCandidates({
+      quantities: [quantity],
+      priceSources: [source],
+      serviceCompositions: [composition],
+      approvedLinks: [{ id: "approved-link", quantityId: quantity.id, compositionId: composition.id, approvedByUser: true }],
+      location: { city: "Cruz das Almas", state: "BA" },
+      remoteDb: throwingRemoteDb,
+    });
+
+    expect(result.remote).toMatchObject({
+      configured: true,
+      searched: true,
+      candidates: [],
+      error: "Remote price database search failed: network unavailable",
+    });
+    expect(result.candidates.map((candidate) => candidate.origin)).toEqual(["project-approved", "manual-entry"]);
   });
 
   it("falls back cleanly when the remote DB is not configured", async () => {
