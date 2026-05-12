@@ -119,6 +119,8 @@ The central database should expose only safe active data through a view or RPC, 
 - `current_price_items`; and/or
 - `search_price_candidates(...)`.
 
+Public read views must be created with `WITH (security_invoker = true)` on Postgres 15+ so the caller's RLS policies remain in force. Public read RPC functions exposed to `anon` or authenticated read roles must use `SECURITY INVOKER`; this is the default, but the schema PR must state it explicitly in the SQL definition or migration notes.
+
 The public read layer must not expose:
 
 - service role behavior;
@@ -131,10 +133,16 @@ The public read layer must not expose:
 
 - Enable RLS on all tables.
 - Public/anon read access is allowed only on active reference price data through safe views/RPC.
+- RLS policies remain the source of truth for public read access.
+- Public read views must use `WITH (security_invoker = true)`.
+- Public read RPC functions exposed to `anon` or authenticated read roles must use `SECURITY INVOKER`.
+- Public read views/RPC functions must not use `SECURITY DEFINER`.
+- If a future `SECURITY DEFINER` function is required, it must be admin/service-role only, must not be exposed to `anon` or public read roles, and must be justified in the schema/RLS PR.
 - Public/anon insert, update and delete must be blocked.
 - `SUPABASE_SERVICE_ROLE_KEY` must be used only by GitHub Actions/admin sync tooling.
 - `SUPABASE_SERVICE_ROLE_KEY` must never be added to Vercel.
 - Future user/project overrides must live in separate auth-protected tables.
+- The schema/RLS PR must include tests or SQL validation notes proving `anon` cannot insert/update/delete and can only read active safe reference rows.
 
 ## Configuration Boundary
 
