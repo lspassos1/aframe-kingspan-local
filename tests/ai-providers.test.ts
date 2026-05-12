@@ -31,41 +31,54 @@ const validPlanExtractJson = JSON.stringify({
 
 describe("AI plan extraction providers", () => {
   it("returns no configured providers when keys are absent", () => {
-    const providers = getConfiguredAiPlanExtractProviders({
-      AI_PLAN_EXTRACT_PROVIDER_ORDER: "openai,openrouter,groq,generic",
-    });
+    const providers = getConfiguredAiPlanExtractProviders({});
 
     expect(providers).toHaveLength(0);
   });
 
   it("keeps OpenAI as the only official provider even when other providers are configured", () => {
     const providers = getAiPlanExtractProviderConfigs({
-      AI_PLAN_EXTRACT_PROVIDER_ORDER: "openrouter,openai,generic",
+      AI_MODE: "paid",
       OPENROUTER_API_KEY: "openrouter-key",
-      AI_OPENROUTER_MODEL: "google/gemini-2.5-flash",
+      OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.5-flash:free",
+      GROQ_API_KEY: "groq-key",
+      GROQ_TEXT_MODEL: "llama-3.1-8b-instant",
       OPENAI_API_KEY: "openai-key",
       AI_OPENAI_MODEL: "gpt-4o-mini",
-      LLM_API_URL: "https://llm.example.com/v1/chat/completions",
-      LLM_API_KEY: "generic-key",
-      LLM_MODEL: "local-model",
     });
 
     expect(providers.map((provider) => provider.id)).toEqual(["openai"]);
     expect(providers.every((provider) => provider.configured)).toBe(true);
   });
 
-  it("falls back to OpenAI when env order has no supported official provider names", () => {
+  it("uses OpenAI when paid mode is explicit", () => {
     const providers = getAiPlanExtractProviderConfigs({
-      AI_PLAN_EXTRACT_PROVIDER_ORDER: "unknown, also-unknown",
+      AI_MODE: "paid",
+      AI_PLAN_PRIMARY_PROVIDER: "unknown",
       OPENAI_API_KEY: "openai-key",
     });
 
     expect(providers.map((provider) => provider.id)).toEqual(["openai"]);
   });
 
-  it("strips non-OpenAI providers from the plan extraction order", () => {
-    expect(getAiPlanExtractProviderOrder({ AI_PLAN_EXTRACT_PROVIDER_ORDER: "openrouter,groq,generic" })).toEqual(["openai"]);
-    expect(getAiPlanExtractProviderOrder({ AI_PLAN_EXTRACT_PROVIDER_ORDER: "openrouter,openai,generic" })).toEqual(["openai"]);
+  it("uses OpenAI as the paid/default extraction order without provider-order envs", () => {
+    expect(getAiPlanExtractProviderOrder({ AI_MODE: "paid", AI_PLAN_PRIMARY_PROVIDER: "openrouter" })).toEqual(["openai"]);
+    expect(getAiPlanExtractProviderOrder({ AI_MODE: "paid", AI_PLAN_REVIEW_PROVIDER: "openrouter" })).toEqual(["openai"]);
+  });
+
+  it("keeps the premium OpenAI model reserved instead of selecting it automatically", () => {
+    const [provider] = getAiPlanExtractProviderConfigs({
+      AI_MODE: "paid",
+      OPENAI_API_KEY: "openai-key",
+      AI_OPENAI_MODEL: "gpt-4o-mini",
+      AI_OPENAI_MODEL_PREMIUM: "gpt-5.4-mini",
+    });
+
+    expect(provider).toMatchObject({
+      id: "openai",
+      model: "gpt-4o-mini",
+      configured: true,
+    });
   });
 
   it("parses JSON wrapped in a code fence", () => {
@@ -78,20 +91,19 @@ describe("AI plan extraction providers", () => {
 
   it("does not configure Groq even when Groq env vars are present", () => {
     const providers = getConfiguredAiPlanExtractProviders({
-      AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq",
       GROQ_API_KEY: "groq-key",
-      AI_GROQ_MODEL: "llama-3.1-8b-instant",
+      GROQ_TEXT_MODEL: "llama-3.1-8b-instant",
     });
 
     expect(providers).toHaveLength(0);
   });
 
-  it("keeps Groq disabled even when visual input is explicitly enabled", () => {
+  it("keeps Groq text-only and unavailable for visual plan extraction", () => {
     const providers = getConfiguredAiPlanExtractProviders({
-      AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq",
+      AI_MODE: "free-cloud",
+      AI_PLAN_PRIMARY_PROVIDER: "groq",
       GROQ_API_KEY: "groq-key",
-      AI_GROQ_MODEL: "llama-3.2-11b-vision-preview",
-      AI_GROQ_VISION_ENABLED: "true",
+      GROQ_TEXT_MODEL: "llama-3.1-8b-instant",
     });
 
     expect(providers).toHaveLength(0);
@@ -99,9 +111,8 @@ describe("AI plan extraction providers", () => {
 
   it("does not configure OpenRouter even when OpenRouter env vars are present", () => {
     const providers = getConfiguredAiPlanExtractProviders({
-      AI_PLAN_EXTRACT_PROVIDER_ORDER: "openrouter",
       OPENROUTER_API_KEY: "openrouter-key",
-      AI_OPENROUTER_MODEL: "google/gemini-2.5-flash",
+      OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.5-flash:free",
     });
 
     expect(providers).toHaveLength(0);
@@ -114,7 +125,7 @@ describe("AI plan extraction providers", () => {
           mimeType: "application/pdf",
           fileBase64: "abc",
         },
-        { env: { AI_PLAN_EXTRACT_PROVIDER_ORDER: "groq", GROQ_API_KEY: "groq-key", AI_GROQ_MODEL: "llama-3.1-8b-instant" } }
+        { env: { AI_MODE: "paid", GROQ_API_KEY: "groq-key", GROQ_TEXT_MODEL: "llama-3.1-8b-instant" } }
       )
     ).rejects.toBeInstanceOf(AiProviderUnavailableError);
   });
@@ -128,7 +139,7 @@ describe("AI plan extraction providers", () => {
         },
         {
           env: {
-            AI_PLAN_EXTRACT_PROVIDER_ORDER: "openai,openrouter",
+            AI_MODE: "paid",
             OPENAI_API_KEY: "openai-key",
             OPENROUTER_API_KEY: "openrouter-key",
           },
@@ -138,5 +149,68 @@ describe("AI plan extraction providers", () => {
         }
       )
     ).rejects.toBeInstanceOf(AiProviderChainError);
+  });
+
+  it("does not call OpenAI when free-cloud mode is active", async () => {
+    const calledProviders: string[] = [];
+    await expect(
+      extractPlanWithProviderChain(
+        {
+          mimeType: "image/png",
+          fileBase64: "abc",
+        },
+        {
+          env: {
+            AI_MODE: "free-cloud",
+            AI_PLAN_PRIMARY_PROVIDER: "gemini",
+            GEMINI_API_KEY: "gemini-key",
+            GEMINI_MODEL: "gemini-2.5-flash",
+            OPENAI_API_KEY: "openai-key",
+            AI_OPENAI_MODEL: "gpt-4o-mini",
+          },
+          async callProvider(provider) {
+            calledProviders.push(provider.id);
+            return {
+              result: parsePlanExtractResult(validPlanExtractJson),
+              provider: provider.id,
+              model: provider.model,
+            };
+          },
+        }
+      )
+    ).resolves.toMatchObject({ provider: "gemini" });
+
+    expect(calledProviders).toEqual(["gemini"]);
+  });
+
+  it("uses OpenAI and not free providers when paid mode is explicit", async () => {
+    const calledProviders: string[] = [];
+    await expect(
+      extractPlanWithProviderChain(
+        {
+          mimeType: "image/png",
+          fileBase64: "abc",
+        },
+        {
+          env: {
+            AI_MODE: "paid",
+            OPENAI_API_KEY: "openai-key",
+            AI_OPENAI_MODEL: "gpt-4o-mini",
+            GEMINI_API_KEY: "gemini-key",
+            GEMINI_MODEL: "gemini-2.5-flash",
+          },
+          async callProvider(provider) {
+            calledProviders.push(provider.id);
+            return {
+              result: parsePlanExtractResult(validPlanExtractJson),
+              provider: provider.id,
+              model: provider.model,
+            };
+          },
+        }
+      )
+    ).resolves.toMatchObject({ provider: "openai" });
+
+    expect(calledProviders).toEqual(["openai"]);
   });
 });

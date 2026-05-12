@@ -33,15 +33,16 @@ Optional real run against a local or preview app endpoint:
 npm run ai:free-cloud:benchmark -- --real --endpoint http://localhost:3000/api/ai/plan-extract
 ```
 
-If the endpoint is protected, pass authentication through server-side environment variables, not command output:
+If the endpoint is protected, pass temporary local authentication as CLI input for the manual run:
 
 ```bash
-AI_FREE_CLOUD_BENCHMARK_COOKIE="__session=<local-session-cookie>" \
-AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS=30000 \
-npm run ai:free-cloud:benchmark -- --real --endpoint http://localhost:3000/api/ai/plan-extract
+npm run ai:free-cloud:benchmark -- --real \
+  --endpoint http://localhost:3000/api/ai/plan-extract \
+  --auth-cookie "__session=<local-session-cookie>" \
+  --timeout-ms 30000
 ```
 
-Real mode is not part of CI. It requires the app endpoint to be running with free-cloud server env vars configured. It does not read or print provider API keys or authentication headers.
+Real mode is not part of CI. It requires the app endpoint to be running with the existing free-cloud server env vars configured. It does not require extra Vercel env vars, and it does not read or print provider API keys.
 
 ## Current dry-run baseline
 

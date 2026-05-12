@@ -10,15 +10,28 @@ O resultado sempre passa por revisão humana antes de ser aplicado ao projeto. A
 
 ## Provider Atual E Modo Free-cloud
 
-O runtime atual de `/api/ai/plan-extract` continua usando OpenAI API quando a feature estiver habilitada:
+O runtime de `/api/ai/plan-extract` escolhe provider pelo modo explícito. No modo gratuito:
 
 ```txt
-AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
-OPENAI_API_KEY=...
-AI_OPENAI_MODEL=gpt-4o-mini
+AI_MODE=free-cloud
+AI_PLAN_PRIMARY_PROVIDER=gemini
+AI_PLAN_REVIEW_PROVIDER=openrouter
+AI_TEXT_PROVIDER=groq
+AI_TEXT_FALLBACK_PROVIDER=cerebras
 ```
 
-O ciclo `#182` introduz `AI_MODE=free-cloud` com OpenAI em standby. Nesse modo, o router usa providers gratuitos por tarefa quando configurados: Gemini para extração principal, OpenRouter Free para segunda leitura e Groq/Cerebras/SambaNova para resumo textual auxiliar. Veja `free-cloud-ai-routing.md`.
+Nesse modo, Gemini faz a extração principal, OpenRouter Free faz a segunda leitura quando suportado e Groq/Cerebras/SambaNova resumem pendências. OpenAI fica em standby. Veja `free-cloud-ai-routing.md`.
+
+No modo Pro/OpenAI explícito:
+
+```txt
+AI_MODE=paid
+OPENAI_API_KEY=...
+AI_OPENAI_MODEL=gpt-4o-mini
+AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini
+```
+
+`AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente agora.
 
 `OPENAI_API_KEY` deve ser lida apenas no servidor. Nunca use `NEXT_PUBLIC_OPENAI_API_KEY`; variáveis com prefixo `NEXT_PUBLIC_` entram no bundle do navegador.
 
@@ -26,12 +39,12 @@ O ciclo `#182` introduz `AI_MODE=free-cloud` com OpenAI em standby. Nesse modo, 
 
 Copie `.env.example` para `.env.local` no desenvolvimento local. Em Vercel, configure as mesmas variáveis em Project Settings > Environment Variables.
 
-Obrigatórias para habilitar o runtime OpenAI atual:
+Obrigatórias para habilitar o runtime:
 
 - `AI_PLAN_EXTRACT_ENABLED=true`
-- `AI_PLAN_EXTRACT_PROVIDER_ORDER=openai`
-- `OPENAI_API_KEY`
-- `AI_OPENAI_MODEL=gpt-4o-mini`
+- `AI_MODE=free-cloud` ou `AI_MODE=paid`
+- Em `free-cloud`: `GEMINI_API_KEY`, `GEMINI_MODEL`, `OPENROUTER_API_KEY`, `OPENROUTER_PLAN_REVIEW_MODEL`, `GROQ_API_KEY`, `GROQ_TEXT_MODEL` conforme providers habilitados.
+- Em `paid`: `OPENAI_API_KEY` e `AI_OPENAI_MODEL=gpt-4o-mini`.
 - `AI_RATE_LIMIT_SALT` com valor forte e único em produção
 
 Limites e segurança:
@@ -118,18 +131,26 @@ npm install
 npm run dev
 ```
 
-Para testar sem custo no runtime atual, mantenha `AI_PLAN_EXTRACT_ENABLED=false`. Para testar com OpenAI real, configure limites pequenos:
+Para testar sem custo com providers gratuitos, configure limites pequenos:
 
 ```txt
 AI_PLAN_EXTRACT_ENABLED=true
+AI_MODE=free-cloud
 AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER=3
 AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT=10
-AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
-OPENAI_API_KEY=...
-AI_OPENAI_MODEL=gpt-4o-mini
+AI_PLAN_PRIMARY_PROVIDER=gemini
+AI_PLAN_REVIEW_PROVIDER=openrouter
+AI_TEXT_PROVIDER=groq
+AI_TEXT_FALLBACK_PROVIDER=cerebras
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.5-flash
+OPENROUTER_API_KEY=...
+OPENROUTER_PLAN_REVIEW_MODEL=google/gemini-2.0-flash-exp:free
+GROQ_API_KEY=...
+GROQ_TEXT_MODEL=llama-3.1-8b-instant
 ```
 
-Assinatura ChatGPT não configura automaticamente a API do app. A chave precisa vir da plataforma OpenAI e ficar somente em `.env.local` ou nas variáveis server-side da Vercel.
+Para testar com OpenAI real, use `AI_MODE=paid`, `OPENAI_API_KEY` e `AI_OPENAI_MODEL`. Assinatura ChatGPT não configura automaticamente a API do app. A chave precisa vir da plataforma OpenAI e ficar somente em `.env.local` ou nas variáveis server-side da Vercel.
 
 ## Deploy Vercel
 

@@ -7,7 +7,7 @@ export type PlanImportStateCopy = {
   progress?: number;
 };
 
-export type PlanImportAiMode = "free-cloud" | "openai";
+export type PlanImportAiMode = "free-cloud" | "paid";
 
 export type PlanImportProviderUiStatus = {
   mode: PlanImportAiMode;
@@ -22,9 +22,9 @@ export type PlanImportProviderUiStatus = {
 };
 
 export const defaultPlanImportProviderUiStatus: PlanImportProviderUiStatus = {
-  mode: "openai",
-  modeLabel: "OpenAI API",
-  primaryProviderLabel: "OpenAI",
+  mode: "paid",
+  modeLabel: "Modo Pro",
+  primaryProviderLabel: "Revisao detalhada",
   paidFallbackEnabled: false,
   primaryConfigured: false,
   reviewConfigured: false,
@@ -32,19 +32,19 @@ export const defaultPlanImportProviderUiStatus: PlanImportProviderUiStatus = {
 
 export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> = {
   idle: {
-    badge: "OpenAI sob demanda",
+    badge: "Modo Pro",
     title: "Arraste a planta aqui",
     description: "PNG, JPG, WebP ou PDF. Nada sera aplicado sem revisao.",
   },
   uploading: {
     badge: "Enviando",
     title: "Enviando arquivo",
-    description: "A chave OpenAI permanece somente no servidor.",
+    description: "As credenciais permanecem somente no servidor.",
     progress: 32,
   },
   analyzing: {
     badge: "Analisando",
-    title: "Analisando com OpenAI",
+    title: "Analisando em Modo Pro",
     description: "Extraindo campos preliminares, evidencias e incertezas.",
     progress: 68,
   },
@@ -82,25 +82,25 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
     idle: {
       badge: "Modo gratuito",
       title: "Arraste a planta aqui",
-      description: "PDF, PNG, JPG ou WebP. Providers gratuitos sugerem; voce revisa antes de aplicar.",
+      description: "PDF, PNG, JPG ou WebP. A análise sugere; voce revisa antes de aplicar.",
     },
     uploading: {
       badge: "Enviando",
       title: "Enviando arquivo",
-      description: "As chaves dos providers ficam somente no servidor.",
+      description: "As credenciais ficam somente no servidor.",
       progress: 32,
     },
     analyzing: {
       badge: "Analisando",
-      title: `Analisando com ${providerStatus.primaryProviderLabel}`,
+      title: providerStatus.primaryProviderLabel,
       description: providerStatus.reviewProviderLabel
-        ? `Segunda leitura opcional com ${providerStatus.reviewProviderLabel}; divergencias ficam pendentes.`
+        ? `${providerStatus.reviewProviderLabel} opcional; divergencias ficam pendentes.`
         : "Extraindo campos preliminares, evidencias e incertezas.",
       progress: 68,
     },
     error: {
       badge: "Fallback manual",
-      title: "Provider gratuito indisponivel",
+      title: "Análise indisponivel",
       description: "Continue pelo preenchimento manual ou tente outro arquivo quando o limite externo liberar.",
     },
     "limit-exceeded": {
@@ -141,13 +141,5 @@ export function getPlanImportPayloadMessage(payload: unknown, state: PlanImportS
 
 export function formatPlanImportProviderName(provider?: string) {
   if (!provider) return undefined;
-  const labels: Record<string, string> = {
-    gemini: "Gemini Free",
-    openrouter: "OpenRouter Free",
-    groq: "Groq Free",
-    cerebras: "Cerebras Free",
-    sambanova: "SambaNova Free",
-    openai: "OpenAI",
-  };
-  return labels[provider] ?? provider;
+  return provider === "openai" ? "Modo Pro" : "Modo gratuito";
 }

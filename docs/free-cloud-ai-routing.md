@@ -2,7 +2,7 @@
 
 ## Status
 
-Este documento define a política operacional do ciclo `#182`. O roteador contratual vive em `src/lib/ai/free-cloud-router.ts`. Gemini já atua como primeira leitura visual no modo `free-cloud`; OpenRouter Free atua como segunda leitura visual/comparação quando configurado e quando o tipo de arquivo for suportado pelo modelo selecionado.
+Este documento define a política operacional do ciclo `#182`. A resolução Free/Pro vive em `src/lib/ai/mode.ts`; o roteador contratual de tarefas vive em `src/lib/ai/free-cloud-router.ts`. Gemini já atua como primeira leitura visual no modo `free-cloud`; OpenRouter Free atua como segunda leitura visual/comparação quando configurado e quando o tipo de arquivo for suportado pelo modelo selecionado.
 
 ## Objetivo
 
@@ -22,9 +22,9 @@ Fluxo de produto:
 | --- | --- | --- |
 | `AI_MODE` | `free-cloud` | Modo padrão deste ciclo. Não pode chamar OpenAI nem provider pago. |
 | `AI_PAID_FALLBACK_ENABLED` | `false` | Padrão seguro. Sem fallback automático para OpenAI ou provider pago. |
-| `AI_PAID_FALLBACK_ENABLED` | `true` | Permitido apenas em modo pago/operação explícita futura. Deve ser visível na UI. |
+| `AI_MODE` | `paid` | Modo Pro/OpenAI explícito. Usa `OPENAI_API_KEY` e `AI_OPENAI_MODEL`. |
 
-OpenAI não deve ser removido. A chave `OPENAI_API_KEY` continua server-side e só pode ser usada quando o modo pago estiver explicitamente habilitado.
+OpenAI não deve ser removido. A chave `OPENAI_API_KEY` continua server-side e só pode ser usada quando o modo pago estiver explicitamente habilitado. `AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente agora.
 
 ## Providers Por Tarefa
 
@@ -34,7 +34,7 @@ OpenAI não deve ser removido. A chave `OPENAI_API_KEY` continua server-side e s
 | Segunda leitura visual/comparação | OpenRouter Free | `AI_PLAN_REVIEW_PROVIDER=openrouter` |
 | Resumo textual e pendências | Groq Free | `AI_TEXT_PROVIDER=groq` |
 | Fallback textual opcional | Cerebras ou SambaNova Free | `AI_TEXT_FALLBACK_PROVIDER=cerebras` ou `sambanova` |
-| Standby pago | OpenAI | somente com `AI_PAID_FALLBACK_ENABLED=true` ou modo pago explícito |
+| Modo Pro explícito | OpenAI | somente com `AI_MODE=paid` |
 
 OpenRouter deve usar apenas modelos gratuitos no modo `free-cloud`. Neste contrato inicial, OpenRouter é tratado como segunda leitura visual sem suporte PDF genérico; suporte PDF dependerá do modelo/rota em PR futuro. No modo `free-cloud`, `OPENROUTER_PLAN_REVIEW_MODEL` é obrigatório para OpenRouter e o router só aceita IDs de modelo com sufixo `:free`. Se não houver modelo gratuito compatível com a tarefa, a extração primária com Gemini continua e a segunda leitura fica marcada como indisponível/pendente.
 
@@ -46,6 +46,7 @@ Modelos configuráveis por provider:
 - `CEREBRAS_TEXT_MODEL`
 - `SAMBANOVA_TEXT_MODEL`
 - `AI_OPENAI_MODEL` para OpenAI em modo pago explícito
+- `AI_OPENAI_MODEL_PREMIUM` reservado para comparação futura
 
 ## Variáveis De Ambiente
 
@@ -68,6 +69,10 @@ CEREBRAS_API_KEY=
 CEREBRAS_TEXT_MODEL=
 SAMBANOVA_API_KEY=
 SAMBANOVA_TEXT_MODEL=
+
+OPENAI_API_KEY=
+AI_OPENAI_MODEL=gpt-4o-mini
+AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini
 ```
 
 Regras:
@@ -86,7 +91,7 @@ Comportamento esperado:
 
 - respeitar cache por hash de arquivo;
 - manter rate limit por usuário/IP/global;
-- mostrar provider usado e status seguro na UI;
+- mostrar status de produto seguro na UI;
 - quando o provider gratuito falhar ou atingir limite, voltar para preenchimento manual;
 - não acionar OpenAI automaticamente para "salvar" a análise.
 

@@ -6,11 +6,13 @@ Definir o mapa técnico para transformar planta baixa ou entrada manual em quant
 
 ## Contrato De IA
 
-Provider oficial:
+Providers oficiais:
 
-- OpenAI API.
-- `OPENAI_API_KEY` somente no servidor.
-- Nenhum `NEXT_PUBLIC_OPENAI_API_KEY`.
+- Modo free-cloud: Gemini como análise principal, OpenRouter como segunda leitura e Groq/Cerebras/SambaNova para texto.
+- Modo pago explícito: OpenAI com `AI_OPENAI_MODEL=gpt-4o-mini`.
+- `AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini` fica reservado para comparação futura e não é chamado automaticamente.
+- Todas as chaves ficam somente no servidor.
+- Nenhum `NEXT_PUBLIC_*_API_KEY`.
 - Nenhuma chave em log, resposta de API ou código hardcoded.
 
 A IA pode:

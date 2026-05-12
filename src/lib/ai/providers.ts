@@ -3,8 +3,9 @@ import { mergePlanExtractionResults, type PlanExtractComparisonSummary } from "@
 import { parsePlanExtractResult, type PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import { AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError, getAiTaskProviderId, resolveAiTaskProvider, type AiCloudProviderId } from "@/lib/ai/free-cloud-router";
+import { readAiProductMode } from "@/lib/ai/mode";
 
-export type AiPlanExtractProviderId = "gemini" | "openai" | "openrouter" | "groq" | "generic";
+export type AiPlanExtractProviderId = "gemini" | "openai" | "openrouter" | "groq";
 
 export type AiPlanExtractMimeType = "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
 
@@ -72,17 +73,11 @@ const providerDefaults: Record<AiPlanExtractProviderId, { modelEnv: string; keyE
     supports: ["image/png", "image/jpeg", "image/webp"],
   },
   groq: {
-    modelEnv: "AI_GROQ_MODEL",
+    modelEnv: "GROQ_TEXT_MODEL",
     keyEnv: "GROQ_API_KEY",
     defaultModel: "llama-3.1-8b-instant",
     baseUrl: "https://api.groq.com/openai/v1/chat/completions",
-    supports: ["image/png", "image/jpeg", "image/webp"],
-  },
-  generic: {
-    modelEnv: "LLM_MODEL",
-    keyEnv: "LLM_API_KEY",
-    defaultModel: "",
-    supports: ["image/png", "image/jpeg", "image/webp"],
+    supports: [],
   },
 };
 
@@ -96,14 +91,8 @@ class AiProviderHttpError extends Error {
   }
 }
 
-function getBooleanEnv(env: AiPlanExtractEnv, key: string, fallback = false) {
-  const value = env[key];
-  if (value === undefined) return fallback;
-  return value.toLowerCase() === "true";
-}
-
 function isFreeCloudMode(env: AiPlanExtractEnv) {
-  return env.AI_MODE === "free-cloud";
+  return readAiProductMode(env) === "free-cloud";
 }
 
 function toPlanExtractProviderId(providerId: AiCloudProviderId): AiPlanExtractProviderId | undefined {
@@ -120,16 +109,11 @@ export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.en
   return officialProviderOrder;
 }
 
-function getProviderSupportedMimeTypes(id: AiPlanExtractProviderId, env: AiPlanExtractEnv, defaults: (typeof providerDefaults)[AiPlanExtractProviderId]) {
-  if (id !== "groq") return defaults.supports;
-  return getBooleanEnv(env, "AI_GROQ_VISION_ENABLED", false) ? defaults.supports : [];
-}
-
 export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.env): AiPlanExtractProviderConfig[] {
   return getAiPlanExtractProviderOrder(env).map((id) => {
     const defaults = providerDefaults[id];
     const model = env[defaults.modelEnv] || defaults.defaultModel;
-    const baseUrl = id === "generic" ? env.LLM_API_URL : defaults.baseUrl;
+    const baseUrl = defaults.baseUrl;
     const apiKey = defaults.keyEnv ? env[defaults.keyEnv] : undefined;
     return {
       id,
@@ -137,7 +121,7 @@ export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.
       baseUrl,
       apiKey,
       configured: Boolean(model && baseUrl && apiKey),
-      supports: getProviderSupportedMimeTypes(id, env, defaults),
+      supports: defaults.supports,
     };
   });
 }
@@ -151,7 +135,7 @@ export function getAiPlanReviewProviderConfig(env: AiPlanExtractEnv = process.en
 
   const defaults = providerDefaults[id];
   const model = resolved.modelEnv ? env[resolved.modelEnv] || defaults.defaultModel : defaults.defaultModel;
-  const baseUrl = id === "generic" ? env.LLM_API_URL : defaults.baseUrl;
+  const baseUrl = defaults.baseUrl;
   const apiKey = defaults.keyEnv ? env[defaults.keyEnv] : undefined;
   return {
     id,
@@ -159,12 +143,12 @@ export function getAiPlanReviewProviderConfig(env: AiPlanExtractEnv = process.en
     baseUrl,
     apiKey,
     configured: Boolean(model && baseUrl && apiKey),
-    supports: getProviderSupportedMimeTypes(id, env, defaults),
+    supports: defaults.supports,
   };
 }
 
 export function getConfiguredAiPlanExtractProviders(env: AiPlanExtractEnv = process.env) {
-  return getAiPlanExtractProviderConfigs(env).filter((provider) => provider.configured);
+  return getAiPlanExtractProviderConfigs(env).filter((provider) => provider.configured && provider.supports.length > 0);
 }
 
 function createAbortSignal(timeoutMs: number) {

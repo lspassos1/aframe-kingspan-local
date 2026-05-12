@@ -112,10 +112,10 @@ function waitForNextPaint() {
 
 function getReviewStatusLabel(review?: PlanExtractReviewPayload, providerStatus: PlanImportProviderUiStatus = defaultPlanImportProviderUiStatus) {
   if (!review && providerStatus.mode === "free-cloud") {
-    return providerStatus.reviewProviderLabel ? `${providerStatus.reviewProviderLabel}: aguardando upload.` : "Comparação: não configurada.";
+    return providerStatus.reviewProviderLabel ? `${providerStatus.reviewProviderLabel}: aguardando upload.` : "Revisão: não configurada.";
   }
   if (!review) return undefined;
-  const providerLabel = formatPlanImportProviderName(review.provider) ?? providerStatus.reviewProviderLabel ?? "Provider de comparação";
+  const providerLabel = providerStatus.reviewProviderLabel ?? "Revisão detalhada";
   if (review.status === "completed") {
     const divergences = review.comparison?.divergences?.length ?? 0;
     const unresolved = review.comparison?.unresolved?.length ?? 0;
@@ -147,8 +147,8 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
         title: "Upload assistido indisponivel",
         description:
           aiProviderStatus.mode === "free-cloud"
-            ? "Configure AI_PLAN_EXTRACT_ENABLED=true, AI_MODE=free-cloud e providers gratuitos no servidor."
-            : "Configure AI_PLAN_EXTRACT_ENABLED=true e OPENAI_API_KEY no servidor para habilitar OpenAI.",
+            ? "Configure o modo gratuito no servidor."
+            : "Configure o Modo Pro no servidor.",
       };
   const isBusy = state === "uploading" || state === "analyzing";
   const canUpload = planExtractEnabled && !isBusy;
@@ -158,7 +158,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
   const providerCopy =
     aiProviderStatus.mode === "free-cloud"
       ? `${aiProviderStatus.primaryProviderLabel} sugere campos preliminares; o sistema não aplica nada sem revisão humana.`
-      : "OpenAI sugere campos preliminares; o sistema não aplica nada sem revisão humana.";
+      : "Modo Pro sugere campos preliminares; o sistema não aplica nada sem revisão humana.";
 
   function openManualFallback() {
     if (onManualFallback) {
@@ -380,35 +380,26 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
             <p>
               {aiProviderStatus.mode === "free-cloud"
                 ? `Modo gratuito: ${aiProviderStatus.primaryProviderLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando chave no servidor"}.`
-                : "Provider configurado: OpenAI."}
+                : `${aiProviderStatus.modeLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando configuração no servidor"}.`}
             </p>
             {aiProviderStatus.mode === "free-cloud" && aiProviderStatus.reviewProviderLabel ? (
               <p>
-                Comparação: {aiProviderStatus.reviewProviderLabel}
-                {aiProviderStatus.reviewConfigured ? "" : " aguardando chave no servidor"}.
+                Revisão: {aiProviderStatus.reviewProviderLabel}
+                {aiProviderStatus.reviewConfigured ? "" : " aguardando configuração no servidor"}.
               </p>
             ) : null}
             {providerMeta.provider ? (
-              <p>
-                Resposta: {formatPlanImportProviderName(providerMeta.provider)}
-                {aiProviderStatus.mode === "openai" && providerMeta.model ? `/${providerMeta.model}` : ""}.
-              </p>
+              <p>Resposta: {formatPlanImportProviderName(providerMeta.provider)}.</p>
             ) : null}
             {reviewStatusLabel ? <p>{reviewStatusLabel}</p> : null}
             {providerMeta.cached ? <p>Cache reaproveitado; limite diario nao foi consumido.</p> : null}
             {providerMeta.remaining && providerMeta.limit ? <p>Limite restante hoje: {providerMeta.remaining}/{providerMeta.limit}.</p> : null}
-            {aiProviderStatus.mode === "free-cloud" ? (
-              aiProviderStatus.paidFallbackEnabled ? (
-                <p>Fallback pago configurado, mas não é acionado automaticamente neste fluxo.</p>
-              ) : (
-                <p>Sem fallback pago automatico; custo zero depende dos limites externos dos providers.</p>
-              )
-            ) : null}
+            {aiProviderStatus.mode === "free-cloud" ? <p>Sem fallback pago automatico; custo zero depende dos limites externos.</p> : null}
             {!planExtractEnabled ? (
               <p>
                 {aiProviderStatus.mode === "free-cloud"
-                  ? "Configure chaves server-side dos providers gratuitos; nenhuma chave deve usar NEXT_PUBLIC_."
-                  : "Assinatura ChatGPT nao configura esta API automaticamente; use uma API key da OpenAI no ambiente do servidor."}
+                  ? "Configure as credenciais server-side; nenhuma chave deve usar NEXT_PUBLIC_."
+                  : "Assinatura ChatGPT nao configura esta API automaticamente; use credencial server-side no ambiente do servidor."}
               </p>
             ) : null}
           </div>

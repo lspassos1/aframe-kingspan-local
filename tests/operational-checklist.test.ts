@@ -8,9 +8,10 @@ vi.mock("server-only", () => ({}));
 
 const disabledEnvironment: OperationalEnvironmentStatus = {
   aiPlanExtractEnabled: false,
-  openAiApiKeyConfigured: false,
-  openAiModelConfigured: false,
-  providerLabel: "OpenAI",
+  aiMode: "free-cloud",
+  aiProviderConfigured: false,
+  aiModelConfigured: false,
+  providerLabel: "Modo gratuito",
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
 };
 
@@ -25,7 +26,7 @@ describe("operational checklist", () => {
     const checklist = createOperationalChecklist(disabledEnvironment, defaultProject);
 
     expect(getStatus(checklist, "ai")).toBe("desligada");
-    expect(getStatus(checklist, "provider")).toBe("OpenAI");
+    expect(getStatus(checklist, "provider")).toBe("Modo gratuito");
     expect(getStatus(checklist, "model")).toBe("ausente");
     expect(getStatus(checklist, "daily-limit")).toBe("disponível");
     expect(getStatus(checklist, "sinapi")).toBe("base ausente");
@@ -57,8 +58,8 @@ describe("operational checklist", () => {
       {
         ...disabledEnvironment,
         aiPlanExtractEnabled: true,
-        openAiApiKeyConfigured: true,
-        openAiModelConfigured: true,
+        aiProviderConfigured: true,
+        aiModelConfigured: true,
       },
       project
     );
@@ -70,13 +71,13 @@ describe("operational checklist", () => {
     expect(JSON.stringify(checklist)).not.toContain("sk-");
   });
 
-  it("keeps AI active with OpenAI key while reporting an absent explicit model", () => {
+  it("keeps AI active with configured provider while reporting an absent explicit model", () => {
     const checklist = createOperationalChecklist(
       {
         ...disabledEnvironment,
         aiPlanExtractEnabled: true,
-        openAiApiKeyConfigured: true,
-        openAiModelConfigured: false,
+        aiProviderConfigured: true,
+        aiModelConfigured: false,
       },
       defaultProject
     );

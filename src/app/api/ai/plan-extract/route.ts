@@ -12,6 +12,7 @@ import {
 import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtractFile } from "@/lib/ai/plan-extract-request";
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError } from "@/lib/ai/free-cloud-router";
+import { readAiProductMode } from "@/lib/ai/mode";
 
 export const runtime = "nodejs";
 
@@ -20,12 +21,13 @@ function jsonResponse(body: Record<string, unknown>, init?: ResponseInit) {
 }
 
 function getErrorMessage(error: unknown) {
+  const mode = readAiProductMode(process.env);
   if (error instanceof AiProviderUnavailableError) {
     return {
       message:
-        process.env.AI_MODE === "free-cloud"
-          ? "Provider gratuito de IA nao esta configurado no servidor. Verifique GEMINI_API_KEY e GEMINI_MODEL."
-          : "OpenAI API nao esta configurada no servidor. Defina OPENAI_API_KEY e AI_OPENAI_MODEL para habilitar a extracao.",
+        mode === "free-cloud"
+          ? "Modo gratuito de IA nao esta configurado no servidor."
+          : "Modo Pro de IA nao esta configurado no servidor.",
       code: error.code,
     };
   }
@@ -35,9 +37,7 @@ function getErrorMessage(error: unknown) {
   if (error instanceof AiProviderChainError) {
     return {
       message:
-        process.env.AI_MODE === "free-cloud"
-          ? "Nao foi possivel extrair a planta com provider gratuito neste momento."
-          : "Nao foi possivel extrair a planta com OpenAI neste momento.",
+        mode === "free-cloud" ? "Nao foi possivel extrair a planta com o modo gratuito neste momento." : "Nao foi possivel extrair a planta com o Modo Pro neste momento.",
       providers: error.providerErrors,
     };
   }

@@ -32,10 +32,10 @@ import { PlanImportCard } from "@/components/ai/PlanImportCard";
 const freeCloudStatus: PlanImportProviderUiStatus = {
   mode: "free-cloud",
   modeLabel: "Modo gratuito",
-  primaryProviderLabel: "Gemini Free",
-  reviewProviderLabel: "OpenRouter Free",
-  textProviderLabel: "Groq Free",
-  textFallbackProviderLabel: "Cerebras Free",
+  primaryProviderLabel: "Analise rapida",
+  reviewProviderLabel: "Revisao detalhada",
+  textProviderLabel: "Resumo de pendencias",
+  textFallbackProviderLabel: "Resumo alternativo",
   paidFallbackEnabled: false,
   primaryConfigured: true,
   reviewConfigured: false,
@@ -53,25 +53,26 @@ describe("plan import UI state", () => {
   it("keeps explicit copy for upload, analyzing, cache hit and limit states", () => {
     expect(planImportStateCopy.idle.title).toContain("Arraste");
     expect(planImportStateCopy.uploading.badge).toBe("Enviando");
-    expect(planImportStateCopy.analyzing.title).toContain("OpenAI");
+    expect(planImportStateCopy.analyzing.title).toContain("Modo Pro");
     expect(planImportStateCopy["cache-hit"].description).toContain("limite diario nao foi consumido");
     expect(planImportStateCopy["limit-exceeded"].description).toContain("preenchimento manual");
   });
 
   it("switches upload copy to free-cloud mode without promising a paid provider", () => {
     expect(getPlanImportStateCopy("idle", freeCloudStatus).badge).toBe("Modo gratuito");
-    expect(getPlanImportStateCopy("analyzing", freeCloudStatus).title).toContain("Gemini Free");
-    expect(getPlanImportStateCopy("analyzing", freeCloudStatus).description).toContain("OpenRouter Free");
+    expect(getPlanImportStateCopy("analyzing", freeCloudStatus).title).toContain("Analise rapida");
+    expect(getPlanImportStateCopy("analyzing", freeCloudStatus).description).toContain("Revisao detalhada");
     expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).description).toContain("sem chamar provider pago");
   });
 
   it("uses safe API messages without exposing provider secrets", () => {
-    expect(getPlanImportPayloadMessage({ message: "OpenAI API nao esta configurada no servidor." }, "error")).toContain("OpenAI API");
+    expect(getPlanImportPayloadMessage({ message: "Modo Pro de IA nao esta configurado no servidor." }, "error")).toContain("Modo Pro");
     expect(getPlanImportPayloadMessage(null, "limit-exceeded")).toContain("Limite diario");
   });
 
-  it("keeps unknown provider names instead of relabeling them as primary", () => {
-    expect(formatPlanImportProviderName("custom-free-provider")).toBe("custom-free-provider");
+  it("formats provider responses as product modes", () => {
+    expect(formatPlanImportProviderName("custom-free-provider")).toBe("Modo gratuito");
+    expect(formatPlanImportProviderName("openai")).toBe("Modo Pro");
   });
 
   it("creates safe free-cloud UI status from server env without leaking keys", () => {
@@ -83,6 +84,7 @@ describe("plan import UI state", () => {
       AI_TEXT_FALLBACK_PROVIDER: "cerebras",
       AI_PAID_FALLBACK_ENABLED: "false",
       GEMINI_API_KEY: "secret-gemini",
+      GEMINI_MODEL: "gemini-2.5-flash",
       OPENROUTER_API_KEY: "secret-openrouter",
       GROQ_API_KEY: "secret-groq",
     });
@@ -90,9 +92,9 @@ describe("plan import UI state", () => {
     expect(status).toMatchObject({
       mode: "free-cloud",
       modeLabel: "Modo gratuito",
-      primaryProviderLabel: "Gemini Free",
-      reviewProviderLabel: "OpenRouter Free",
-      textProviderLabel: "Groq Free",
+      primaryProviderLabel: "Analise rapida",
+      reviewProviderLabel: "Revisao detalhada",
+      textProviderLabel: "Resumo de pendencias",
       paidFallbackEnabled: false,
       primaryConfigured: true,
       reviewConfigured: true,
@@ -112,40 +114,52 @@ describe("PlanImportCard", () => {
     expect(html).toContain('data-state="idle"');
     expect(html).toContain("Arraste a planta aqui");
     expect(html).toContain("Clique para selecionar ou solte o arquivo aqui");
-    expect(html).toContain("Provider configurado: OpenAI.");
+    expect(html).toContain("Modo Pro aguardando configuração no servidor.");
   });
 
   it("renders free-cloud provider status, comparison and manual fallback copy", () => {
     const html = renderToStaticMarkup(createElement(PlanImportCard, { planExtractEnabled: true, aiProviderStatus: freeCloudStatus }));
 
     expect(html).toContain("Modo gratuito");
-    expect(html).toContain("Gemini Free sugere campos preliminares");
-    expect(html).toContain("Modo gratuito: Gemini Free.");
-    expect(html).toContain("Comparação: OpenRouter Free aguardando chave no servidor.");
+    expect(html).toContain("Analise rapida sugere campos preliminares");
+    expect(html).toContain("Modo gratuito: Analise rapida.");
+    expect(html).toContain("Revisão: Revisao detalhada aguardando configuração no servidor.");
     expect(html).toContain("Sem fallback pago automatico");
     expect(html).not.toContain("OPENAI_API_KEY");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
   });
 
-  it("renders explicit paid fallback status when the safe UI flag is enabled", () => {
+  it("keeps paid fallback disabled even if the env flag is misconfigured", () => {
+    const status = getSafePlanImportProviderUiStatus({
+      AI_MODE: "free-cloud",
+      AI_PLAN_PRIMARY_PROVIDER: "gemini",
+      AI_PAID_FALLBACK_ENABLED: "true",
+      GEMINI_API_KEY: "secret-gemini",
+    });
+
+    expect(status.paidFallbackEnabled).toBe(false);
+  });
+
+  it("does not advertise paid fallback in free-cloud upload status", () => {
     const html = renderToStaticMarkup(
       createElement(PlanImportCard, {
         planExtractEnabled: true,
-        aiProviderStatus: { ...freeCloudStatus, paidFallbackEnabled: true },
+        aiProviderStatus: freeCloudStatus,
       })
     );
 
     expect(html).toContain("Modo gratuito");
-    expect(html).toContain("Gemini Free sugere campos preliminares");
-    expect(html).toContain("Fallback pago configurado, mas não é acionado automaticamente neste fluxo.");
-    expect(html).not.toContain("Sem fallback pago automatico");
+    expect(html).toContain("Analise rapida sugere campos preliminares");
+    expect(html).toContain("Sem fallback pago automatico");
+    expect(html).not.toContain("provider pago");
   });
 
   it("renders operational setup copy when AI extraction is disabled", () => {
     const html = renderToStaticMarkup(createElement(PlanImportCard, { planExtractEnabled: false }));
 
     expect(html).toContain("Upload assistido indisponivel");
-    expect(html).toContain("AI_PLAN_EXTRACT_ENABLED=true");
-    expect(html).toContain("OPENAI_API_KEY");
+    expect(html).toContain("Configure o Modo Pro no servidor.");
     expect(html).toContain("Assinatura ChatGPT nao configura esta API automaticamente");
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
@@ -154,8 +168,7 @@ describe("PlanImportCard", () => {
   it("renders free-cloud setup copy when extraction is disabled", () => {
     const html = renderToStaticMarkup(createElement(PlanImportCard, { planExtractEnabled: false, aiProviderStatus: freeCloudStatus }));
 
-    expect(html).toContain("AI_MODE=free-cloud");
-    expect(html).toContain("providers gratuitos");
+    expect(html).toContain("Configure o modo gratuito no servidor.");
     expect(html).toContain("nenhuma chave deve usar NEXT_PUBLIC_");
     expect(html).not.toContain("OPENAI_API_KEY");
   });

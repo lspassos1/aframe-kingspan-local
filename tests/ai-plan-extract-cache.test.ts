@@ -37,7 +37,7 @@ describe("AI plan extract cache", () => {
   it("uses file bytes, mime type and provider version in cache keys", () => {
     const fileBytes = encoder.encode("same floor plan");
     const baseEnv = {
-      AI_PLAN_EXTRACT_PROVIDER_ORDER: "openai",
+      AI_MODE: "paid",
       OPENAI_API_KEY: "key",
       AI_OPENAI_MODEL: "gpt-4o-mini",
     };

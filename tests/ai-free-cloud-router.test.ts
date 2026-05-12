@@ -109,24 +109,12 @@ describe("free-cloud AI router", () => {
     ).toThrowError(new AiRouterError("Provider pago openai bloqueado no modo free-cloud.", "ai-paid-provider-blocked"));
   });
 
-  it("blocks OpenAI paid fallback when paid fallback is disabled", () => {
-    expect(() =>
-      resolveAiTaskProvider("paid-fallback", {
-        env: {
-          AI_MODE: "paid",
-          AI_PAID_FALLBACK_ENABLED: "false",
-          OPENAI_API_KEY: "openai-key",
-        },
-      })
-    ).toThrowError(new AiRouterError("Fallback pago esta desabilitado.", "ai-paid-fallback-disabled"));
-  });
-
-  it("allows OpenAI selection in explicit paid mode", () => {
+  it("allows OpenAI selection only when explicitly requested in paid mode", () => {
     expect(
-      resolveAiTaskProvider("paid-fallback", {
+      resolveAiTaskProvider("plan-primary", {
         env: {
           AI_MODE: "paid",
-          AI_PAID_FALLBACK_ENABLED: "true",
+          AI_PLAN_PRIMARY_PROVIDER: "openai",
           OPENAI_API_KEY: "openai-key",
           AI_OPENAI_MODEL: "gpt-4o-mini",
         },

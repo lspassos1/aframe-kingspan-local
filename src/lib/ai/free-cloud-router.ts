@@ -1,6 +1,8 @@
+import { readAiProductMode, type AiProductMode } from "@/lib/ai/mode";
+
 export type AiMode = "free-cloud" | "paid";
 
-export type AiTask = "plan-primary" | "plan-review" | "text-summary" | "text-fallback" | "paid-fallback";
+export type AiTask = "plan-primary" | "plan-review" | "text-summary" | "text-fallback";
 
 export type AiCloudProviderId = "gemini" | "openrouter" | "groq" | "cerebras" | "sambanova" | "openai";
 
@@ -26,7 +28,7 @@ export type AiProviderDescriptor = AiProviderCapabilities & {
 
 export type ResolvedAiTaskProvider = AiProviderDescriptor & {
   task: AiTask;
-  mode: AiMode;
+  mode: AiProductMode;
 };
 
 export class AiRouterError extends Error {
@@ -113,7 +115,6 @@ const taskProviderEnv: Record<AiTask, string> = {
   "plan-review": "AI_PLAN_REVIEW_PROVIDER",
   "text-summary": "AI_TEXT_PROVIDER",
   "text-fallback": "AI_TEXT_FALLBACK_PROVIDER",
-  "paid-fallback": "AI_PAID_FALLBACK_PROVIDER",
 };
 
 const taskDefaultProvider: Record<AiTask, AiCloudProviderId> = {
@@ -121,7 +122,6 @@ const taskDefaultProvider: Record<AiTask, AiCloudProviderId> = {
   "plan-review": "openrouter",
   "text-summary": "groq",
   "text-fallback": "cerebras",
-  "paid-fallback": "openai",
 };
 
 const taskRequiredCapabilities: Record<AiTask, AiProviderCapability[]> = {
@@ -129,16 +129,7 @@ const taskRequiredCapabilities: Record<AiTask, AiProviderCapability[]> = {
   "plan-review": ["vision", "jsonSchema"],
   "text-summary": ["jsonSchema"],
   "text-fallback": ["jsonSchema"],
-  "paid-fallback": ["jsonSchema"],
 };
-
-function readAiMode(env: AiRouterEnv): AiMode {
-  return env.AI_MODE === "paid" ? "paid" : "free-cloud";
-}
-
-function readBooleanEnv(env: AiRouterEnv, key: string) {
-  return env[key]?.toLowerCase() === "true";
-}
 
 function normalizeProviderId(value: string | undefined): AiCloudProviderId | undefined {
   const normalized = value?.trim().toLowerCase();
@@ -159,7 +150,7 @@ function readProviderModel(provider: AiProviderDescriptor, env: AiRouterEnv) {
   return provider.modelEnv ? env[provider.modelEnv]?.trim() : undefined;
 }
 
-function assertFreeCloudModel(provider: AiProviderDescriptor, env: AiRouterEnv, mode: AiMode) {
+function assertFreeCloudModel(provider: AiProviderDescriptor, env: AiRouterEnv, mode: AiProductMode) {
   if (mode !== "free-cloud" || provider.id !== "openrouter") return;
 
   const model = readProviderModel(provider, env);
@@ -206,12 +197,8 @@ export function resolveAiTaskProvider(
   } = {}
 ): ResolvedAiTaskProvider {
   const env = options.env ?? process.env;
-  const mode = readAiMode(env);
+  const mode = readAiProductMode(env);
   const provider = createDescriptor(getAiTaskProviderId(task, env), env);
-
-  if (task === "paid-fallback" && !readBooleanEnv(env, "AI_PAID_FALLBACK_ENABLED")) {
-    throw new AiRouterError("Fallback pago esta desabilitado.", "ai-paid-fallback-disabled");
-  }
 
   if (mode === "free-cloud" && provider.isPaid) {
     throw new AiRouterError(`Provider pago ${provider.id} bloqueado no modo free-cloud.`, "ai-paid-provider-blocked");

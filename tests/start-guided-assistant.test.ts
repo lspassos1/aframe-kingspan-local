@@ -36,10 +36,10 @@ import { StartGuidedAssistant } from "@/components/onboarding/StartGuidedAssista
 const freeCloudStatus: PlanImportProviderUiStatus = {
   mode: "free-cloud",
   modeLabel: "Modo gratuito",
-  primaryProviderLabel: "Gemini Free",
-  reviewProviderLabel: "OpenRouter Free",
-  textProviderLabel: "Groq Free",
-  textFallbackProviderLabel: "Cerebras Free",
+  primaryProviderLabel: "Analise rapida",
+  reviewProviderLabel: "Revisao detalhada",
+  textProviderLabel: "Resumo de pendencias",
+  textFallbackProviderLabel: "Resumo alternativo",
   paidFallbackEnabled: false,
   primaryConfigured: true,
   reviewConfigured: true,
@@ -85,7 +85,7 @@ describe("createStartAssistantViewModel", () => {
   it("describes the AI option as free-cloud when requested", () => {
     const viewModel = createStartAssistantViewModel({ mode: "choose", planExtractEnabled: true, aiMode: "free-cloud" });
 
-    expect(viewModel.options.find((option) => option.id === "ai")?.description).toContain("Providers gratuitos");
+    expect(viewModel.options.find((option) => option.id === "ai")?.description).toContain("Análise rápida");
   });
 
   it("supports manual and example modes explicitly", () => {
@@ -138,7 +138,7 @@ describe("StartGuidedAssistant", () => {
     expect(html).not.toContain('data-testid="manual-form"');
     expect(typeof planImportCardProps.latest?.onManualFallback).toBe("function");
     expect(html).toContain("Status da IA");
-    expect(html).toContain("OpenAI API");
+    expect(html).toContain("Modo Pro");
     expect(html).toContain("Limite diário");
     expect(html).toContain("Cache por hash ativo");
     expect(html).toContain("Fallback manual disponível");
@@ -150,13 +150,14 @@ describe("StartGuidedAssistant", () => {
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true, initialMode: "ai", aiProviderStatus: freeCloudStatus }));
 
     expect(html).toContain("Modo gratuito");
-    expect(html).toContain("Provider principal");
-    expect(html).toContain("Gemini Free");
-    expect(html).toContain("OpenRouter Free quando disponível");
-    expect(html).toContain("OpenAI permanece em standby");
+    expect(html).toContain("Análise");
+    expect(html).toContain("Analise rapida");
+    expect(html).toContain("Revisao detalhada quando disponível");
     expect(html).toContain("Custo zero depende dos limites externos");
-    expect(planImportCardProps.latest?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Gemini Free" });
+    expect(planImportCardProps.latest?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Analise rapida" });
     expect(html).not.toContain("OPENAI_API_KEY");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
   });
 
   it("renders the manual fallback when AI mode is selected but disabled", () => {

@@ -4,9 +4,10 @@ export type OperationalChecklistTone = "ok" | "warning" | "muted";
 
 export interface OperationalEnvironmentStatus {
   aiPlanExtractEnabled: boolean;
-  openAiApiKeyConfigured: boolean;
-  openAiModelConfigured: boolean;
-  providerLabel: "OpenAI";
+  aiMode: "free-cloud" | "paid";
+  aiProviderConfigured: boolean;
+  aiModelConfigured: boolean;
+  providerLabel: string;
   dailyLimitLabel: string;
 }
 
@@ -40,7 +41,7 @@ export function createOperationalChecklist(
     sinapiSources.some((source) => source.id === composition.sourceId)
   );
   const hasSinapiBase = sinapiSources.length > 0 || hasSinapiCompositions;
-  const aiOperational = environment.aiPlanExtractEnabled && environment.openAiApiKeyConfigured;
+  const aiOperational = environment.aiPlanExtractEnabled && environment.aiProviderConfigured;
   const scenarioLocation = scenario?.location as Partial<Scenario["location"]> | undefined;
   const scenarioState = typeof scenarioLocation?.state === "string" ? scenarioLocation.state.trim() : "";
   const hasSinapiReference = sinapiSources.some((source) => source.referenceDate.trim());
@@ -52,23 +53,35 @@ export function createOperationalChecklist(
       label: "IA",
       status: aiOperational ? "ativa" : "desligada",
       detail: aiOperational
-        ? "Upload assistido pode ser exibido no início. Confira o status do modelo abaixo."
-        : "Verifique a flag e OPENAI_API_KEY no ambiente do servidor.",
+        ? "Upload assistido pode ser exibido no início. Confira o modo de análise abaixo."
+        : environment.aiMode === "paid"
+          ? "Verifique AI_PLAN_EXTRACT_ENABLED, OPENAI_API_KEY e AI_OPENAI_MODEL no servidor."
+          : "Verifique AI_PLAN_EXTRACT_ENABLED, AI_MODE=free-cloud, GEMINI_API_KEY e GEMINI_MODEL no servidor.",
       tone: aiOperational ? "ok" : "warning",
     },
     {
       id: "provider",
-      label: "Provider",
+      label: "Modo",
       status: environment.providerLabel,
-      detail: "Provider oficial desta entrega. Outros providers não são necessários.",
+      detail:
+        environment.aiMode === "paid"
+          ? "Modo Pro usa análise paga explícita. Premium fica reservado para comparação futura."
+          : "Modo gratuito usa análise rápida, revisão opcional e resumo de pendências.",
       tone: "ok",
     },
     {
       id: "model",
-      label: "Modelo",
-      status: environment.openAiModelConfigured ? "configurado" : "ausente",
-      detail: environment.openAiModelConfigured ? "AI_OPENAI_MODEL está definido." : "Defina AI_OPENAI_MODEL no ambiente do servidor.",
-      tone: environment.openAiModelConfigured ? "ok" : "warning",
+      label: "Configuração",
+      status: environment.aiModelConfigured ? "configurado" : "ausente",
+      detail:
+        environment.aiMode === "paid"
+          ? environment.aiModelConfigured
+            ? "AI_OPENAI_MODEL está definido."
+            : "Defina AI_OPENAI_MODEL no ambiente do servidor."
+          : environment.aiModelConfigured
+            ? "GEMINI_MODEL está definido."
+            : "Defina GEMINI_MODEL no ambiente do servidor.",
+      tone: environment.aiModelConfigured ? "ok" : "warning",
     },
     {
       id: "daily-limit",
