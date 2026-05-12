@@ -74,16 +74,21 @@ export function evaluatePriceQuality(input: PriceQualityInput): PriceQualityResu
   const sourceTitle = input.source?.title?.trim() || "";
   const sourceState = input.state?.trim() || input.source?.state?.trim() || "";
   const referenceDate = input.referenceDate?.trim() || input.source?.referenceDate?.trim() || "";
-  const regime = input.regime?.trim() ?? "";
+  const regime = normalizeRegime(input.regime);
+  const sourceType = input.source?.type?.trim() ?? "";
   const priceStatus = input.priceStatus?.trim();
+  const isReviewed = input.requiresReview === false;
 
   if (!sourceId || (!sourceCode && !sourceTitle)) {
     issues.push(createIssue("missing_source_metadata", "pending", "Fonte, código ou título da composição precisam estar rastreáveis."));
   }
+  if (!sourceState) {
+    issues.push(createIssue("missing_source_metadata", "pending", "UF ou região da fonte precisa estar rastreável."));
+  }
   if (!referenceDate) {
     issues.push(createIssue("missing_reference", "pending", "Preço sem referência/data-base não pode ser tratado como revisado."));
   }
-  if (regime === "unknown") {
+  if (regime === "unknown" || (sourceType === "sinapi" && !regime)) {
     issues.push(createIssue("unknown_regime", "pending", "Regime desconhecido exige revisão antes de usar o preço."));
   }
   if (priceStatus === "invalid") {
@@ -126,7 +131,7 @@ export function evaluatePriceQuality(input: PriceQualityInput): PriceQualityResu
   if (input.totalLaborHoursPerUnit != null) {
     if (!Number.isFinite(input.totalLaborHoursPerUnit) || input.totalLaborHoursPerUnit < 0) {
       issues.push(createIssue("negative_labor_hours", "invalid", "H/H negativo ou inválido é incompatível com preço revisado."));
-    } else if (input.totalLaborHoursPerUnit > priceQualityThresholds.maxLaborHoursPerUnit) {
+    } else if (input.totalLaborHoursPerUnit > priceQualityThresholds.maxLaborHoursPerUnit && !isReviewed) {
       issues.push(createIssue("unrealistic_labor_hours", "pending", "H/H por unidade acima do limite operacional exige revisão."));
     }
   }
@@ -134,13 +139,19 @@ export function evaluatePriceQuality(input: PriceQualityInput): PriceQualityResu
   if (input.wastePercent != null) {
     if (!Number.isFinite(input.wastePercent) || input.wastePercent < 0) {
       issues.push(createIssue("negative_waste", "invalid", "Perda negativa ou inválida não é aceita."));
-    } else if (input.wastePercent > priceQualityThresholds.maxWastePercent) {
+    } else if (input.wastePercent > priceQualityThresholds.maxWastePercent && !isReviewed) {
       issues.push(createIssue("unrealistic_waste", "pending", "Perda acima do limite operacional exige justificativa."));
     }
   }
 
-  if (input.requiresReview) {
-    issues.push(createIssue("requires_review", "pending", "Preço marcado para revisão continua preliminar."));
+  if (input.requiresReview !== false) {
+    issues.push(
+      createIssue(
+        "requires_review",
+        "pending",
+        input.requiresReview === true ? "Preço marcado para revisão continua preliminar." : "Status de revisão ausente mantém o preço pendente."
+      )
+    );
   }
   if (input.candidateApprovedByUser === false) {
     issues.push(createIssue("candidate_requires_review", "pending", "Candidato de preço não é aprovado automaticamente."));
@@ -176,7 +187,7 @@ export function evaluateServiceCompositionPriceQuality(
     otherCostBRL: composition.otherCostBRL,
     totalLaborHoursPerUnit: composition.sinapi?.totalLaborHoursPerUnit ?? composition.totalLaborHoursPerUnit,
     priceStatus: composition.sinapi?.priceStatus,
-    requiresReview: composition.requiresReview || composition.sinapi?.requiresReview,
+    requiresReview: resolveReviewStatus(composition),
     ...options,
   });
 }
@@ -205,4 +216,14 @@ function normalizeStateKey(value: string | undefined) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function normalizeRegime(value: string | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function resolveReviewStatus(composition: ServiceComposition) {
+  if (composition.requiresReview === true || composition.sinapi?.requiresReview === true) return true;
+  if (composition.requiresReview === false || composition.sinapi?.requiresReview === false) return false;
+  return undefined;
 }

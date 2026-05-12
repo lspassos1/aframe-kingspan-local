@@ -67,11 +67,12 @@ describe("price quality contract", () => {
     });
   });
 
-  it("requires source metadata, reference month and known regime", () => {
+  it("requires source metadata, region, reference month and known regime", () => {
     const result = evaluatePriceQuality(
       createQualityInput({
         sourceId: "",
         sourceCode: "",
+        state: "",
         referenceDate: "",
         regime: "unknown",
       })
@@ -79,6 +80,26 @@ describe("price quality contract", () => {
 
     expect(result).toMatchObject({ status: "pending", usable: false });
     expect(result.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(["missing_source_metadata", "missing_reference", "unknown_regime"]));
+  });
+
+  it("treats missing review status as pending", () => {
+    const result = evaluatePriceQuality(createQualityInput({ requiresReview: undefined }));
+
+    expect(result).toMatchObject({ status: "pending", usable: false, requiresReview: true });
+    expect(result.issues.map((issue) => issue.code)).toContain("requires_review");
+  });
+
+  it("normalizes unknown regimes and requires regime metadata for SINAPI rows", () => {
+    const upperUnknown = evaluatePriceQuality(createQualityInput({ regime: "UNKNOWN" }));
+    const missingSinapiRegime = evaluatePriceQuality(
+      createQualityInput({
+        regime: "",
+        source: { id: "sinapi-ba-2026-05", title: "SINAPI BA", type: "sinapi", state: "BA", referenceDate: "2026-05" },
+      })
+    );
+
+    expect(upperUnknown.issues.map((issue) => issue.code)).toContain("unknown_regime");
+    expect(missingSinapiRegime.issues.map((issue) => issue.code)).toContain("unknown_regime");
   });
 
   it("invalidates impossible cost breakdown, negative H/H and negative losses", () => {
@@ -93,13 +114,24 @@ describe("price quality contract", () => {
   });
 
   it("keeps unrealistic H/H and waste pending until reviewed", () => {
-    const labor = evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: 120 }));
-    const waste = evaluatePriceQuality(createQualityInput({ wastePercent: 80 }));
+    const labor = evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: 120, requiresReview: true }));
+    const waste = evaluatePriceQuality(createQualityInput({ wastePercent: 80, requiresReview: true }));
 
     expect(labor).toMatchObject({ status: "pending", usable: false });
     expect(waste).toMatchObject({ status: "pending", usable: false });
     expect(labor.issues.map((issue) => issue.code)).toContain("unrealistic_labor_hours");
     expect(waste.issues.map((issue) => issue.code)).toContain("unrealistic_waste");
+  });
+
+  it("allows reviewed high H/H and waste threshold overrides without clearing hard invalids", () => {
+    expect(evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: 120, wastePercent: 80, requiresReview: false }))).toMatchObject({
+      status: "usable",
+      usable: true,
+    });
+    expect(evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: -1, requiresReview: false }))).toMatchObject({
+      status: "invalid",
+      usable: false,
+    });
   });
 
   it("does not treat a price candidate as approved automatically", () => {
