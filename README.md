@@ -1,6 +1,6 @@
 # Estudo Construtivo
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 Aplicação para estudo construtivo modular, pré-orçamento assistido e revisão de quantitativos a partir de planta baixa, medidas manuais ou projeto exemplo.
 
@@ -132,7 +132,14 @@ Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 
 ## Licença
 
-Este repositório está licenciado sob a [MIT License](LICENSE). Código de terceiros e dependências mantêm suas próprias licenças.
+Este repositório está licenciado sob a [GNU General Public License v3.0 only](LICENSE), identificado como `GPL-3.0-only`.
+
+Leia também:
+
+- [LICENSING.md](LICENSING.md): escopo da licença, declaração de autoria/manutenção, revisões MIT anteriores e observação de que o conteúdo não é aconselhamento jurídico.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): dependências, marcas, nomes de terceiros e regra de atribuição para materiais futuros.
+
+Código de terceiros e dependências mantêm suas próprias licenças.
 
 ## Limitações
 
