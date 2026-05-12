@@ -5,10 +5,11 @@
 -- sync jobs and Supabase client setup belong to later PRs in the #200 sequence.
 
 create schema if not exists extensions;
-create extension if not exists pgcrypto with schema extensions;
+set search_path = public, extensions, pg_catalog;
+create extension if not exists pgcrypto;
 
 create table if not exists public.price_sources (
-  id uuid primary key default extensions.gen_random_uuid(),
+  id uuid primary key default gen_random_uuid(),
   source_type text not null check (source_type in ('sinapi', 'tcpo', 'supplier_quote', 'manual', 'historical', 'web_reference')),
   title text not null,
   supplier text not null,
@@ -25,7 +26,7 @@ create table if not exists public.price_sources (
 );
 
 create table if not exists public.price_items (
-  id uuid primary key default extensions.gen_random_uuid(),
+  id uuid primary key default gen_random_uuid(),
   source_id uuid not null references public.price_sources(id) on delete cascade,
   item_type text not null check (item_type in ('composition', 'input')),
   code text not null,
@@ -54,7 +55,7 @@ create table if not exists public.price_items (
 );
 
 create table if not exists public.composition_inputs (
-  id uuid primary key default extensions.gen_random_uuid(),
+  id uuid primary key default gen_random_uuid(),
   composition_item_id uuid not null references public.price_items(id) on delete cascade,
   input_code text,
   kind text not null check (kind in ('material', 'labor', 'equipment', 'third_party', 'other')),
@@ -67,7 +68,7 @@ create table if not exists public.composition_inputs (
 );
 
 create table if not exists public.waste_rules (
-  id uuid primary key default extensions.gen_random_uuid(),
+  id uuid primary key default gen_random_uuid(),
   source_id uuid references public.price_sources(id) on delete cascade,
   label text not null,
   applies_to text[] not null default '{}',
@@ -79,7 +80,7 @@ create table if not exists public.waste_rules (
 );
 
 create table if not exists public.price_sync_runs (
-  id uuid primary key default extensions.gen_random_uuid(),
+  id uuid primary key default gen_random_uuid(),
   source_type text not null,
   reference_month date not null,
   state text not null,
@@ -249,13 +250,23 @@ returns table (
   confidence text,
   requires_review boolean,
   pending_reason text,
-  tags text
+  tags text[]
 )
 language sql
 stable
 security invoker
 set search_path = public
 as $$
+  with normalized_query as (
+    select nullif(trim(search_query), '') as value
+  ),
+  search_terms as (
+    select
+      value,
+      websearch_to_tsquery('portuguese', value) as query
+    from normalized_query
+    where value is not null
+  )
   select
     item.id,
     item.source_id,
@@ -285,7 +296,13 @@ as $$
     item.pending_reason,
     item.tags
   from public.current_price_items item
-  where (search_query is null or search_query = '' or item.search_text ilike '%' || search_query || '%' or item.description ilike '%' || search_query || '%' or item.code ilike '%' || search_query || '%')
+  cross join normalized_query normalized
+  left join search_terms terms on true
+  where (
+      normalized.value is null
+      or item.code ilike normalized.value || '%'
+      or to_tsvector('portuguese', item.search_text) @@ terms.query
+    )
     and (search_state is null or item.state = search_state)
     and (search_reference_month is null or item.reference_month = search_reference_month)
     and (search_regime is null or item.regime = search_regime)
