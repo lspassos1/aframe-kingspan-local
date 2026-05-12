@@ -7,12 +7,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AdvancedDisclosure, BudgetGroupCard, InlineHelp, MetricCard, PageFrame, PageHeader, StatusPill } from "@/components/shared/design-system";
+import { GuidedActionPanel } from "@/components/shared/GuidedActionPanel";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { estimateRadierFoundation } from "@/lib/calculations/foundation";
 import { calculateScenarioBudget, calculateScenarioGeometry } from "@/lib/construction-methods/scenario-calculations";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
+import type { GuidedActionItem } from "@/lib/ux/guided-actions";
 import type { BudgetItem, BudgetSummary, FoundationAssumptions, MaterialCategory, Project } from "@/types/project";
 
 const BudgetCategoryChart = dynamic(
@@ -113,6 +115,40 @@ export default function BudgetPage() {
   const builtArea = readNumber(geometry, ["builtAreaM2", "combinedTotalArea", "groundFloorTotalArea"]);
   const chartData = chartDataForBudget(budget);
   const isAFrame = scenario.constructionMethod === "aframe";
+  const budgetGuidedActions: GuidedActionItem[] = [
+    ...(pendingItems.length > 0
+      ? [
+          {
+            id: "budget-pending-prices",
+            kind: "manual-price" as const,
+            title: "Preços pendentes",
+            description: "Revise fonte, unidade e região antes de tratar qualquer linha como orçamento revisado.",
+            status: `${pendingItems.length} pendente(s)`,
+            tone: "warning" as const,
+            actions: [
+              { label: "Revisar fonte", href: "/budget-assistant" },
+              { label: "Preencher preço", href: "/budget-assistant#manual-price-link", variant: "outline" as const },
+            ],
+          },
+        ]
+      : []),
+    ...(warningItems.length > 0
+      ? [
+          {
+            id: "budget-technical-alerts",
+            kind: "review" as const,
+            title: "Avisos técnicos",
+            description: "Premissas técnicas devem acompanhar o estudo e ser revisadas antes de decisão de obra.",
+            status: `${warningItems.length} aviso(s)`,
+            tone: "pending" as const,
+            actions: [
+              { label: "Abrir projeto técnico", href: "/technical-project" },
+              { label: "Exportar preliminar", href: "/export", variant: "outline" as const },
+            ],
+          },
+        ]
+      : []),
+  ];
   const foundation = isAFrame ? estimateRadierFoundation(scenario, project.foundationAssumptions) : null;
   const foundationMaterialCostBRL = foundation
     ? foundation.items.filter((item) => foundationMaterialIds.has(item.id)).reduce((sum, item) => sum + item.netTotalBRL, 0)
@@ -160,6 +196,8 @@ export default function BudgetPage() {
         <MetricCard label="Itens com pendência" value={pendingItems.length} detail="Fonte, unidade ou revisão" tone={pendingItems.length > 0 ? "warning" : "success"} icon={<FileWarning className="h-4 w-4" />} />
         <MetricCard label="Alertas técnicos" value={warningItems.length} detail="Fundação, estrutura e premissas" tone={warningItems.length > 0 ? "warning" : "success"} icon={<ShieldAlert className="h-4 w-4" />} />
       </section>
+
+      <GuidedActionPanel items={budgetGuidedActions} />
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <BudgetGroupCard

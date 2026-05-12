@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Download, FileJson, FileSpreadsheet, FileText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActionCard, AdvancedDisclosure, FileDropzone, FormSection, InlineHelp, MetricCard, PageFrame, PageHeader, SectionHeader, StatusPill } from "@/components/shared/design-system";
+import { GuidedActionPanel } from "@/components/shared/GuidedActionPanel";
 import {
   calculateScenarioBudget,
   calculateScenarioMaterials,
@@ -26,6 +27,7 @@ import {
   prepareSpreadsheetExportLibrary,
 } from "@/lib/export/files";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
+import { createExportGuidance } from "@/lib/ux/guided-actions";
 import type { Project } from "@/types/project";
 
 type ExportLibraryKind = "spreadsheet" | "pdf";
@@ -51,6 +53,11 @@ export default function ExportPage() {
   const pendingMaterials = materials.filter((item) => item.requiresConfirmation);
   const pendingBudgetItems = budget.items.filter((item) => item.requiresConfirmation);
   const exportWarnings = budget.warnings.filter((warning) => warning.level !== "info");
+  const guidedActions = createExportGuidance({
+    pendingMaterialCount: pendingMaterials.length,
+    pendingBudgetItemCount: pendingBudgetItems.length,
+    warningCount: exportWarnings.length,
+  });
   const spreadsheetReady = exportLibraryStatus.spreadsheet === "ready";
   const pdfReady = exportLibraryStatus.pdf === "ready";
 
@@ -239,6 +246,12 @@ export default function ExportPage() {
           O pacote pode ser exportado, mas deve sair como preliminar: há pendências de fonte, fornecedor ou alerta técnico que precisam aparecer no relatório.
         </InlineHelp>
       ) : null}
+
+      <GuidedActionPanel
+        title="Resolver antes de aprovar"
+        description="A exportação continua disponível como preliminar, mas cada pendência tem uma ação segura."
+        items={guidedActions}
+      />
 
       <section className="grid gap-4 md:grid-cols-3">
         <FormSection title="Importar projeto" description="Carregue um JSON exportado anteriormente.">

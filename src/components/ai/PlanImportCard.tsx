@@ -4,6 +4,7 @@ import { useRef, useState, type DragEvent } from "react";
 import { AlertTriangle, CheckCircle2, FileCheck2, FileUp, Loader2, UploadCloud } from "lucide-react";
 import { PlanExtractReview, type PlanExtractCurrentValues, type PlanExtractModifiedValues, type PlanExtractQuestionAnswers } from "@/components/ai/PlanExtractReview";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { applyPlanExtractToProject, getDefaultPlanExtractSelectedFields, type PlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
 import {
@@ -154,6 +155,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
   const canUpload = planExtractEnabled && !isBusy;
   const currentValues = getCurrentPlanExtractValues(project);
   const showReview = (state === "review-ready" || state === "cache-hit") && result;
+  const canShowManualRecovery = !planExtractEnabled || state === "error" || state === "limit-exceeded";
   const reviewStatusLabel = getReviewStatusLabel(providerMeta.review, aiProviderStatus);
   const providerCopy =
     aiProviderStatus.mode === "free-cloud"
@@ -403,6 +405,13 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
               </p>
             ) : null}
           </div>
+          {canShowManualRecovery ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button type="button" onClick={openManualFallback}>
+                Continuar manualmente
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
 

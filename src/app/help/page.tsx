@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { Bot, Database, FileQuestion, FileText, MapPinned, ShieldAlert } from "lucide-react";
 import { OperationalChecklist } from "@/components/help/OperationalChecklist";
+import { Button } from "@/components/ui/button";
 import { ActionCard, PageFrame, PageHeader, SectionHeader, StatusPill } from "@/components/shared/design-system";
 import { createOperationalEnvironmentStatus } from "@/lib/operations/operational-environment";
 
@@ -36,24 +38,32 @@ export default function HelpPage() {
         : "Ative a análise no servidor ou continue preenchendo manualmente.",
       icon: Bot,
       status: operationalEnvironment.aiPlanExtractEnabled ? "verificar modo" : "desligada",
+      href: "/start?mode=manual",
+      cta: "Continuar manualmente",
     },
     {
       title: "Base de preço ausente",
       body: "Importe SINAPI ou base equivalente no Assistente de orçamento antes de aprovar vínculos.",
       icon: Database,
       status: "ação",
+      href: "/budget-assistant#price-base-import",
+      cta: "Importar base de preços",
     },
     {
       title: "UF ou referência pendente",
       body: "Revise Dados da obra e metadados da base para filtros regionais consistentes.",
       icon: MapPinned,
       status: "revisar",
+      href: "/edit",
+      cta: "Revisar dados da obra",
     },
     {
       title: "Relatório preliminar",
       body: "Exportações devem manter pendências, fonte, revisão humana e avisos técnicos visíveis.",
       icon: FileText,
       status: "preliminar",
+      href: "/export",
+      cta: "Abrir exportação",
     },
   ];
 
@@ -71,6 +81,11 @@ export default function HelpPage() {
               title={action.title}
               description={action.body}
               badge={<StatusPill tone="warning" icon={false}>{action.status}</StatusPill>}
+              footer={
+                <Button asChild size="sm" variant="outline">
+                  <Link href={action.href}>{action.cta}</Link>
+                </Button>
+              }
               className="min-h-44"
             />
           ))}

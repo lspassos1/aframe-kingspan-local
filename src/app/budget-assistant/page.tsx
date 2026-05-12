@@ -19,6 +19,7 @@ import {
   ConfidenceBadge,
   StatusPill,
 } from "@/components/shared/design-system";
+import { GuidedActionPanel } from "@/components/shared/GuidedActionPanel";
 import { PriceBaseImportCard } from "@/components/budget-assistant/PriceBaseImportCard";
 import { BrazilLocationSelectFields } from "@/components/shared/BrazilLocationSelectFields";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import { formatLocalDateInputValue } from "@/lib/date";
 import { formatCompactNumber, formatCurrency, formatDate } from "@/lib/format";
 import { isBrazilCityInState, isBrazilState, normalizeBrazilStateName } from "@/lib/locations/brazil";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
+import { createBudgetAssistantGuidance } from "@/lib/ux/guided-actions";
 
 const confidenceOptions: Array<{ value: BudgetConfidenceLevel; label: string }> = [
   { value: "unverified", label: "Sem revisão" },
@@ -102,6 +104,14 @@ export default function BudgetAssistantPage() {
   const costItemById = new Map(availableCostItems.map((item) => [item.id, item]));
   const suggestedMatches = viewModel.matches.filter((match) => !match.approvedByUser);
   const scenarioHasValidRegion = Boolean(scenario.location.city.trim() && scenarioState.trim());
+  const guidedActions = createBudgetAssistantGuidance({
+    hasValidRegion: scenarioHasValidRegion,
+    costSourceCount: viewModel.costSources.length,
+    applicableCostSourceCount: viewModel.applicableCostSources.length,
+    pendingPriceCount: viewModel.pendingPriceItems.length,
+    lowConfidenceCount: viewModel.lowConfidenceCount,
+    remotePriceDbConfigured: false,
+  });
   const sourceCity = sourceLocation.locationKey === scenarioLocationKey ? sourceLocation.city : scenario.location.city;
   const sourceState = sourceLocation.locationKey === scenarioLocationKey ? normalizeBrazilStateName(sourceLocation.state) || sourceLocation.state : scenarioState;
   const sourceStateIsValid = isBrazilState(sourceState);
@@ -242,6 +252,8 @@ export default function BudgetAssistantPage() {
         <MetricCard icon={<Link2 className="h-4 w-4" />} label="Fontes" value={viewModel.costSources.length} detail="Cadastradas/importadas" />
       </section>
 
+      <GuidedActionPanel items={guidedActions} />
+
       <section className="space-y-4">
         <SectionHeader
           eyebrow="Fluxo da base"
@@ -262,7 +274,7 @@ export default function BudgetAssistantPage() {
         </div>
       </section>
 
-      <Card className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
+      <Card id="regional-price-filter" className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -314,26 +326,29 @@ export default function BudgetAssistantPage() {
         </CardContent>
       </Card>
 
-      <PriceBaseImportCard
-        scenarioId={scenario.id}
-        scenarioCity={scenario.location.city}
-        scenarioState={scenarioState}
-        defaultConstructionMethod={scenario.constructionMethod}
-        importedSourceCount={project.budgetAssistant.priceSources.length}
-        importedCompositionCount={project.budgetAssistant.serviceCompositions.length}
-        onImport={addBudgetImportedPriceBase}
-      />
+      <div id="price-base-import">
+        <PriceBaseImportCard
+          scenarioId={scenario.id}
+          scenarioCity={scenario.location.city}
+          scenarioState={scenarioState}
+          defaultConstructionMethod={scenario.constructionMethod}
+          importedSourceCount={project.budgetAssistant.priceSources.length}
+          importedCompositionCount={project.budgetAssistant.serviceCompositions.length}
+          onImport={addBudgetImportedPriceBase}
+        />
+      </div>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <FormSection
-          title={
-            <span className="flex items-center gap-2">
-              <Link2 className="h-5 w-5" />
-              Cadastrar fonte de preço
-            </span>
-          }
-          description="Fonte, região e data de referência ficam explícitas antes do vínculo."
-        >
+        <div id="manual-price-source">
+          <FormSection
+            title={
+              <span className="flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Cadastrar fonte de preço
+              </span>
+            }
+            description="Fonte, região e data de referência ficam explícitas antes do vínculo."
+          >
             <form onSubmit={handleAddSource} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="source-title">Nome da fonte</Label>
@@ -383,17 +398,19 @@ export default function BudgetAssistantPage() {
                 </Button>
               </div>
             </form>
-        </FormSection>
+          </FormSection>
+        </div>
 
-        <FormSection
-          title={
-            <span className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Vincular preço manual
-            </span>
-          }
-          description="Preço manual sempre nasce como item revisável com fonte e confiança."
-        >
+        <div id="manual-price-link">
+          <FormSection
+            title={
+              <span className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Vincular preço manual
+              </span>
+            }
+            description="Preço manual sempre nasce como item revisável com fonte e confiança."
+          >
             <form onSubmit={handleAddManualPrice} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="quantity-item">Quantitativo</Label>
@@ -464,10 +481,11 @@ export default function BudgetAssistantPage() {
                 </Button>
               </div>
             </form>
-        </FormSection>
+          </FormSection>
+        </div>
       </section>
 
-      <Card className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
+      <Card id="matching-assisted" className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BadgeDollarSign className="h-5 w-5" />
@@ -588,7 +606,7 @@ export default function BudgetAssistantPage() {
         </div>
 
         <div className="space-y-4">
-          <Card className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
+          <Card id="review-report" className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Link2 className="h-5 w-5" />
@@ -597,7 +615,20 @@ export default function BudgetAssistantPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {viewModel.costSources.length === 0 ? (
-                <EmptyState title="Nenhuma fonte cadastrada" description="Cadastre uma fonte local, estadual, nacional ou manual revisável antes de aprovar preços." />
+                <EmptyState
+                  title="Nenhuma fonte cadastrada"
+                  description="Cadastre uma fonte local, estadual, nacional ou manual revisável antes de aprovar preços."
+                  action={
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild size="sm">
+                        <a href="#price-base-import">Importar base</a>
+                      </Button>
+                      <Button asChild size="sm" variant="outline">
+                        <a href="#manual-price-source">Cadastrar fonte</a>
+                      </Button>
+                    </div>
+                  }
+                />
               ) : (
                 viewModel.costSources.map((source) => {
                   const regionalSource = applicableSourceById.get(source.id);
@@ -631,7 +662,15 @@ export default function BudgetAssistantPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {viewModel.costItems.length === 0 ? (
-                <EmptyState title="Sem itens revisados" description="Itens com preço manual aparecem aqui com fonte, data, unidade e confiança." />
+                <EmptyState
+                  title="Sem itens revisados"
+                  description="Itens com preço manual aparecem aqui com fonte, data, unidade e confiança."
+                  action={
+                    <Button asChild size="sm">
+                      <a href="#manual-price-link">Preencher preço</a>
+                    </Button>
+                  }
+                />
               ) : (
                 viewModel.costItems.map((item) => {
                   const source = sourceById.get(item.sourceId);

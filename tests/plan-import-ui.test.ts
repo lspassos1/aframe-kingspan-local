@@ -163,6 +163,7 @@ describe("PlanImportCard", () => {
     expect(html).toContain("Upload assistido indisponivel");
     expect(html).toContain("Configure o Modo Pro no servidor.");
     expect(html).toContain("Configure o Modo Pro no servidor ou continue manualmente.");
+    expect(html).toContain("Continuar manualmente");
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
   });
@@ -172,6 +173,7 @@ describe("PlanImportCard", () => {
 
     expect(html).toContain("Configure o modo gratuito no servidor.");
     expect(html).toContain("Configure o modo gratuito no servidor ou continue manualmente.");
+    expect(html).toContain("Continuar manualmente");
     expect(html).not.toContain("OPENAI_API_KEY");
   });
 });
