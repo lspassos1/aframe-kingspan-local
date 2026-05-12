@@ -29,6 +29,7 @@ describe("SceneFirstViewerShell", () => {
     );
 
     expect(html).toContain('data-slot="scene-first-3d-shell"');
+    expect(html).toContain('<h1 class="sr-only">Visualizacao interativa</h1>');
     expect(html).toContain("Cena 3D");
     expect(html).toContain("A-frame");
     expect(html).toContain("Visualizacao interativa");
@@ -41,6 +42,7 @@ describe("SceneFirstViewerShell", () => {
     expect(html).toContain("Controles");
     expect(html).toContain("Volume");
     expect(html).toContain("Resumo mobile");
+    expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
   it("keeps the hidden controls panel closed by default", () => {
