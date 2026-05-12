@@ -1,5 +1,6 @@
 import type { Project, Scenario } from "@/types/project";
 import { calculateScenarioBudget } from "@/lib/construction-methods/scenario-calculations";
+import type { ExternalPriceDbOperationalStatus } from "@/lib/pricing/price-db-operations";
 
 export type OperationalChecklistTone = "ok" | "warning" | "muted";
 
@@ -13,6 +14,7 @@ export interface OperationalEnvironmentStatus {
   centralPriceDbConfigured: boolean;
   centralPriceDbLabel: string;
   lastMonthlySyncLabel: string;
+  centralPriceDbOperational: ExternalPriceDbOperationalStatus;
 }
 
 export interface OperationalChecklistItem {
@@ -165,13 +167,9 @@ export function createOperationalChecklist(
       id: "central-db",
       label: "Base central",
       status: environment.centralPriceDbLabel,
-      detail: environment.centralPriceDbConfigured
-        ? "Busca central pode ser apresentada como candidata; preços ainda exigem aprovação."
-        : "Base central não é dependência: use importação local ou fonte manual revisável.",
-      technicalDetail: environment.centralPriceDbConfigured
-        ? "Leitura pública configurada; chave de serviço não é usada no app."
-        : "Sem runtime remoto configurado; não há busca automática em banco central.",
-      tone: environment.centralPriceDbConfigured ? "ok" : "muted",
+      detail: environment.centralPriceDbOperational.detail,
+      technicalDetail: environment.centralPriceDbOperational.technicalDetail,
+      tone: environment.centralPriceDbOperational.tone,
     },
     {
       id: "sinapi",
@@ -198,10 +196,11 @@ export function createOperationalChecklist(
       id: "monthly-sync",
       label: "Sync mensal",
       status: environment.lastMonthlySyncLabel,
-      detail: environment.centralPriceDbConfigured
-        ? "A última sincronização ainda não é informada pelo app."
-        : "Sync mensal depende da base central futura; fluxo local continua disponível.",
-      tone: "muted",
+      detail: environment.centralPriceDbOperational.syncDetail,
+      technicalDetail: environment.centralPriceDbOperational.safeError
+        ? "Erro sanitizado para diagnóstico; logs completos devem ficar apenas no workflow/admin."
+        : undefined,
+      tone: environment.centralPriceDbOperational.status === "ready" ? "ok" : environment.centralPriceDbOperational.tone,
     },
     {
       id: "export",
