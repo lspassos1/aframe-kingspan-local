@@ -72,26 +72,30 @@ export function createStatusCounts(statuses) {
 
 export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
   const issues = [];
+  const data = isRecord(row) ? row : {};
+  if (!isRecord(row)) {
+    issues.push(createIssue("invalid-row", `Row ${rowNumber} must be an object.`, rowNumber, "invalid"));
+  }
   for (const column of sinapiDryRunRequiredRowColumns) {
-    if (!Object.hasOwn(row, column)) {
+    if (!Object.hasOwn(data, column)) {
       issues.push(createIssue("missing-column", `Row ${rowNumber} is missing required column "${column}".`, rowNumber, "invalid"));
     }
   }
 
-  const unit = String(row.unidade ?? "").trim();
-  const total = toNumber(row.preco_total);
-  const state = normalizeState(row.uf);
-  const regime = String(row.regime ?? "unknown").trim() || "unknown";
+  const unit = String(data.unidade ?? "").trim();
+  const total = toNumber(data.preco_total);
+  const state = normalizeState(data.uf);
+  const regime = String(data.regime ?? "unknown").trim() || "unknown";
   let status = "valid";
 
   if (issues.length > 0) status = "invalid";
-  if (!hasValue(row.codigo) || !hasValue(row.descricao)) {
+  if (!hasValue(data.codigo) || !hasValue(data.descricao)) {
     issues.push(createIssue("invalid-row", `Row ${rowNumber} must include code and description.`, rowNumber, "invalid"));
     status = "invalid";
   }
   if (unit && !validUnits.has(unit)) {
     issues.push(createIssue("invalid-unit", `Row ${rowNumber} has unsupported unit "${unit}".`, rowNumber, "invalid"));
-    status = "invalid_unit";
+    if (status === "valid") status = "invalid_unit";
   }
   if (!Number.isFinite(total)) {
     issues.push(createIssue("missing-price", `Row ${rowNumber} has no numeric total price.`, rowNumber));
@@ -107,7 +111,7 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
     issues.push(createIssue("missing-state", `Row ${rowNumber} has no UF/state.`, rowNumber));
     if (status === "valid") status = "requires_review";
   } else if (expectedState && state !== expectedState) {
-    issues.push(createIssue("out-of-region", `Row ${rowNumber} UF "${row.uf}" differs from source/project UF.`, rowNumber));
+    issues.push(createIssue("out-of-region", `Row ${rowNumber} UF "${data.uf}" differs from source/project UF.`, rowNumber));
     if (status === "valid") status = "out_of_region";
   }
   if (!validRegimes.has(regime)) {
@@ -117,8 +121,8 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
 
   return {
     rowNumber,
-    code: String(row.codigo ?? ""),
-    description: String(row.descricao ?? ""),
+    code: String(data.codigo ?? ""),
+    description: String(data.descricao ?? ""),
     unit,
     status,
     requiresReview: status !== "valid",
@@ -138,8 +142,13 @@ export function parseSinapiSyncArgs(argv) {
     const value = argv[index];
     if (value === "--dry-run") args.dryRun = true;
     else if (value === "--json") args.json = true;
-    else if (value === "--input") args.inputPath = path.resolve(argv[++index] ?? "");
-    else if (value === "--expected-state") args.expectedState = argv[++index];
+    else if (value === "--input") {
+      args.inputPath = path.resolve(readRequiredArgValue(argv, index, "--input"));
+      index += 1;
+    } else if (value === "--expected-state") {
+      args.expectedState = readRequiredArgValue(argv, index, "--expected-state");
+      index += 1;
+    }
     else if (value === "--write" || value === "--write-mode" || value === "--mode=write") {
       throw new Error("Write mode is not implemented in this PR. Run dry-run only.");
     } else if (value === "--help" || value === "-h") {
@@ -189,6 +198,16 @@ function hasValue(value) {
 
 function normalizeState(value) {
   return String(value ?? "").trim().toUpperCase();
+}
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readRequiredArgValue(argv, index, name) {
+  const next = argv[index + 1];
+  if (!next || next.startsWith("--")) throw new Error(`${name} requires a value.`);
+  return next;
 }
 
 function toNumber(value) {

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createStatusCounts,
+  parseSinapiSyncArgs,
   readSinapiSyncInput,
   runSinapiSyncDryRun,
   validateSinapiDryRunRow,
@@ -43,6 +44,47 @@ describe("SINAPI monthly sync dry-run", () => {
     );
   });
 
+  it("reports malformed null rows without throwing", () => {
+    const result = runSinapiSyncDryRun({
+      source: {
+        title: "SINAPI BA",
+        supplier: "CAIXA",
+        state: "BA",
+        referenceDate: "2026-05",
+        regime: "desonerado",
+      },
+      rows: [null],
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.statusCounts).toMatchObject({ invalid: 1 });
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "invalid-row", message: "Row 2 must be an object." }),
+        expect.objectContaining({ code: "missing-column", message: expect.stringContaining("codigo") }),
+      ])
+    );
+  });
+
+  it("preserves invalid row status when unit validation also fails", () => {
+    const result = validateSinapiDryRunRow(
+      {
+        codigo: "",
+        descricao: "",
+        unidade: "cx",
+        preco_total: 10,
+        uf: "BA",
+        data_base: "2026-05",
+        regime: "desonerado",
+      },
+      2,
+      "BA"
+    );
+
+    expect(result.status).toBe("invalid");
+    expect(result.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(["invalid-row", "invalid-unit"]));
+  });
+
   it("reports status counts for pending and invalid rows", () => {
     expect(createStatusCounts(["valid", "zeroed", "missing", "invalid_unit", "out_of_region", "requires_review", "invalid"])).toEqual({
       valid: 1,
@@ -68,6 +110,11 @@ describe("SINAPI monthly sync dry-run", () => {
         expect.objectContaining({ code: "empty-input" }),
       ])
     );
+  });
+
+  it("fails clearly when --input is missing a value", () => {
+    expect(() => parseSinapiSyncArgs(["--input"])).toThrow("--input requires a value.");
+    expect(() => parseSinapiSyncArgs(["--input", "--json"])).toThrow("--input requires a value.");
   });
 
   it("keeps Supabase write credentials and write paths out of dry-run files", () => {
