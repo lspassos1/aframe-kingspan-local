@@ -16,6 +16,7 @@ export interface OperationalChecklistItem {
   label: string;
   status: string;
   detail: string;
+  technicalDetail?: string;
   tone: OperationalChecklistTone;
 }
 
@@ -54,7 +55,9 @@ export function createOperationalChecklist(
       status: aiOperational ? "ativa" : "desligada",
       detail: aiOperational
         ? "Upload assistido pode ser exibido no início. Confira o modo de análise abaixo."
-        : environment.aiMode === "paid"
+        : "Ative a análise no ambiente do servidor ou continue pelo preenchimento manual.",
+      technicalDetail:
+        environment.aiMode === "paid"
           ? "Verifique AI_PLAN_EXTRACT_ENABLED, OPENAI_API_KEY e AI_OPENAI_MODEL no servidor."
           : "Verifique AI_PLAN_EXTRACT_ENABLED, AI_MODE=free-cloud, GEMINI_API_KEY e GEMINI_MODEL no servidor.",
       tone: aiOperational ? "ok" : "warning",
@@ -73,7 +76,8 @@ export function createOperationalChecklist(
       id: "model",
       label: "Configuração",
       status: environment.aiModelConfigured ? "configurado" : "ausente",
-      detail:
+      detail: environment.aiModelConfigured ? "Configuração do modo atual está pronta." : "Complete a configuração do modo atual no servidor.",
+      technicalDetail:
         environment.aiMode === "paid"
           ? environment.aiModelConfigured
             ? "AI_OPENAI_MODEL está definido."

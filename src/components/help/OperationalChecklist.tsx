@@ -31,7 +31,7 @@ export function OperationalChecklist({ environment }: { environment: Operational
   return (
     <BudgetGroupCard
       title="Checklist operacional"
-      description="Diagnóstico seguro de IA, OpenAI, limites, SINAPI e região do projeto atual."
+      description="Diagnóstico seguro de IA, limites, SINAPI e região do projeto atual."
       status={<StatusPill tone={checklist.some((item) => item.tone === "warning") ? "warning" : "success"}>{checklist.filter((item) => item.tone === "warning").length} ação(ões)</StatusPill>}
     >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -48,6 +48,12 @@ export function OperationalChecklist({ environment }: { environment: Operational
                   <StatusPill tone={meta.tone} icon={false}>{item.status}</StatusPill>
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.detail}</p>
+                {item.technicalDetail ? (
+                  <details className="mt-3 rounded-xl border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer font-semibold text-foreground">Diagnóstico técnico</summary>
+                    <p className="mt-2 leading-relaxed">{item.technicalDetail}</p>
+                  </details>
+                ) : null}
               </div>
             );
           })}

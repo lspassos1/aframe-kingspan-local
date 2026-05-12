@@ -24,6 +24,7 @@ function getStatus(items: ReturnType<typeof createOperationalChecklist>, id: str
 describe("operational checklist", () => {
   it("shows safe fallback statuses when AI and SINAPI are not configured", () => {
     const checklist = createOperationalChecklist(disabledEnvironment, defaultProject);
+    const publicDetails = checklist.map((item) => item.detail).join(" ");
 
     expect(getStatus(checklist, "ai")).toBe("desligada");
     expect(getStatus(checklist, "provider")).toBe("Modo gratuito");
@@ -33,6 +34,10 @@ describe("operational checklist", () => {
     expect(getStatus(checklist, "state")).toBe("definida");
     expect(getStatus(checklist, "reference")).toBe("ausente");
     expect(getStatus(checklist, "regime")).toBe("ausente");
+    expect(publicDetails).not.toContain("OPENAI_API_KEY");
+    expect(publicDetails).not.toContain("GEMINI_API_KEY");
+    expect(publicDetails).not.toContain("AI_MODE");
+    expect(checklist.some((item) => item.technicalDetail?.includes("GEMINI_MODEL"))).toBe(true);
   });
 
   it("detects imported SINAPI metadata without exposing secrets", () => {

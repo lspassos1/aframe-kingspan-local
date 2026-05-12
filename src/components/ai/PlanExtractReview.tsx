@@ -571,7 +571,7 @@ export function PlanExtractReview({
             </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Fallback pago</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cobrança automática</p>
             <p className="mt-1 font-medium">Desligado</p>
           </div>
           {analysisStatus.cached ? <StatusPill tone="info">Resultado veio do cache</StatusPill> : null}

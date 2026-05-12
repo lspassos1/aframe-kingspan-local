@@ -42,7 +42,7 @@ Isso não significa que a experiência final deve continuar centrada em A-frame.
 
 ## IA Assistiva
 
-A IA atua como pré-preenchimento e explicação de incertezas. No modo free-cloud, Gemini faz a leitura principal, OpenRouter faz a segunda leitura e Groq/Cerebras/SambaNova resumem pendências. OpenAI permanece em standby para modo pago explícito.
+A IA atua como pré-preenchimento e explicação de incertezas. A experiência pública deve falar em `Modo gratuito`, `Modo Pro`, `Análise rápida`, `Revisão detalhada` e `Continuar manualmente`; nomes de providers, modelos, roteamento e cadeia de fallback ficam restritos a diagnóstico técnico avançado.
 
 A IA pode:
 

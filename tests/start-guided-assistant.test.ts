@@ -141,7 +141,7 @@ describe("StartGuidedAssistant", () => {
     expect(html).toContain("Modo Pro");
     expect(html).toContain("Limite diário");
     expect(html).toContain("Cache por hash ativo");
-    expect(html).toContain("Fallback manual disponível");
+    expect(html).toContain("Continuar manualmente disponível");
     expect(html).toContain("Abrir preenchimento manual");
   });
 
@@ -153,11 +153,13 @@ describe("StartGuidedAssistant", () => {
     expect(html).toContain("Análise");
     expect(html).toContain("Analise rapida");
     expect(html).toContain("Revisao detalhada quando disponível");
-    expect(html).toContain("Custo zero depende dos limites externos");
+    expect(html).toContain("Análise gratuita depende de limites externos");
     expect(planImportCardProps.latest?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Analise rapida" });
     expect(html).not.toContain("OPENAI_API_KEY");
     expect(html).not.toContain("Gemini");
     expect(html).not.toContain("OpenRouter");
+    expect(html).not.toContain("Free cloud");
+    expect(html).not.toContain("fallback pago");
   });
 
   it("renders the manual fallback when AI mode is selected but disabled", () => {
