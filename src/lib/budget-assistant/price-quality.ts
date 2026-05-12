@@ -47,6 +47,8 @@ export interface PriceQualityInput {
   otherCostBRL?: number;
   totalLaborHoursPerUnit?: number | null;
   wastePercent?: number | null;
+  laborHoursReviewed?: boolean;
+  wasteReviewed?: boolean;
   requiresReview?: boolean;
   candidateApprovedByUser?: boolean;
 }
@@ -77,7 +79,6 @@ export function evaluatePriceQuality(input: PriceQualityInput): PriceQualityResu
   const regime = normalizeRegime(input.regime);
   const sourceType = input.source?.type?.trim() ?? "";
   const priceStatus = input.priceStatus?.trim();
-  const isReviewed = input.requiresReview === false;
 
   if (!sourceId || (!sourceCode && !sourceTitle)) {
     issues.push(createIssue("missing_source_metadata", "pending", "Fonte, código ou título da composição precisam estar rastreáveis."));
@@ -131,7 +132,7 @@ export function evaluatePriceQuality(input: PriceQualityInput): PriceQualityResu
   if (input.totalLaborHoursPerUnit != null) {
     if (!Number.isFinite(input.totalLaborHoursPerUnit) || input.totalLaborHoursPerUnit < 0) {
       issues.push(createIssue("negative_labor_hours", "invalid", "H/H negativo ou inválido é incompatível com preço revisado."));
-    } else if (input.totalLaborHoursPerUnit > priceQualityThresholds.maxLaborHoursPerUnit && !isReviewed) {
+    } else if (input.totalLaborHoursPerUnit > priceQualityThresholds.maxLaborHoursPerUnit && !input.laborHoursReviewed) {
       issues.push(createIssue("unrealistic_labor_hours", "pending", "H/H por unidade acima do limite operacional exige revisão."));
     }
   }
@@ -139,7 +140,7 @@ export function evaluatePriceQuality(input: PriceQualityInput): PriceQualityResu
   if (input.wastePercent != null) {
     if (!Number.isFinite(input.wastePercent) || input.wastePercent < 0) {
       issues.push(createIssue("negative_waste", "invalid", "Perda negativa ou inválida não é aceita."));
-    } else if (input.wastePercent > priceQualityThresholds.maxWastePercent && !isReviewed) {
+    } else if (input.wastePercent > priceQualityThresholds.maxWastePercent && !input.wasteReviewed) {
       issues.push(createIssue("unrealistic_waste", "pending", "Perda acima do limite operacional exige justificativa."));
     }
   }
@@ -170,9 +171,21 @@ export function evaluatePriceQuality(input: PriceQualityInput): PriceQualityResu
 
 export function evaluateServiceCompositionPriceQuality(
   composition: ServiceComposition,
-  options: Pick<PriceQualityInput, "allowOutOfRegionFallback" | "candidateApprovedByUser" | "expectedState" | "expectedUnit" | "wastePercent"> = {}
+  options: Pick<
+    PriceQualityInput,
+    "allowOutOfRegionFallback" | "candidateApprovedByUser" | "expectedState" | "expectedUnit" | "laborHoursReviewed" | "wastePercent" | "wasteReviewed"
+  > = {}
 ): PriceQualityResult {
   return evaluatePriceQuality({
+    source: composition.sinapi
+      ? {
+          id: composition.sinapi.sourceId,
+          type: "sinapi",
+          title: composition.sinapi.sourceTitle ?? "",
+          state: composition.sinapi.state,
+          referenceDate: composition.sinapi.referenceDate,
+        }
+      : undefined,
     sourceId: composition.sourceId,
     sourceCode: composition.sourceCode || composition.serviceCode,
     state: composition.sinapi?.state ?? composition.state,

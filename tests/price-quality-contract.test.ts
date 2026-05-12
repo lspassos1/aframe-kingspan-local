@@ -114,8 +114,8 @@ describe("price quality contract", () => {
   });
 
   it("keeps unrealistic H/H and waste pending until reviewed", () => {
-    const labor = evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: 120, requiresReview: true }));
-    const waste = evaluatePriceQuality(createQualityInput({ wastePercent: 80, requiresReview: true }));
+    const labor = evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: 120, requiresReview: false }));
+    const waste = evaluatePriceQuality(createQualityInput({ wastePercent: 80, requiresReview: false }));
 
     expect(labor).toMatchObject({ status: "pending", usable: false });
     expect(waste).toMatchObject({ status: "pending", usable: false });
@@ -124,13 +124,37 @@ describe("price quality contract", () => {
   });
 
   it("allows reviewed high H/H and waste threshold overrides without clearing hard invalids", () => {
-    expect(evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: 120, wastePercent: 80, requiresReview: false }))).toMatchObject({
+    expect(
+      evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: 120, wastePercent: 80, laborHoursReviewed: true, requiresReview: false, wasteReviewed: true }))
+    ).toMatchObject({
       status: "usable",
       usable: true,
     });
     expect(evaluatePriceQuality(createQualityInput({ totalLaborHoursPerUnit: -1, requiresReview: false }))).toMatchObject({
       status: "invalid",
       usable: false,
+    });
+  });
+
+  it("does not treat importer review flags as anomaly approval", () => {
+    const composition = createServiceComposition({
+      totalLaborHoursPerUnit: 120,
+      sinapi: {
+        ...createServiceComposition().sinapi!,
+        totalLaborHoursPerUnit: 120,
+      },
+    });
+
+    expect(evaluateServiceCompositionPriceQuality(composition, { expectedState: "BA", expectedUnit: "m2" })).toMatchObject({
+      status: "pending",
+      usable: false,
+    });
+    expect(evaluateServiceCompositionPriceQuality(composition, { expectedState: "BA", expectedUnit: "m2" }).issues.map((issue) => issue.code)).toContain(
+      "unrealistic_labor_hours"
+    );
+    expect(evaluateServiceCompositionPriceQuality(composition, { expectedState: "BA", expectedUnit: "m2", laborHoursReviewed: true })).toMatchObject({
+      status: "usable",
+      usable: true,
     });
   });
 
@@ -144,6 +168,20 @@ describe("price quality contract", () => {
 
     expect(result).toMatchObject({ status: "pending", usable: false, requiresReview: true });
     expect(result.issues.map((issue) => issue.code)).toContain("candidate_requires_review");
+  });
+
+  it("requires SINAPI regime metadata in service composition evaluation", () => {
+    const composition = createServiceComposition({
+      sinapi: {
+        ...createServiceComposition().sinapi!,
+        regime: "" as NonNullable<ServiceComposition["sinapi"]>["regime"],
+      },
+    });
+
+    const result = evaluateServiceCompositionPriceQuality(composition, { expectedState: "BA", expectedUnit: "m2" });
+
+    expect(result).toMatchObject({ status: "pending", usable: false });
+    expect(result.issues.map((issue) => issue.code)).toContain("unknown_regime");
   });
 
   it("aligns with current SINAPI importer statuses without live services", async () => {
