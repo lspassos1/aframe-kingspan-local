@@ -44,6 +44,7 @@ export function SceneFirstViewerShell({
 
   return (
     <section data-slot="scene-first-3d-shell" className="space-y-4">
+      <h1 className="sr-only">{title}</h1>
       <div className="relative min-h-[58svh] overflow-hidden rounded-[1.65rem] border border-slate-900/10 bg-slate-950 shadow-2xl shadow-slate-950/15 xl:min-h-[calc(100svh-9rem)]">
         <div className="absolute inset-0">{scene}</div>
         <div className="pointer-events-none absolute inset-x-3 top-3 z-20 hidden items-start justify-between gap-3 xl:flex">
@@ -54,7 +55,9 @@ export function SceneFirstViewerShell({
             </div>
             <div className="mt-2 flex items-center gap-2">
               <Maximize2 className="h-4 w-4 text-slate-500" />
-              <h1 className="text-lg font-semibold tracking-normal">{title}</h1>
+              <p className="text-lg font-semibold tracking-normal" aria-hidden="true">
+                {title}
+              </p>
             </div>
           </div>
 
