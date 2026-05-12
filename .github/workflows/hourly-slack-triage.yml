@@ -1,8 +1,8 @@
-name: Hourly Slack GitHub triage
+name: Slack GitHub triage
 
 on:
   schedule:
-    - cron: "7 * * * *"
+    - cron: "7 */12 * * *"
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Post hourly triage to Slack
+      - name: Post scheduled triage to Slack
         run: npm run triage:slack
         env:
           GITHUB_TOKEN: ${{ github.token }}

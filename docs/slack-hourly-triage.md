@@ -1,8 +1,8 @@
-# Slack Hourly GitHub Triage
+# Slack GitHub Triage
 
 ## Objetivo
 
-Rodar uma análise horária dos issues e PRs abertos do repositório e enviar um resumo para Slack.
+Rodar uma análise agendada dos issues e PRs abertos do repositório e enviar um resumo para Slack.
 
 O workflow é informativo. Ele não marca PR como ready, não faz merge, não fecha issue e não usa `Closes #`.
 
@@ -23,10 +23,10 @@ scripts/hourly-github-triage.mjs
 Frequência:
 
 ```txt
-7 * * * *
+7 */12 * * *
 ```
 
-O workflow também pode ser acionado manualmente por `workflow_dispatch`.
+O agendamento roda a cada 12 horas no minuto 7. O workflow também pode ser acionado manualmente por `workflow_dispatch`.
 
 ## Configuração
 
