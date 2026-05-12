@@ -1,0 +1,47 @@
+name: Monthly SINAPI Sync Write
+
+on:
+  workflow_dispatch:
+    inputs:
+      input_path:
+        description: "Repository fixture/input path to sync"
+        required: false
+        default: "scripts/fixtures/sinapi-monthly-dry-run-sample.json"
+      expected_state:
+        description: "Expected UF/state for validation"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  write:
+    name: Write SINAPI prices to Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run guarded write sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          INPUT_PATH: ${{ inputs.input_path }}
+          EXPECTED_STATE: ${{ inputs.expected_state }}
+        run: |
+          args=(--write --json --input "$INPUT_PATH")
+          if [ -n "$EXPECTED_STATE" ]; then
+            args+=(--expected-state "$EXPECTED_STATE")
+          fi
+          node scripts/sinapi-sync-monthly.mjs "${args[@]}"

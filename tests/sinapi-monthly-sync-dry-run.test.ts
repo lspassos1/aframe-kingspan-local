@@ -117,9 +117,8 @@ describe("SINAPI monthly sync dry-run", () => {
     expect(() => parseSinapiSyncArgs(["--input", "--json"])).toThrow("--input requires a value.");
   });
 
-  it("keeps Supabase write credentials and write paths out of dry-run files", () => {
+  it("keeps Supabase write credentials and write paths out of dry-run workflow and fixture", () => {
     const files = [
-      "scripts/sinapi-sync-monthly.mjs",
       ".github/workflows/sinapi-monthly-sync-dry-run.yml",
       "scripts/fixtures/sinapi-monthly-dry-run-sample.json",
     ].map((file) => readFileSync(join(process.cwd(), file), "utf8"));

@@ -12,6 +12,8 @@ export const sinapiDryRunStatuses = ["valid", "zeroed", "missing", "requires_rev
 
 const validUnits = new Set(["un", "m", "m2", "m3", "kg", "package", "lot"]);
 const validRegimes = new Set(["onerado", "nao_desonerado", "desonerado", "unknown"]);
+const validPriceStatuses = new Set(sinapiDryRunStatuses);
+const defaultWriteBatchSize = 500;
 
 export async function readSinapiSyncInput(inputPath = defaultInputPath) {
   const raw = await readFile(inputPath, "utf8");
@@ -60,6 +62,79 @@ export function runSinapiSyncDryRun(input, options = {}) {
     issues,
     valid: invalidIssues.length === 0,
   };
+}
+
+export async function runSinapiSyncWrite(input, options = {}) {
+  const dryRun = runSinapiSyncDryRun(input, options);
+  if (!dryRun.valid) {
+    throw new Error(`Cannot write invalid SINAPI input. Resolve ${dryRun.issues.length} dry-run issue(s) first.`);
+  }
+
+  const config = resolveSupabaseWriteConfig(options.env ?? process.env);
+  const client = createSupabaseWriteClient(config, { fetcher: options.fetcher });
+  const sourceType = "sinapi";
+  const referenceMonth = toReferenceMonth(dryRun.source.referenceDate);
+  const runPayload = {
+    source_type: sourceType,
+    reference_month: referenceMonth,
+    state: dryRun.source.state,
+    regime: dryRun.source.regime,
+    status: "started",
+    imported_rows: 0,
+    review_rows: 0,
+    status_counts: {},
+  };
+  let syncRun;
+  let source;
+
+  try {
+    syncRun = await client.insertOne("price_sync_runs", runPayload);
+    source = await client.insertOne("price_sources", {
+      source_type: sourceType,
+      title: dryRun.source.title,
+      supplier: dryRun.source.supplier,
+      state: dryRun.source.state,
+      city: input?.source?.city ?? null,
+      reference_month: referenceMonth,
+      regime: dryRun.source.regime,
+      version: dryRun.source.version || `${dryRun.source.referenceDate}-${dryRun.source.state}-${dryRun.source.regime}`,
+      status: "staging",
+      source_hash: input?.source?.sourceHash ?? input?.source?.hash ?? null,
+      notes: input?.source?.notes ?? "",
+    });
+
+    const sourceId = requireReturnedId(source, "price_sources");
+    const priceItems = createPriceItemRows(input.rows, sourceId, { ...dryRun.source, city: input?.source?.city ?? "" }, options);
+    const insertedItems = await client.insertMany("price_items", priceItems, options.batchSize ?? defaultWriteBatchSize);
+    validateWriteCounts(dryRun, insertedItems);
+
+    await archivePreviousActiveSource(client, { sourceId, sourceType, source: dryRun.source, referenceMonth });
+    await client.patch("price_sources", { status: "active" }, { id: `eq.${sourceId}` });
+    await client.patch(
+      "price_sync_runs",
+      {
+        status: "completed",
+        finished_at: new Date().toISOString(),
+        imported_rows: dryRun.importedRows,
+        review_rows: dryRun.reviewRows,
+        status_counts: dryRun.statusCounts,
+      },
+      { id: `eq.${requireReturnedId(syncRun, "price_sync_runs")}` }
+    );
+
+    return {
+      ...dryRun,
+      dryRun: false,
+      writeMode: true,
+      syncRunId: requireReturnedId(syncRun, "price_sync_runs"),
+      sourceId,
+      writtenRows: insertedItems.length,
+      archivedPreviousActive: true,
+    };
+  } catch (error) {
+    await recordWriteFailure(client, syncRun, source, error);
+    throw error;
+  }
 }
 
 export function createStatusCounts(statuses) {
@@ -133,6 +208,7 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
 export function parseSinapiSyncArgs(argv) {
   const args = {
     dryRun: true,
+    write: false,
     inputPath: defaultInputPath,
     expectedState: undefined,
     json: false,
@@ -140,7 +216,10 @@ export function parseSinapiSyncArgs(argv) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (value === "--dry-run") args.dryRun = true;
+    if (value === "--dry-run") {
+      args.dryRun = true;
+      args.write = false;
+    }
     else if (value === "--json") args.json = true;
     else if (value === "--input") {
       args.inputPath = path.resolve(readRequiredArgValue(argv, index, "--input"));
@@ -150,7 +229,8 @@ export function parseSinapiSyncArgs(argv) {
       index += 1;
     }
     else if (value === "--write" || value === "--write-mode" || value === "--mode=write") {
-      throw new Error("Write mode is not implemented in this PR. Run dry-run only.");
+      args.write = true;
+      args.dryRun = false;
     } else if (value === "--help" || value === "-h") {
       args.help = true;
     } else {
@@ -170,7 +250,7 @@ export function formatSinapiDryRunSummary(result) {
     `Status counts: ${JSON.stringify(result.statusCounts)}`,
     `Issues: ${result.issues.length}`,
     `Valid dry-run: ${result.valid ? "yes" : "no"}`,
-    "Write mode: unavailable in this PR",
+    `Write mode: ${result.writeMode ? "completed" : "available only with --write"}`,
   ].join("\n");
 }
 
@@ -180,12 +260,107 @@ async function main() {
     console.log("Usage: node scripts/sinapi-sync-monthly.mjs --dry-run [--input file.json] [--expected-state UF] [--json]");
     return;
   }
-  if (!args.dryRun) throw new Error("Only dry-run is supported.");
-
   const input = await readSinapiSyncInput(args.inputPath);
-  const result = runSinapiSyncDryRun(input, { expectedState: args.expectedState });
+  const result = args.write ? await runSinapiSyncWrite(input, { expectedState: args.expectedState }) : runSinapiSyncDryRun(input, { expectedState: args.expectedState });
   console.log(args.json ? JSON.stringify(result, null, 2) : formatSinapiDryRunSummary(result));
   if (!result.valid) process.exitCode = 1;
+}
+
+export function resolveSupabaseWriteConfig(env = process.env) {
+  const supabaseUrl = env.SUPABASE_URL?.trim() ?? "";
+  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("SINAPI write mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  }
+  return {
+    supabaseUrl: supabaseUrl.replace(/\/+$/, ""),
+    serviceRoleKey,
+  };
+}
+
+export function createSupabaseWriteClient(config, options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  const headers = {
+    apikey: config.serviceRoleKey,
+    Authorization: `Bearer ${config.serviceRoleKey}`,
+    "Content-Type": "application/json",
+  };
+
+  async function request(method, table, body, query = {}, prefer = "return=representation") {
+    const url = `${config.supabaseUrl}/rest/v1/${table}${formatQuery(query)}`;
+    const response = await fetcher(url, {
+      method,
+      headers: {
+        ...headers,
+        Prefer: prefer,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new Error(`Supabase ${table} ${method} failed with status ${response.status}: ${await readResponseText(response)}`);
+    }
+    if (response.status === 204) return [];
+    const text = await response.text();
+    if (!text) return [];
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  }
+
+  return {
+    insertOne: async (table, body) => {
+      const rows = await request("POST", table, body);
+      return rows[0];
+    },
+    insertMany: async (table, rows, batchSize = defaultWriteBatchSize) => {
+      const inserted = [];
+      for (let index = 0; index < rows.length; index += batchSize) {
+        inserted.push(...(await request("POST", table, rows.slice(index, index + batchSize))));
+      }
+      return inserted;
+    },
+    patch: async (table, body, query) => request("PATCH", table, body, query),
+  };
+}
+
+export function createPriceItemRows(rows, sourceId, source, options = {}) {
+  return rows.map((row, index) => {
+    const normalized = validateSinapiDryRunRow(row, index + 2, normalizeState(options.expectedState ?? source.state));
+    const materialCost = toNumber(row.material);
+    const laborCost = toNumber(row.mao_obra);
+    const equipmentCost = toNumber(row.equipamento);
+    const directCost = toNumber(row.preco_total);
+    const category = String(row.etapa ?? "civil").trim() || "civil";
+    const constructionMethod = String(row.metodo ?? "conventional-masonry").trim() || "conventional-masonry";
+    const tags = parseTags(row.tags);
+    const pendingReason = normalized.issues.map((issue) => issue.message).join(" ");
+
+    return {
+      source_id: sourceId,
+      item_type: row.tipo_item === "input" ? "input" : "composition",
+      code: normalized.code,
+      description: normalized.description,
+      unit: normalized.unit,
+      category,
+      construction_method: constructionMethod,
+      state: normalizeState(row.uf || source.state),
+      city: source.city || null,
+      reference_month: toReferenceMonth(row.data_base || source.referenceDate),
+      regime: String(row.regime ?? source.regime ?? "unknown").trim() || "unknown",
+      material_cost_brl: Number.isFinite(materialCost) ? materialCost : 0,
+      labor_cost_brl: Number.isFinite(laborCost) ? laborCost : 0,
+      equipment_cost_brl: Number.isFinite(equipmentCost) ? equipmentCost : 0,
+      third_party_cost_brl: Number.isFinite(toNumber(row.terceiros)) ? toNumber(row.terceiros) : 0,
+      other_cost_brl: Number.isFinite(toNumber(row.outros)) ? toNumber(row.outros) : 0,
+      direct_unit_cost_brl: Number.isFinite(directCost) ? directCost : 0,
+      total_labor_hours_per_unit: Number.isFinite(toNumber(row.hh)) ? toNumber(row.hh) : 0,
+      price_status: validPriceStatuses.has(normalized.status) ? normalized.status : "requires_review",
+      confidence: normalized.status === "valid" ? "high" : "medium",
+      requires_review: normalized.requiresReview,
+      pending_reason: pendingReason,
+      tags,
+      search_text: [normalized.code, normalized.description, category, constructionMethod, ...tags].filter(Boolean).join(" "),
+    };
+  });
 }
 
 function createIssue(code, message, rowNumber, severity = "pending") {
@@ -208,6 +383,80 @@ function readRequiredArgValue(argv, index, name) {
   const next = argv[index + 1];
   if (!next || next.startsWith("--")) throw new Error(`${name} requires a value.`);
   return next;
+}
+
+function validateWriteCounts(dryRun, insertedItems) {
+  if (insertedItems.length !== dryRun.importedRows) {
+    throw new Error(`Supabase write returned ${insertedItems.length} row(s), expected ${dryRun.importedRows}.`);
+  }
+}
+
+async function archivePreviousActiveSource(client, { sourceId, sourceType, source, referenceMonth }) {
+  await client.patch(
+    "price_sources",
+    { status: "archived" },
+    {
+      source_type: `eq.${sourceType}`,
+      state: `eq.${source.state}`,
+      reference_month: `eq.${referenceMonth}`,
+      regime: `eq.${source.regime}`,
+      status: "eq.active",
+      id: `neq.${sourceId}`,
+    }
+  );
+}
+
+async function recordWriteFailure(client, syncRun, source, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (source?.id) {
+    await client.patch("price_sources", { status: "failed", notes: `Sync failed: ${message}` }, { id: `eq.${source.id}` }).catch(() => undefined);
+  }
+  if (syncRun?.id) {
+    await client
+      .patch(
+        "price_sync_runs",
+        {
+          status: "failed",
+          finished_at: new Date().toISOString(),
+          error_message: message,
+        },
+        { id: `eq.${syncRun.id}` }
+      )
+      .catch(() => undefined);
+  }
+}
+
+function requireReturnedId(row, table) {
+  if (!row?.id) throw new Error(`Supabase ${table} write did not return an id.`);
+  return row.id;
+}
+
+function formatQuery(query = {}) {
+  const entries = Object.entries(query);
+  if (entries.length === 0) return "";
+  return `?${entries.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`).join("&")}`;
+}
+
+async function readResponseText(response) {
+  try {
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
+function toReferenceMonth(value) {
+  const normalized = String(value ?? "").trim();
+  if (/^\d{4}-\d{2}$/.test(normalized)) return `${normalized}-01`;
+  return normalized;
+}
+
+function parseTags(value) {
+  if (Array.isArray(value)) return value.map((tag) => String(tag).trim()).filter(Boolean);
+  return String(value ?? "")
+    .split(/[;,]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 function toNumber(value) {
