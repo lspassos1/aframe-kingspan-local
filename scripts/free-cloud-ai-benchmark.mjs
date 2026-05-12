@@ -27,8 +27,12 @@ function parseArgs(argv) {
     mode: "dry-run",
     fixtures: defaultFixturePath,
     output: "",
-    endpoint: process.env.AI_FREE_CLOUD_BENCHMARK_ENDPOINT || "http://localhost:3000/api/ai/plan-extract",
+    endpoint: "http://localhost:3000/api/ai/plan-extract",
     format: "json",
+    timeoutMs: defaultFetchTimeoutMs,
+    authCookie: "",
+    authBearer: "",
+    authHeader: "",
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -38,6 +42,14 @@ function parseArgs(argv) {
     else if (arg === "--fixtures") args.fixtures = path.resolve(argv[++index] || "");
     else if (arg === "--output") args.output = path.resolve(argv[++index] || "");
     else if (arg === "--endpoint") args.endpoint = argv[++index] || args.endpoint;
+    else if (arg === "--timeout-ms") {
+      const timeoutMs = Number(argv[++index]);
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("--timeout-ms must be a positive number.");
+      args.timeoutMs = Math.round(timeoutMs);
+    }
+    else if (arg === "--auth-cookie") args.authCookie = argv[++index] || "";
+    else if (arg === "--auth-bearer") args.authBearer = argv[++index] || "";
+    else if (arg === "--auth-header") args.authHeader = argv[++index] || "";
     else if (arg === "--format") {
       const format = argv[++index] || args.format;
       if (!["json", "markdown"].includes(format)) throw new Error(`Unsupported format "${format}". Use json or markdown.`);
@@ -55,9 +67,8 @@ function printHelp() {
 
 Default mode is --dry-run. It uses sanitized fixture outputs and performs no network calls.
 Use --real only against a local/preview endpoint configured with free-cloud providers.
-Protected endpoints can receive auth through AI_FREE_CLOUD_BENCHMARK_COOKIE,
-AI_FREE_CLOUD_BENCHMARK_AUTH_BEARER or AI_FREE_CLOUD_BENCHMARK_AUTH_HEADER.
-AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS controls real-mode request timeout. Default: 30000.
+Protected endpoints can receive auth through --auth-cookie, --auth-bearer or --auth-header.
+--timeout-ms controls real-mode request timeout. Default: 30000.
 `);
 }
 
@@ -92,17 +103,16 @@ function isSchemaValid(result) {
   return Boolean(result && result.version === "1.0" && result.extracted && typeof result.extracted === "object");
 }
 
-function readFetchTimeoutMs() {
-  const value = Number(process.env.AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS);
+function readFetchTimeoutMs(value) {
   if (!Number.isFinite(value) || value <= 0) return defaultFetchTimeoutMs;
   return Math.round(value);
 }
 
-function createRealBenchmarkHeaders() {
+function createRealBenchmarkHeaders(args) {
   const headers = {};
-  const cookie = process.env.AI_FREE_CLOUD_BENCHMARK_COOKIE?.trim();
-  const bearer = process.env.AI_FREE_CLOUD_BENCHMARK_AUTH_BEARER?.trim();
-  const authHeader = process.env.AI_FREE_CLOUD_BENCHMARK_AUTH_HEADER?.trim();
+  const cookie = args.authCookie?.trim();
+  const bearer = args.authBearer?.trim();
+  const authHeader = args.authHeader?.trim();
 
   if (cookie) headers.Cookie = cookie;
   if (bearer) headers.Authorization = `Bearer ${bearer}`;
@@ -221,7 +231,7 @@ function runDryBenchmark(fixtures) {
   return createReport("dry-run", fixtureReports);
 }
 
-async function runRealBenchmark(fixtures, endpoint) {
+async function runRealBenchmark(fixtures, args) {
   const fixtureReports = [];
   for (const fixture of fixtures) {
     const form = new FormData();
@@ -232,12 +242,12 @@ async function runRealBenchmark(fixtures, endpoint) {
     const start = performance.now();
     let payload = {};
     let httpStatus = 0;
-    const timeoutMs = readFetchTimeoutMs();
+    const timeoutMs = readFetchTimeoutMs(args.timeoutMs);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const headers = createRealBenchmarkHeaders();
-      const response = await fetch(endpoint, {
+      const headers = createRealBenchmarkHeaders(args);
+      const response = await fetch(args.endpoint, {
         method: "POST",
         body: form,
         signal: controller.signal,
@@ -424,7 +434,7 @@ async function main() {
   }
 
   const fixtures = await loadFixtures(args.fixtures);
-  const report = args.mode === "real" ? await runRealBenchmark(fixtures, args.endpoint) : runDryBenchmark(fixtures);
+  const report = args.mode === "real" ? await runRealBenchmark(fixtures, args) : runDryBenchmark(fixtures);
   const serializedReport = serializeReport(report, args.format);
 
   if (args.output) {

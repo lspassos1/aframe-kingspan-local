@@ -5,11 +5,12 @@ vi.mock("server-only", () => ({}));
 import { createOperationalEnvironmentStatus } from "@/lib/operations/operational-environment";
 
 describe("operational environment status", () => {
-  it("returns only safe OpenAI configuration metadata", () => {
+  it("returns only safe free-cloud configuration metadata", () => {
     const status = createOperationalEnvironmentStatus({
       AI_PLAN_EXTRACT_ENABLED: "true",
-      OPENAI_API_KEY: "sk-secret-value",
-      AI_OPENAI_MODEL: "gpt-4o-mini",
+      AI_MODE: "free-cloud",
+      GEMINI_API_KEY: "secret-gemini",
+      GEMINI_MODEL: "gemini-2.5-flash",
       AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "4",
       AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP: "6",
       AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT: "80",
@@ -17,10 +18,29 @@ describe("operational environment status", () => {
 
     expect(status).toEqual({
       aiPlanExtractEnabled: true,
-      openAiApiKeyConfigured: true,
-      openAiModelConfigured: true,
-      providerLabel: "OpenAI",
+      aiMode: "free-cloud",
+      aiProviderConfigured: true,
+      aiModelConfigured: true,
+      providerLabel: "Modo gratuito",
       dailyLimitLabel: "4/usuário · 6/IP · 80/global",
+    });
+    expect(JSON.stringify(status)).not.toContain("secret-gemini");
+  });
+
+  it("returns only safe paid OpenAI configuration metadata", () => {
+    const status = createOperationalEnvironmentStatus({
+      AI_PLAN_EXTRACT_ENABLED: "true",
+      AI_MODE: "paid",
+      OPENAI_API_KEY: "sk-secret-value",
+      AI_OPENAI_MODEL: "gpt-4o-mini",
+    });
+
+    expect(status).toMatchObject({
+      aiPlanExtractEnabled: true,
+      aiMode: "paid",
+      aiProviderConfigured: true,
+      aiModelConfigured: true,
+      providerLabel: "Modo Pro",
     });
     expect(JSON.stringify(status)).not.toContain("sk-secret-value");
   });

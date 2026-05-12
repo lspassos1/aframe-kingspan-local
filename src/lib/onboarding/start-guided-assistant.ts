@@ -28,11 +28,11 @@ export function normalizeStartAssistantModeParam(value: string | string[] | unde
 export function createStartAssistantViewModel({
   mode,
   planExtractEnabled,
-  aiMode = "openai",
+  aiMode = "paid",
 }: {
   mode: StartAssistantMode;
   planExtractEnabled: boolean;
-  aiMode?: "free-cloud" | "openai";
+  aiMode?: "free-cloud" | "paid";
 }): StartAssistantViewModel {
   const options: StartAssistantOption[] = [
     {
@@ -40,11 +40,11 @@ export function createStartAssistantViewModel({
       title: "Enviar planta",
       description: planExtractEnabled
         ? aiMode === "free-cloud"
-          ? "Providers gratuitos leem a planta; você revisa tudo."
+          ? "Análise rápida lê a planta; você revisa tudo."
           : "A IA lê a planta e você revisa os campos."
         : aiMode === "free-cloud"
           ? "Disponível quando o modo gratuito estiver configurado."
-          : "Disponível quando a OpenAI API estiver configurada.",
+          : "Disponível quando o Modo Pro estiver configurado.",
       primary: planExtractEnabled,
       disabledReason: planExtractEnabled ? undefined : "IA desligada",
     },

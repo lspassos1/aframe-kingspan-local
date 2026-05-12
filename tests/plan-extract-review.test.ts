@@ -137,8 +137,8 @@ describe("PlanExtractReview", () => {
         currentValues,
         analysisStatus: {
           modeLabel: "Modo gratuito",
-          primaryProviderLabel: "Gemini Free",
-          reviewProviderLabel: "OpenRouter Free",
+          primaryProviderLabel: "Analise rapida",
+          reviewProviderLabel: "Revisao detalhada",
           cached: true,
           paidFallbackEnabled: false,
           review: {
@@ -182,7 +182,9 @@ describe("PlanExtractReview", () => {
     expect(html).toContain("Resposta registrada nesta revisao");
     expect(html).toContain("Alertas estruturados");
     expect(html).toContain("Modo gratuito");
-    expect(html).toContain("Gemini Free");
+    expect(html).toContain("Analise rapida");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
     expect(html).toContain("1 pendências para revisão");
     expect(html).toContain("Resultado veio do cache");
     expect(html).toContain("Divergências ficam pendentes");

@@ -138,17 +138,15 @@ describe("free-cloud benchmark harness", () => {
     });
 
     try {
-      const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--real", "--endpoint", server.endpoint], {
-        cwd: process.cwd(),
-        encoding: "utf8",
-        timeout: childProcessTimeoutMs,
-        env: {
-          ...process.env,
-          AI_FREE_CLOUD_BENCHMARK_COOKIE: "__session=test-session",
-          AI_FREE_CLOUD_BENCHMARK_AUTH_BEARER: "test-bearer",
-          AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS: "5000",
-        },
-      });
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        [scriptPath, "--real", "--endpoint", server.endpoint, "--auth-cookie", "__session=test-session", "--auth-bearer", "test-bearer", "--timeout-ms", "5000"],
+        {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          timeout: childProcessTimeoutMs,
+        }
+      );
       const report = JSON.parse(stdout);
 
       expect(report.fixtures.every((fixture: { primary: { status: string } }) => fixture.primary.status === "success")).toBe(true);
@@ -170,7 +168,6 @@ describe("free-cloud benchmark harness", () => {
         cwd: process.cwd(),
         encoding: "utf8",
         timeout: childProcessTimeoutMs,
-        env: { ...process.env, AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS: "5000" },
       });
       const report = JSON.parse(stdout);
 
@@ -190,11 +187,10 @@ describe("free-cloud benchmark harness", () => {
     });
 
     try {
-      const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--real", "--endpoint", server.endpoint], {
+      const { stdout } = await execFileAsync(process.execPath, [scriptPath, "--real", "--endpoint", server.endpoint, "--timeout-ms", "20"], {
         cwd: process.cwd(),
         encoding: "utf8",
         timeout: childProcessTimeoutMs,
-        env: { ...process.env, AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS: "20" },
       });
       const report = JSON.parse(stdout);
 
@@ -215,7 +211,6 @@ describe("free-cloud benchmark harness", () => {
         cwd: process.cwd(),
         encoding: "utf8",
         timeout: childProcessTimeoutMs,
-        env: { ...process.env, AI_FREE_CLOUD_BENCHMARK_TIMEOUT_MS: "5000" },
       });
       const report = JSON.parse(stdout);
 

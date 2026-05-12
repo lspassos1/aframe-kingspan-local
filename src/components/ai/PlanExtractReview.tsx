@@ -551,11 +551,11 @@ export function PlanExtractReview({
             <p className="mt-1 font-medium">{analysisStatus.modeLabel}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Provider principal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Análise</p>
             <p className="mt-1 font-medium">{analysisStatus.primaryProviderLabel}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Comparação</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Revisão</p>
             <p className="mt-1 font-medium">
               {analysisStatus.review?.status === "completed"
                 ? comparisonDivergences > 0
@@ -564,7 +564,7 @@ export function PlanExtractReview({
                 : analysisStatus.review?.status === "skipped"
                   ? "Indisponível para este arquivo"
                   : analysisStatus.review?.status === "unavailable"
-                    ? "Provider indisponível"
+                    ? "Revisão indisponível"
                     : analysisStatus.reviewProviderLabel
                       ? `${analysisStatus.reviewProviderLabel} quando disponível`
                       : "Sem segunda leitura"}
@@ -572,7 +572,7 @@ export function PlanExtractReview({
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Fallback pago</p>
-            <p className="mt-1 font-medium">{analysisStatus.paidFallbackEnabled ? "Não automático" : "Desligado"}</p>
+            <p className="mt-1 font-medium">Desligado</p>
           </div>
           {analysisStatus.cached ? <StatusPill tone="info">Resultado veio do cache</StatusPill> : null}
           {comparisonDivergences > 0 ? <StatusPill tone="warning">Divergências ficam pendentes</StatusPill> : null}

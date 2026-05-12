@@ -42,7 +42,7 @@ Isso não significa que a experiência final deve continuar centrada em A-frame.
 
 ## IA Assistiva
 
-A IA atua como pré-preenchimento e explicação de incertezas. O runtime atual usa OpenAI API quando habilitado; o ciclo free-cloud define OpenAI em standby e providers gratuitos por tarefa para PRs futuros.
+A IA atua como pré-preenchimento e explicação de incertezas. No modo free-cloud, Gemini faz a leitura principal, OpenRouter faz a segunda leitura e Groq/Cerebras/SambaNova resumem pendências. OpenAI permanece em standby para modo pago explícito.
 
 A IA pode:
 

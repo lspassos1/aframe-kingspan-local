@@ -30,7 +30,7 @@ Não mostrar na primeira camada:
 
 ## Modo IA
 
-Quando `AI_PLAN_EXTRACT_ENABLED=true` e OpenAI estiver configurado, upload de planta deve ser o caminho principal.
+Quando `AI_PLAN_EXTRACT_ENABLED=true` e o provider do modo atual estiver configurado, upload de planta deve ser o caminho principal. Em `AI_MODE=free-cloud`, isso significa Gemini como leitura principal; em `AI_MODE=paid`, OpenAI explícito.
 
 Estados obrigatórios:
 
@@ -42,7 +42,7 @@ Estados obrigatórios:
 - error;
 - limit exceeded.
 
-Se IA estiver desligada ou sem `OPENAI_API_KEY`, a UI deve explicar de forma segura que o upload assistido não está disponível e oferecer fluxo manual.
+Se IA estiver desligada ou sem o provider server-side do modo atual, a UI deve explicar de forma segura que o upload assistido não está disponível e oferecer fluxo manual.
 
 ## Modo Manual
 

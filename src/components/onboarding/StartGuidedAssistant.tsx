@@ -37,15 +37,15 @@ function getAiOperationalFacts(aiProviderStatus: PlanImportProviderUiStatus) {
   if (aiProviderStatus.mode === "free-cloud") {
     return [
       { label: "Modo", value: aiProviderStatus.modeLabel },
-      { label: "Provider principal", value: aiProviderStatus.primaryProviderLabel },
-      { label: "Comparação", value: aiProviderStatus.reviewProviderLabel ? `${aiProviderStatus.reviewProviderLabel} quando disponível` : "Sem segunda leitura" },
-      { label: "Fallback pago", value: aiProviderStatus.paidFallbackEnabled ? "Configurado, mas não acionado automaticamente" : "Desligado" },
+      { label: "Análise", value: aiProviderStatus.primaryProviderLabel },
+      { label: "Revisão", value: aiProviderStatus.reviewProviderLabel ? `${aiProviderStatus.reviewProviderLabel} quando disponível` : "Sem segunda leitura" },
+      { label: "Fallback pago", value: "Desligado" },
       { label: "Fallback manual", value: "Sempre disponível se limite externo falhar" },
     ];
   }
 
   return [
-    { label: "Provider", value: aiProviderStatus.modeLabel },
+    { label: "Modo", value: aiProviderStatus.modeLabel },
     { label: "Arquivo", value: "PDF, PNG ou JPG até o limite configurado" },
     { label: "Limite diário", value: "Validado no servidor por usuário e IP" },
     { label: "Cache", value: "Hash do arquivo evita análise repetida" },
@@ -73,8 +73,8 @@ export function StartGuidedAssistant({
   const openedInitialExampleRef = useRef(false);
   const viewModel = useMemo(() => createStartAssistantViewModel({ mode, planExtractEnabled, aiMode: aiProviderStatus.mode }), [aiProviderStatus.mode, mode, planExtractEnabled]);
   const aiOperationalFacts = useMemo(() => getAiOperationalFacts(aiProviderStatus), [aiProviderStatus]);
-  const aiReadyLabel = aiProviderStatus.mode === "free-cloud" ? aiProviderStatus.modeLabel : "OpenAI pronta";
-  const aiConfiguredLabel = aiProviderStatus.mode === "free-cloud" ? aiProviderStatus.modeLabel : "OpenAI configurada";
+  const aiReadyLabel = aiProviderStatus.modeLabel;
+  const aiConfiguredLabel = aiProviderStatus.modeLabel;
 
   const loadExampleProject = useCallback(() => {
     setProject({
@@ -218,8 +218,8 @@ export function StartGuidedAssistant({
       {viewModel.showAiDisabledNotice ? (
         <InlineHelp tone="warning">
           {aiProviderStatus.mode === "free-cloud"
-            ? "A leitura por IA está desligada neste ambiente. Configure `AI_PLAN_EXTRACT_ENABLED=true`, `AI_MODE=free-cloud` e providers gratuitos no servidor, ou continue preenchendo manualmente."
-            : "A leitura por IA está desligada neste ambiente. Configure `AI_PLAN_EXTRACT_ENABLED=true` e `OPENAI_API_KEY` no servidor para habilitar upload, ou continue preenchendo manualmente."}
+            ? "A leitura por IA está desligada neste ambiente. Configure o modo gratuito no servidor ou continue preenchendo manualmente."
+            : "A leitura por IA está desligada neste ambiente. Configure o Modo Pro no servidor para habilitar upload, ou continue preenchendo manualmente."}
         </InlineHelp>
       ) : null}
 
@@ -238,9 +238,7 @@ export function StartGuidedAssistant({
           <StickySummary
             title="Status da IA"
             description={
-              aiProviderStatus.mode === "free-cloud"
-                ? "Somente metadados seguros aparecem nesta tela. Chaves ficam no servidor e o OpenAI permanece em standby."
-                : "Somente metadados seguros aparecem nesta tela. A chave da OpenAI fica no servidor."
+              "Somente metadados seguros aparecem nesta tela. Credenciais ficam no servidor."
             }
           >
             <div className="space-y-2">

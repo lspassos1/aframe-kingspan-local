@@ -1,6 +1,6 @@
 # Setup De IA E SINAPI
 
-Este guia explica onde configurar IA, limites da extração e importação SINAPI. O runtime atual de upload assistido ainda usa OpenAI quando habilitado; o ciclo free-cloud mantém OpenAI em standby e adiciona providers gratuitos em PRs futuros.
+Este guia explica onde configurar IA, limites da extração e importação SINAPI. O contrato atual não cria novas envs: o modo free-cloud usa somente as variáveis já cadastradas para Gemini, OpenRouter, Groq, Cerebras e SambaNova. OpenAI permanece em standby para modo pago explícito.
 
 ## Desenvolvimento Local
 
@@ -10,13 +10,27 @@ Este guia explica onde configurar IA, limites da extração e importação SINAP
 cp .env.example .env.local
 ```
 
-2. Configure a IA somente se quiser testar upload assistido:
+2. Configure a IA somente se quiser testar upload assistido em modo free-cloud:
 
 ```txt
 AI_PLAN_EXTRACT_ENABLED=true
-AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
-OPENAI_API_KEY=sk-...
-AI_OPENAI_MODEL=gpt-4o-mini
+AI_MODE=free-cloud
+AI_PAID_FALLBACK_ENABLED=false
+AI_PLAN_PRIMARY_PROVIDER=gemini
+AI_PLAN_REVIEW_PROVIDER=openrouter
+AI_TEXT_PROVIDER=groq
+AI_TEXT_FALLBACK_PROVIDER=cerebras
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_FREE_TIER_NOTICE=true
+OPENROUTER_API_KEY=...
+OPENROUTER_PLAN_REVIEW_MODEL=google/gemini-2.0-flash-exp:free
+GROQ_API_KEY=...
+GROQ_TEXT_MODEL=llama-3.1-8b-instant
+CEREBRAS_API_KEY=...
+CEREBRAS_TEXT_MODEL=...
+SAMBANOVA_API_KEY=...
+SAMBANOVA_TEXT_MODEL=...
 AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER=3
 AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP=5
 AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT=50
@@ -41,9 +55,9 @@ Project Settings -> Environment Variables
 
 Configure os ambientes necessários: Preview, Production ou Development. Depois de alterar variável server-side, faça redeploy do deployment afetado.
 
-Não coloque `OPENAI_API_KEY` em variável pública. Nunca use `NEXT_PUBLIC_OPENAI_API_KEY`.
+Não coloque chaves de IA em variável pública. Nunca use `NEXT_PUBLIC_OPENAI_API_KEY` ou `NEXT_PUBLIC_*_API_KEY` para providers privados.
 
-## OpenAI API
+## OpenAI API Em Standby
 
 Use uma chave da plataforma OpenAI. Assinatura ChatGPT Plus/Team/Enterprise não configura automaticamente a API deste app.
 
@@ -55,16 +69,20 @@ Regras:
 - Não hardcodar a chave.
 - Não expor em componente client.
 
-Provider oficial nesta entrega:
+Modo Pro/OpenAI explícito:
 
 ```txt
-AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
+AI_MODE=paid
+OPENAI_API_KEY=sk-...
 AI_OPENAI_MODEL=gpt-4o-mini
+AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini
 ```
+
+`AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente agora.
 
 ## Modo Free-cloud
 
-O ciclo `#182` define `AI_MODE=free-cloud` para uso pessoal/testes sem custo. O router separa análise visual, segunda leitura e resumo textual por tarefa, mantendo OpenAI em standby para modo pago explícito.
+O ciclo `#182` define `AI_MODE=free-cloud` para uso pessoal/testes sem custo. O router separa análise visual, segunda leitura e resumo textual por tarefa, mantendo OpenAI em standby para modo pago explícito. Não crie novas envs nem variações de modelo/provider.
 
 ```txt
 AI_MODE=free-cloud
@@ -74,11 +92,16 @@ AI_PLAN_REVIEW_PROVIDER=openrouter
 AI_TEXT_PROVIDER=groq
 AI_TEXT_FALLBACK_PROVIDER=cerebras
 GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_FREE_TIER_NOTICE=true
 OPENROUTER_API_KEY=...
+OPENROUTER_PLAN_REVIEW_MODEL=google/gemini-2.0-flash-exp:free
 GROQ_API_KEY=...
 GROQ_TEXT_MODEL=llama-3.1-8b-instant
 CEREBRAS_API_KEY=...
+CEREBRAS_TEXT_MODEL=...
 SAMBANOVA_API_KEY=...
+SAMBANOVA_TEXT_MODEL=...
 ```
 
 Regras:
@@ -105,7 +128,7 @@ IA ligada:
 AI_PLAN_EXTRACT_ENABLED=true
 ```
 
-Mesmo com a flag ligada, upload assistido precisa de `OPENAI_API_KEY` no servidor. Configure `AI_OPENAI_MODEL` explicitamente para controle operacional; se ele estiver ausente, o backend usa o padrão OpenAI atual e o checklist mostra `Modelo: ausente`.
+Mesmo com a flag ligada, upload assistido precisa do provider do modo atual configurado no servidor. Em `AI_MODE=free-cloud`, configure Gemini como principal e OpenRouter/Groq conforme a lista acima. Em `AI_MODE=paid`, configure `OPENAI_API_KEY` e `AI_OPENAI_MODEL`.
 
 ## Limites Diários
 
@@ -130,9 +153,9 @@ Rate limit:
 Verifique:
 
 1. `AI_PLAN_EXTRACT_ENABLED=true`.
-2. `AI_PLAN_EXTRACT_PROVIDER_ORDER=openai`.
-3. `OPENAI_API_KEY` existe no ambiente do servidor.
-4. `AI_OPENAI_MODEL` está configurado explicitamente, se você quiser controle operacional do modelo. Sem isso, o backend usa o padrão OpenAI atual e o checklist mostra `Modelo: ausente`.
+2. `AI_MODE=free-cloud` ou `AI_MODE=paid`.
+3. Em free-cloud: `GEMINI_API_KEY`, `GEMINI_MODEL`, `OPENROUTER_API_KEY`, `OPENROUTER_PLAN_REVIEW_MODEL`, `GROQ_API_KEY` e `GROQ_TEXT_MODEL` existem no servidor conforme o fluxo desejado.
+4. Em modo pago: `OPENAI_API_KEY` e `AI_OPENAI_MODEL` existem no servidor.
 5. O deployment foi refeito depois da mudança.
 6. O usuário está autenticado, se anônimo estiver desabilitado.
 7. O arquivo é PNG, JPG, WebP ou PDF e respeita `AI_PLAN_EXTRACT_MAX_FILE_MB`.
@@ -143,7 +166,7 @@ Se estiver em Vercel, confira se a variável foi adicionada ao mesmo ambiente do
 No app, abra `Ajuda` e confira o checklist operacional atual:
 
 - `IA: ativa/desligada`;
-- `Provider: OpenAI`;
+- `Provider: Gemini/OpenRouter/Groq ou OpenAI`, conforme o modo;
 - `Modelo: configurado/ausente`;
 - `Limite diário: disponível`;
 - `SINAPI: base ausente/base importada`;

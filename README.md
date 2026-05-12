@@ -40,13 +40,27 @@ Variáveis comuns:
 - `GITHUB_FEEDBACK_TOKEN`
 - `GITHUB_FEEDBACK_REPO=lspassos1/aframe-kingspan-local`
 
-Para IA assistiva de planta baixa, o runtime atual usa OpenAI quando habilitado. No ciclo free-cloud, OpenAI fica em standby e providers gratuitos entram por tarefa nos próximos PRs.
+Para IA assistiva de planta baixa, o modo gratuito usa as envs já cadastradas para Gemini, OpenRouter e providers textuais. OpenAI fica em standby para modo pago explícito.
 
 ```txt
 AI_PLAN_EXTRACT_ENABLED=true
-AI_PLAN_EXTRACT_PROVIDER_ORDER=openai
-OPENAI_API_KEY=...
-AI_OPENAI_MODEL=gpt-4o-mini
+AI_MODE=free-cloud
+AI_PAID_FALLBACK_ENABLED=false
+AI_PLAN_PRIMARY_PROVIDER=gemini
+AI_PLAN_REVIEW_PROVIDER=openrouter
+AI_TEXT_PROVIDER=groq
+AI_TEXT_FALLBACK_PROVIDER=cerebras
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_FREE_TIER_NOTICE=true
+OPENROUTER_API_KEY=...
+OPENROUTER_PLAN_REVIEW_MODEL=google/gemini-2.0-flash-exp:free
+GROQ_API_KEY=...
+GROQ_TEXT_MODEL=llama-3.1-8b-instant
+CEREBRAS_API_KEY=...
+CEREBRAS_TEXT_MODEL=...
+SAMBANOVA_API_KEY=...
+SAMBANOVA_TEXT_MODEL=...
 AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER=3
 AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP=5
 AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT=50
@@ -55,20 +69,18 @@ AI_PLAN_EXTRACT_CACHE_TTL_HOURS=24
 AI_RATE_LIMIT_SALT=valor_secreto_forte
 ```
 
-`OPENAI_API_KEY` é server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY`, nunca exponha a chave no frontend, em logs ou respostas de API. Assinatura ChatGPT não configura automaticamente a API deste app; é preciso uma chave de API da plataforma OpenAI.
-
-Modo free-cloud planejado:
+Para modo Pro/OpenAI:
 
 ```txt
-AI_MODE=free-cloud
-AI_PAID_FALLBACK_ENABLED=false
-AI_PLAN_PRIMARY_PROVIDER=gemini
-AI_PLAN_REVIEW_PROVIDER=openrouter
-AI_TEXT_PROVIDER=groq
-AI_TEXT_FALLBACK_PROVIDER=cerebras
+AI_MODE=paid
+OPENAI_API_KEY=...
+AI_OPENAI_MODEL=gpt-4o-mini
+AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini
 ```
 
-Essas variáveis não expõem chaves no client e não habilitam fallback pago automático. Veja [docs/free-cloud-ai-routing.md](docs/free-cloud-ai-routing.md) e [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md) para setup completo de IA, Vercel, limites diários e SINAPI.
+`AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente. Chaves de IA são server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY` nem `NEXT_PUBLIC_*_API_KEY` para providers privados, e nunca exponha chave no frontend, em logs ou respostas de API.
+
+Não crie novas variações de env de modelo/provider. Veja [docs/free-cloud-ai-routing.md](docs/free-cloud-ai-routing.md) e [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md) para setup completo de IA, Vercel, limites diários e SINAPI.
 
 ### Slack GitHub Review Bridge
 
