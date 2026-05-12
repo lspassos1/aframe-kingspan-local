@@ -5,3 +5,4 @@ export * from "./service-budget";
 export * from "./composition-matching";
 export * from "./importer";
 export * from "./export";
+export * from "./price-quality";
