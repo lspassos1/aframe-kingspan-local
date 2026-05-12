@@ -184,7 +184,7 @@ export function buildSlackReport({ repo = DEFAULT_REPO, generatedAt = new Date()
   const orphanIssues = issues.filter((issue) => !(prCoverage.get(issue.number) || []).length);
 
   const lines = [
-    `*GitHub triage hourly — ${repo}*`,
+    `*Scheduled GitHub triage — ${repo}*`,
     `Gerado: ${generatedAt.toISOString()}`,
     runUrl ? `Run: ${runUrl}` : "",
     "",
@@ -350,7 +350,7 @@ async function main() {
   }
 
   await postSlack(webhookUrl, buildSlackPayload(report));
-  console.log(`Posted hourly GitHub triage for ${repo} to Slack.`);
+  console.log(`Posted scheduled GitHub triage for ${repo} to Slack.`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

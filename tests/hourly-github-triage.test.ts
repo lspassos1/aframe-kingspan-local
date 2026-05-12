@@ -9,7 +9,7 @@ import {
   summarizeChecks,
 } from "../scripts/hourly-github-triage.mjs";
 
-describe("hourly GitHub triage Slack report", () => {
+describe("scheduled GitHub triage Slack report", () => {
   it("extracts only Refs issue links for coverage", () => {
     expect(extractIssueRefs("Refs #124\nRefs #122")).toEqual([122, 124]);
     expect(extractIssueRefs("Closes #124\nFixes #125")).toEqual([]);
@@ -96,7 +96,7 @@ describe("hourly GitHub triage Slack report", () => {
       ],
     });
 
-    expect(report).toContain("*GitHub triage hourly — lspassos1/aframe-kingspan-local*");
+    expect(report).toContain("*Scheduled GitHub triage — lspassos1/aframe-kingspan-local*");
     expect(report).toContain("PRs bloqueados/não aprovados por Lucas: 1");
     expect(report).toContain("PRs com closing refs proibidos: 1");
     expect(report).toContain("ALERTA: closing ref #126");
