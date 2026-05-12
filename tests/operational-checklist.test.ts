@@ -13,6 +13,9 @@ const disabledEnvironment: OperationalEnvironmentStatus = {
   aiModelConfigured: false,
   providerLabel: "Modo gratuito",
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
+  centralPriceDbConfigured: false,
+  centralPriceDbLabel: "não configurada",
+  lastMonthlySyncLabel: "sem registro",
 };
 
 function getStatus(items: ReturnType<typeof createOperationalChecklist>, id: string) {
@@ -26,13 +29,18 @@ describe("operational checklist", () => {
     const checklist = createOperationalChecklist(disabledEnvironment, defaultProject);
     const publicDetails = checklist.map((item) => item.detail).join(" ");
 
-    expect(getStatus(checklist, "ai")).toBe("desligada");
-    expect(getStatus(checklist, "provider")).toBe("Modo gratuito");
-    expect(getStatus(checklist, "model")).toBe("ausente");
+    expect(getStatus(checklist, "ai")).toBe("Modo gratuito");
+    expect(getStatus(checklist, "plan-extract")).toBe("desligado");
+    expect(getStatus(checklist, "manual-fallback")).toBe("disponível");
+    expect(getStatus(checklist, "ai-config")).toBe("ausente");
     expect(getStatus(checklist, "daily-limit")).toBe("disponível");
+    expect(getStatus(checklist, "local-price-base")).toBe("ausente");
+    expect(getStatus(checklist, "central-db")).toBe("não configurada");
     expect(getStatus(checklist, "sinapi")).toBe("base ausente");
     expect(getStatus(checklist, "state")).toBe("definida");
     expect(getStatus(checklist, "reference")).toBe("ausente");
+    expect(getStatus(checklist, "monthly-sync")).toBe("sem registro");
+    expect(getStatus(checklist, "export")).toBe("preliminar");
     expect(getStatus(checklist, "regime")).toBe("ausente");
     expect(publicDetails).not.toContain("OPENAI_API_KEY");
     expect(publicDetails).not.toContain("GEMINI_API_KEY");
@@ -69,9 +77,10 @@ describe("operational checklist", () => {
       project
     );
 
-    expect(getStatus(checklist, "ai")).toBe("ativa");
+    expect(getStatus(checklist, "plan-extract")).toBe("ativo");
     expect(getStatus(checklist, "sinapi")).toBe("base importada");
-    expect(getStatus(checklist, "reference")).toBe("definida");
+    expect(getStatus(checklist, "local-price-base")).toBe("1 fonte(s)");
+    expect(getStatus(checklist, "reference")).toBe("2026-05");
     expect(getStatus(checklist, "regime")).toBe("definido");
     expect(JSON.stringify(checklist)).not.toContain("sk-");
   });
@@ -87,8 +96,16 @@ describe("operational checklist", () => {
       defaultProject
     );
 
-    expect(getStatus(checklist, "ai")).toBe("ativa");
-    expect(getStatus(checklist, "model")).toBe("ausente");
+    expect(getStatus(checklist, "plan-extract")).toBe("ativo");
+    expect(getStatus(checklist, "ai-config")).toBe("ausente");
+  });
+
+  it("reports central DB as optional and keeps local fallback available when remote DB is absent", () => {
+    const checklist = createOperationalChecklist(disabledEnvironment, defaultProject);
+
+    expect(getStatus(checklist, "central-db")).toBe("não configurada");
+    expect(getStatus(checklist, "manual-fallback")).toBe("disponível");
+    expect(checklist.find((item) => item.id === "central-db")?.detail).toContain("Base central não é dependência");
   });
 
   it("keeps a safe UF status when a legacy project has no scenarios", () => {
@@ -100,6 +117,7 @@ describe("operational checklist", () => {
     const checklist = createOperationalChecklist(disabledEnvironment, projectWithoutScenarios);
 
     expect(getStatus(checklist, "state")).toBe("ausente");
+    expect(getStatus(checklist, "export")).toBe("sem cenário");
   });
 
   it("keeps a safe UF status when legacy location state is null", () => {

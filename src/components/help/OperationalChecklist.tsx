@@ -30,8 +30,8 @@ export function OperationalChecklist({ environment }: { environment: Operational
 
   return (
     <BudgetGroupCard
-      title="Checklist operacional"
-      description="Diagnóstico seguro de IA, limites, SINAPI e região do projeto atual."
+      title="Prontidão do produto"
+      description="Diagnóstico seguro de IA, preços, importação e exportação do projeto atual."
       status={<StatusPill tone={checklist.some((item) => item.tone === "warning") ? "warning" : "success"}>{checklist.filter((item) => item.tone === "warning").length} ação(ões)</StatusPill>}
     >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

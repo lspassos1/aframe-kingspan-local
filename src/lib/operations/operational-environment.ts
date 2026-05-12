@@ -8,11 +8,16 @@ function getPositiveNumberEnv(env: Record<string, string | undefined>, key: stri
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function hasEnv(env: Record<string, string | undefined>, key: string) {
+  return Boolean(env[key]?.trim());
+}
+
 export function createOperationalEnvironmentStatus(env: Record<string, string | undefined> = process.env): OperationalEnvironmentStatus {
   const perUserLimit = getPositiveNumberEnv(env, "AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER", 3);
   const perIpLimit = getPositiveNumberEnv(env, "AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP", 5);
   const globalLimit = getPositiveNumberEnv(env, "AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT", 50);
   const aiMode = resolveAiMode(env);
+  const centralPriceDbConfigured = hasEnv(env, "NEXT_PUBLIC_SUPABASE_URL") && hasEnv(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
   return {
     aiPlanExtractEnabled: env.AI_PLAN_EXTRACT_ENABLED === "true",
@@ -21,5 +26,8 @@ export function createOperationalEnvironmentStatus(env: Record<string, string | 
     aiModelConfigured: aiMode.primaryModelConfigured,
     providerLabel: aiMode.publicModeLabel,
     dailyLimitLabel: `${perUserLimit}/usuário · ${perIpLimit}/IP · ${globalLimit}/global`,
+    centralPriceDbConfigured,
+    centralPriceDbLabel: centralPriceDbConfigured ? "configurada" : "não configurada",
+    lastMonthlySyncLabel: "sem registro",
   };
 }
