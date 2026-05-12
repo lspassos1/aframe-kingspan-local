@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { parseSinapiSyncArgs, readSinapiSyncInput, runSinapiSyncWrite } from "../scripts/sinapi-sync-monthly.mjs";
+import { createPriceItemRows, parseSinapiSyncArgs, readSinapiSyncInput, runSinapiSyncDryRun, runSinapiSyncWrite } from "../scripts/sinapi-sync-monthly.mjs";
 
 const fixturePath = join(process.cwd(), "scripts/fixtures/sinapi-monthly-dry-run-sample.json");
 
@@ -56,8 +56,8 @@ describe("SINAPI monthly sync write mode", () => {
       "POST price_sync_runs started",
       "POST price_sources staging",
       "POST price_items ",
-      "PATCH price_sources archived",
       "PATCH price_sources active",
+      "PATCH price_sources archived",
       "PATCH price_sync_runs completed",
     ]);
     expect(calls[2].body).toHaveLength(3);
@@ -66,12 +66,82 @@ describe("SINAPI monthly sync write mode", () => {
       item_type: "composition",
       code: "SINAPI-87489",
       unit: "m2",
+      state: "BA",
       direct_unit_cost_brl: 82.45,
       price_status: "valid",
       requires_review: false,
     });
-    expect(calls[3].url).toContain("status=eq.active");
-    expect(calls[3].url).toContain("id=neq.source-staging-1");
+    expect(calls[3].body).toMatchObject({ status: "active" });
+    expect(calls[4].url).toContain("status=eq.active");
+    expect(calls[4].url).toContain("state=eq.BA");
+    expect(calls[4].url).toContain("id=neq.source-staging-1");
+  });
+
+  it("normalizes source state before creating active source keys", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const calls = [];
+    const fetcher = vi.fn(async (url, init) => {
+      const body = init.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ method: init.method, table: getTableName(url), url: String(url), body });
+      if (String(url).includes("/price_sync_runs") && init.method === "POST") return jsonResponse([{ id: "sync-run-1" }]);
+      if (String(url).includes("/price_sources") && init.method === "POST") return jsonResponse([{ id: "source-staging-1" }]);
+      if (String(url).includes("/price_items") && init.method === "POST") {
+        return jsonResponse(body.map((row, index) => ({ ...row, id: `price-item-${index + 1}` })));
+      }
+      if (init.method === "PATCH") return jsonResponse([{ id: "patched" }]);
+      return jsonResponse([]);
+    });
+
+    await runSinapiSyncWrite(
+      {
+        ...input,
+        source: { ...input.source, state: "Bahia" },
+      },
+      {
+        env: {
+          SUPABASE_URL: "https://prices.example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role-test-key",
+        },
+        fetcher,
+      }
+    );
+
+    expect(calls[0].body).toMatchObject({ state: "BA" });
+    expect(calls[1].body).toMatchObject({ state: "BA" });
+    expect(calls.find((call) => call.body?.status === "archived")?.url).toContain("state=eq.BA");
+  });
+
+  it("rejects negative component costs before write mode creates audit records", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const invalidInput = {
+      ...input,
+      rows: [{ ...input.rows[0], material: -1 }],
+    };
+
+    const dryRun = runSinapiSyncDryRun(invalidInput);
+
+    expect(dryRun.valid).toBe(false);
+    expect(dryRun.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "negative-component-cost", severity: "invalid" })]));
+    await expect(
+      runSinapiSyncWrite(invalidInput, {
+        env: {
+          SUPABASE_URL: "https://prices.example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role-test-key",
+        },
+        fetcher: vi.fn(),
+      })
+    ).rejects.toThrow("Cannot write invalid SINAPI input.");
+  });
+
+  it("coerces unsupported row regimes to unknown before price item insertion", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const rows = createPriceItemRows([{ ...input.rows[0], regime: "nao informado" }], "source-staging-1", input.source);
+
+    expect(rows[0]).toMatchObject({
+      regime: "unknown",
+      price_status: "requires_review",
+      requires_review: true,
+    });
   });
 
   it("records sync failure after a started run", async () => {
@@ -104,6 +174,46 @@ describe("SINAPI monthly sync write mode", () => {
       "PATCH price_sources failed",
       "PATCH price_sync_runs failed",
     ]);
+  });
+
+  it("keeps a newly active source active when only final audit completion fails", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const calls = [];
+    const fetcher = vi.fn(async (url, init) => {
+      const body = init.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ method: init.method, table: getTableName(url), body });
+      if (String(url).includes("/price_sync_runs") && init.method === "POST") return jsonResponse([{ id: "sync-run-1" }]);
+      if (String(url).includes("/price_sources") && init.method === "POST") return jsonResponse([{ id: "source-staging-1" }]);
+      if (String(url).includes("/price_items") && init.method === "POST") {
+        return jsonResponse(body.map((row, index) => ({ ...row, id: `price-item-${index + 1}` })));
+      }
+      if (String(url).includes("/price_sync_runs") && init.method === "PATCH" && body?.status === "completed") {
+        return jsonResponse({ error: "audit failed" }, 500);
+      }
+      if (init.method === "PATCH") return jsonResponse([{ id: "patched" }]);
+      return jsonResponse([]);
+    });
+
+    await expect(
+      runSinapiSyncWrite(input, {
+        env: {
+          SUPABASE_URL: "https://prices.example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role-test-key",
+        },
+        fetcher,
+      })
+    ).rejects.toThrow("Supabase price_sync_runs PATCH failed with status 500");
+
+    expect(calls.map((call) => `${call.method} ${call.table} ${call.body?.status ?? ""}`)).toEqual([
+      "POST price_sync_runs started",
+      "POST price_sources staging",
+      "POST price_items ",
+      "PATCH price_sources active",
+      "PATCH price_sources archived",
+      "PATCH price_sync_runs completed",
+      "PATCH price_sync_runs failed",
+    ]);
+    expect(calls).not.toEqual(expect.arrayContaining([expect.objectContaining({ table: "price_sources", body: expect.objectContaining({ status: "failed" }) })]));
   });
 
   it("keeps service role key references out of app and client runtime code", () => {

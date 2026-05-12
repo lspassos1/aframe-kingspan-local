@@ -14,6 +14,38 @@ const validUnits = new Set(["un", "m", "m2", "m3", "kg", "package", "lot"]);
 const validRegimes = new Set(["onerado", "nao_desonerado", "desonerado", "unknown"]);
 const validPriceStatuses = new Set(sinapiDryRunStatuses);
 const defaultWriteBatchSize = 500;
+const brazilStates = new Set(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]);
+const brazilStateAliases = new Map(
+  Object.entries({
+    acre: "AC",
+    alagoas: "AL",
+    amapa: "AP",
+    amazonas: "AM",
+    bahia: "BA",
+    ceara: "CE",
+    distrito_federal: "DF",
+    espirito_santo: "ES",
+    goias: "GO",
+    maranhao: "MA",
+    mato_grosso: "MT",
+    mato_grosso_do_sul: "MS",
+    minas_gerais: "MG",
+    para: "PA",
+    paraiba: "PB",
+    parana: "PR",
+    pernambuco: "PE",
+    piaui: "PI",
+    rio_de_janeiro: "RJ",
+    rio_grande_do_norte: "RN",
+    rio_grande_do_sul: "RS",
+    rondonia: "RO",
+    roraima: "RR",
+    santa_catarina: "SC",
+    sao_paulo: "SP",
+    sergipe: "SE",
+    tocantins: "TO",
+  })
+);
 
 export async function readSinapiSyncInput(inputPath = defaultInputPath) {
   const raw = await readFile(inputPath, "utf8");
@@ -23,7 +55,9 @@ export async function readSinapiSyncInput(inputPath = defaultInputPath) {
 export function runSinapiSyncDryRun(input, options = {}) {
   const source = input?.source ?? {};
   const rows = Array.isArray(input?.rows) ? input.rows : [];
-  const expectedState = normalizeState(options.expectedState ?? source.state);
+  const sourceState = normalizeState(source.state);
+  const sourceRegime = normalizeRegime(source.regime);
+  const expectedState = normalizeState(options.expectedState ?? sourceState);
   const issues = [];
 
   for (const field of sinapiDryRunRequiredSourceFields) {
@@ -31,7 +65,10 @@ export function runSinapiSyncDryRun(input, options = {}) {
       issues.push(createIssue("missing-source-metadata", `Source metadata is missing required field "${field}".`, undefined, "invalid"));
     }
   }
-  if (source.regime && !validRegimes.has(String(source.regime))) {
+  if (hasValue(source.state) && !isValidBrazilState(sourceState)) {
+    issues.push(createIssue("invalid-source-state", `Source state "${source.state}" must resolve to a valid Brazilian UF.`, undefined, "invalid"));
+  }
+  if (source.regime && sourceRegime === "unknown" && String(source.regime).trim() !== "unknown") {
     issues.push(createIssue("unknown-regime", `Source regime "${source.regime}" is not supported.`, undefined, "invalid"));
   }
   if (rows.length === 0) {
@@ -51,9 +88,9 @@ export function runSinapiSyncDryRun(input, options = {}) {
       id: source.id ?? "",
       title: source.title ?? "",
       supplier: source.supplier ?? "",
-      state: source.state ?? "",
+      state: sourceState,
       referenceDate: source.referenceDate ?? "",
-      regime: source.regime ?? "unknown",
+      regime: sourceRegime,
       version: source.version ?? "",
     },
     importedRows: normalizedRows.length,
@@ -86,6 +123,7 @@ export async function runSinapiSyncWrite(input, options = {}) {
   };
   let syncRun;
   let source;
+  let keepActiveSourceOnFailure = false;
 
   try {
     syncRun = await client.insertOne("price_sync_runs", runPayload);
@@ -108,8 +146,9 @@ export async function runSinapiSyncWrite(input, options = {}) {
     const insertedItems = await client.insertMany("price_items", priceItems, options.batchSize ?? defaultWriteBatchSize);
     validateWriteCounts(dryRun, insertedItems);
 
-    await archivePreviousActiveSource(client, { sourceId, sourceType, source: dryRun.source, referenceMonth });
     await client.patch("price_sources", { status: "active" }, { id: `eq.${sourceId}` });
+    await archivePreviousActiveSource(client, { sourceId, sourceType, source: dryRun.source, referenceMonth });
+    keepActiveSourceOnFailure = true;
     await client.patch(
       "price_sync_runs",
       {
@@ -132,7 +171,7 @@ export async function runSinapiSyncWrite(input, options = {}) {
       archivedPreviousActive: true,
     };
   } catch (error) {
-    await recordWriteFailure(client, syncRun, source, error);
+    await recordWriteFailure(client, syncRun, source, error, { failSource: !keepActiveSourceOnFailure });
     throw error;
   }
 }
@@ -160,7 +199,7 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
   const unit = String(data.unidade ?? "").trim();
   const total = toNumber(data.preco_total);
   const state = normalizeState(data.uf);
-  const regime = String(data.regime ?? "unknown").trim() || "unknown";
+  const regime = normalizeRegime(data.regime ?? "unknown");
   let status = "valid";
 
   if (issues.length > 0) status = "invalid";
@@ -185,13 +224,20 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
   if (!state) {
     issues.push(createIssue("missing-state", `Row ${rowNumber} has no UF/state.`, rowNumber));
     if (status === "valid") status = "requires_review";
+  } else if (!isValidBrazilState(state)) {
+    issues.push(createIssue("invalid-state", `Row ${rowNumber} has unsupported UF/state "${data.uf}".`, rowNumber, "invalid"));
+    status = "invalid";
   } else if (expectedState && state !== expectedState) {
     issues.push(createIssue("out-of-region", `Row ${rowNumber} UF "${data.uf}" differs from source/project UF.`, rowNumber));
     if (status === "valid") status = "out_of_region";
   }
-  if (!validRegimes.has(regime)) {
+  if (regime === "unknown" && hasValue(data.regime) && String(data.regime).trim() !== "unknown") {
     issues.push(createIssue("unknown-regime", `Row ${rowNumber} has unsupported regime "${regime}".`, rowNumber));
     if (status === "valid") status = "requires_review";
+  }
+  for (const componentIssue of getNegativeComponentIssues(data, rowNumber)) {
+    issues.push(componentIssue);
+    status = "invalid";
   }
 
   return {
@@ -325,10 +371,13 @@ export function createSupabaseWriteClient(config, options = {}) {
 export function createPriceItemRows(rows, sourceId, source, options = {}) {
   return rows.map((row, index) => {
     const normalized = validateSinapiDryRunRow(row, index + 2, normalizeState(options.expectedState ?? source.state));
-    const materialCost = toNumber(row.material);
-    const laborCost = toNumber(row.mao_obra);
-    const equipmentCost = toNumber(row.equipamento);
-    const directCost = toNumber(row.preco_total);
+    const materialCost = toNonNegativeNumber(row.material);
+    const laborCost = toNonNegativeNumber(row.mao_obra);
+    const equipmentCost = toNonNegativeNumber(row.equipamento);
+    const thirdPartyCost = toNonNegativeNumber(row.terceiros);
+    const otherCost = toNonNegativeNumber(row.outros);
+    const directCost = toNonNegativeNumber(row.preco_total);
+    const laborHours = toNonNegativeNumber(row.hh);
     const category = String(row.etapa ?? "civil").trim() || "civil";
     const constructionMethod = String(row.metodo ?? "conventional-masonry").trim() || "conventional-masonry";
     const tags = parseTags(row.tags);
@@ -345,14 +394,14 @@ export function createPriceItemRows(rows, sourceId, source, options = {}) {
       state: normalizeState(row.uf || source.state),
       city: source.city || null,
       reference_month: toReferenceMonth(row.data_base || source.referenceDate),
-      regime: String(row.regime ?? source.regime ?? "unknown").trim() || "unknown",
-      material_cost_brl: Number.isFinite(materialCost) ? materialCost : 0,
-      labor_cost_brl: Number.isFinite(laborCost) ? laborCost : 0,
-      equipment_cost_brl: Number.isFinite(equipmentCost) ? equipmentCost : 0,
-      third_party_cost_brl: Number.isFinite(toNumber(row.terceiros)) ? toNumber(row.terceiros) : 0,
-      other_cost_brl: Number.isFinite(toNumber(row.outros)) ? toNumber(row.outros) : 0,
-      direct_unit_cost_brl: Number.isFinite(directCost) ? directCost : 0,
-      total_labor_hours_per_unit: Number.isFinite(toNumber(row.hh)) ? toNumber(row.hh) : 0,
+      regime: normalizeRegime(row.regime ?? source.regime ?? "unknown"),
+      material_cost_brl: materialCost,
+      labor_cost_brl: laborCost,
+      equipment_cost_brl: equipmentCost,
+      third_party_cost_brl: thirdPartyCost,
+      other_cost_brl: otherCost,
+      direct_unit_cost_brl: directCost,
+      total_labor_hours_per_unit: laborHours,
       price_status: validPriceStatuses.has(normalized.status) ? normalized.status : "requires_review",
       confidence: normalized.status === "valid" ? "high" : "medium",
       requires_review: normalized.requiresReview,
@@ -372,7 +421,35 @@ function hasValue(value) {
 }
 
 function normalizeState(value) {
-  return String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+  if (brazilStates.has(upper)) return upper;
+  return brazilStateAliases.get(toTokenKey(raw)) ?? upper;
+}
+
+function isValidBrazilState(value) {
+  return brazilStates.has(value);
+}
+
+function normalizeRegime(value) {
+  const key = toTokenKey(value);
+  if (key === "onerado") return "onerado";
+  if (key === "desonerado") return "desonerado";
+  if (key === "nao_desonerado" || key === "nao_desonerada" || key === "sem_desoneracao") return "nao_desonerado";
+  if (key === "unknown" || key === "desconhecido" || key === "") return "unknown";
+  const trimmed = String(value ?? "").trim();
+  return validRegimes.has(trimmed) ? trimmed : "unknown";
+}
+
+function toTokenKey(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function isRecord(value) {
@@ -406,9 +483,9 @@ async function archivePreviousActiveSource(client, { sourceId, sourceType, sourc
   );
 }
 
-async function recordWriteFailure(client, syncRun, source, error) {
+async function recordWriteFailure(client, syncRun, source, error, options = {}) {
   const message = error instanceof Error ? error.message : String(error);
-  if (source?.id) {
+  if (options.failSource !== false && source?.id) {
     await client.patch("price_sources", { status: "failed", notes: `Sync failed: ${message}` }, { id: `eq.${source.id}` }).catch(() => undefined);
   }
   if (syncRun?.id) {
@@ -463,6 +540,27 @@ function toNumber(value) {
   if (value === undefined || value === null || value === "") return Number.NaN;
   const parsed = typeof value === "number" ? value : Number(String(value).replace(",", "."));
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function toNonNegativeNumber(value) {
+  const parsed = toNumber(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function getNegativeComponentIssues(data, rowNumber) {
+  return [
+    ["material", "material"],
+    ["mao_obra", "labor"],
+    ["equipamento", "equipment"],
+    ["terceiros", "third-party"],
+    ["outros", "other"],
+    ["hh", "labor hours"],
+  ].flatMap(([key, label]) => {
+    if (!hasValue(data[key])) return [];
+    const value = toNumber(data[key]);
+    if (!Number.isFinite(value) || value >= 0) return [];
+    return [createIssue("negative-component-cost", `Row ${rowNumber} has negative ${label} value.`, rowNumber, "invalid")];
+  });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
