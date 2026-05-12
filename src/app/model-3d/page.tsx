@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import { PageFrame, PageHeader, PendingState, StatusPill } from "@/components/shared/design-system";
+import { PageFrame, PendingState } from "@/components/shared/design-system";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 
@@ -24,19 +24,7 @@ export default function Model3DPage() {
   const layers = useMemo(() => methodDefinition.generate3DLayers?.({ project, scenario }) ?? [], [methodDefinition, project, scenario]);
 
   return (
-    <PageFrame>
-      <PageHeader
-        eyebrow="Modelo 3D"
-        title="Visualização interativa"
-        status={<StatusPill tone="info" icon={false}>{methodDefinition.name}</StatusPill>}
-        description={
-          <>
-          {isAFrame
-            ? "Terreno editavel, recuos, paineis trapezoidais, estrutura interna, tercas, pavimento superior opcional, zonas mortas, areas uteis e cotas principais."
-            : "Modelo volumetrico simplificado por camadas para leitura preliminar do metodo construtivo selecionado."}
-          </>
-        }
-      />
+    <PageFrame size="wide" className="space-y-4">
       {isAFrame ? <AFrameViewer project={project} scenario={scenario} /> : <GenericConstructionViewer scenario={scenario} title={methodDefinition.name} layers={layers} />}
     </PageFrame>
   );
