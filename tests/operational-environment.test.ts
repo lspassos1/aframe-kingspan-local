@@ -23,6 +23,9 @@ describe("operational environment status", () => {
       aiModelConfigured: true,
       providerLabel: "Modo gratuito",
       dailyLimitLabel: "4/usuário · 6/IP · 80/global",
+      centralPriceDbConfigured: false,
+      centralPriceDbLabel: "não configurada",
+      lastMonthlySyncLabel: "sem registro",
     });
     expect(JSON.stringify(status)).not.toContain("secret-gemini");
   });
@@ -43,6 +46,18 @@ describe("operational environment status", () => {
       providerLabel: "Modo Pro",
     });
     expect(JSON.stringify(status)).not.toContain("sk-secret-value");
+  });
+
+  it("reports central price DB readiness without exposing public read values", () => {
+    const status = createOperationalEnvironmentStatus({
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-public-read-key",
+    });
+
+    expect(status.centralPriceDbConfigured).toBe(true);
+    expect(status.centralPriceDbLabel).toBe("configurada");
+    expect(JSON.stringify(status)).not.toContain("supabase.co");
+    expect(JSON.stringify(status)).not.toContain("anon-public-read-key");
   });
 
   it("falls back to defaults when limits are invalid or non-positive", () => {
