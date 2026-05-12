@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text } from "@react-three/drei";
-import { Camera, Download, Eye, RotateCcw, Settings2 } from "lucide-react";
+import { Camera, Eye, Settings2 } from "lucide-react";
 import { Mobile3DControls, Mobile3DPreview, type Mobile3DViewMode, useMobile3DViewport } from "@/components/3d/Mobile3DControls";
+import { SceneFirstViewerShell, ViewerControlSection } from "@/components/3d/SceneFirstViewerShell";
 import type { AFrameGeometry, Project, Scenario } from "@/types/project";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -516,268 +517,243 @@ export function AFrameViewer({ project, scenario }: { project: Project; scenario
     </>
   );
 
-  return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="h-[58svh] min-h-[360px] max-h-[520px] overflow-hidden rounded-2xl border bg-slate-50 xl:h-auto xl:max-h-none xl:min-h-[680px] xl:rounded-md">
-        {isMobileViewport ? (
-          <Mobile3DPreview subtitle="Volume leve para celular. Use as vistas rápidas e abra os controles avançados quando precisar." title="Prévia A-frame" view={view} />
-        ) : (
-          <Canvas
-            camera={{ position: [18, 12, 18], fov: 45 }}
-            dpr={[1, 1.5]}
-            gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
-            shadows
-          >
-            <AFrameScene project={project} scenario={scenario} toggles={sceneToggles} view={view} panelOpacity={panelOpacity} dimensionMode={dimensionMode} />
-          </Canvas>
-        )}
-      </div>
-      <Mobile3DControls
-        advancedControls={mobileAdvancedControls}
-        onScreenshot={screenshot}
-        onViewChange={setView}
-        showScreenshotAction={!isMobileViewport}
-        summary={mobileSummary}
-        view={view}
-      />
-      <aside className="hidden space-y-4 xl:sticky xl:top-6 xl:block xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
-        <div className="rounded-md border bg-card">
-          <div className="mb-3 flex items-center gap-2 font-medium">
-            <div className="flex w-full items-center gap-2 px-4 pt-4">
-              <Settings2 className="h-4 w-4" />
-              Geometria e painel
-            </div>
+  const scene = (
+    <div className="h-full min-h-[58svh] overflow-hidden bg-slate-50 xl:min-h-[calc(100svh-9rem)]">
+      {isMobileViewport ? (
+        <Mobile3DPreview subtitle="Volume leve para celular. Use as vistas rápidas e abra os controles avançados quando precisar." title="Prévia A-frame" view={view} />
+      ) : (
+        <Canvas
+          camera={{ position: [18, 12, 18], fov: 45 }}
+          dpr={[1, 1.5]}
+          gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
+          shadows
+        >
+          <AFrameScene project={project} scenario={scenario} toggles={sceneToggles} view={view} panelOpacity={panelOpacity} dimensionMode={dimensionMode} />
+        </Canvas>
+      )}
+    </div>
+  );
+
+  const mobileControls = (
+    <Mobile3DControls
+      advancedControls={mobileAdvancedControls}
+      onScreenshot={screenshot}
+      onViewChange={setView}
+      showScreenshotAction={!isMobileViewport}
+      summary={mobileSummary}
+      view={view}
+    />
+  );
+
+  const desktopControls = (
+    <div className="space-y-4">
+      <ViewerControlSection title="Geometria e painel" icon={<Settings2 className="h-4 w-4" />}>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Produto</Label>
+            <Select value={scenario.panelProductId} onValueChange={selectPanel}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {project.panelProducts.map((item) => (
+                  <SelectItem value={item.id} key={item.id}>
+                    {item.productName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="max-h-[min(640px,calc(100vh-9rem))] overflow-y-auto overflow-x-hidden px-4 pb-6 pr-5">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Produto</Label>
-              <Select value={scenario.panelProductId} onValueChange={selectPanel}>
+          <div className="space-y-2">
+            <Label>Comprimento do painel</Label>
+            {panel.isCustom ? (
+              <Input type="number" step="0.1" value={scenario.aFrame.panelLength} onChange={(event) => updateAFrame({ panelLength: Number(event.target.value) })} />
+            ) : (
+              <Select value={String(scenario.aFrame.panelLength)} onValueChange={(value) => updateAFrame({ panelLength: Number(value) })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {project.panelProducts.map((item) => (
-                    <SelectItem value={item.id} key={item.id}>
-                      {item.productName}
+                  {lengthOptions.map((value) => (
+                    <SelectItem value={String(value)} key={value}>
+                      {value.toLocaleString("pt-BR")} m
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Comprimento do painel</Label>
-              {panel.isCustom ? (
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={scenario.aFrame.panelLength}
-                  onChange={(event) => updateAFrame({ panelLength: Number(event.target.value) })}
-                />
-              ) : (
-                <Select value={String(scenario.aFrame.panelLength)} onValueChange={(value) => updateAFrame({ panelLength: Number(value) })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {lengthOptions.map((value) => (
-                      <SelectItem value={String(value)} key={value}>
-                        {value.toLocaleString("pt-BR")} m
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <p className="text-xs text-muted-foreground">{panel.constraintsNote ?? panel.notes}</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label>Angulo</Label>
-                <Input
-                  type="number"
-                  min={35}
-                  max={75}
-                  step={1}
-                  value={scenario.aFrame.baseAngleDeg}
-                  onChange={(event) => updateAFrame({ baseAngleDeg: Number(event.target.value) })}
-                  className="h-8 w-20"
-                />
-              </div>
-              <Slider
+            )}
+            <p className="text-xs text-muted-foreground">{panel.constraintsNote ?? panel.notes}</p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Angulo</Label>
+              <Input
+                type="number"
                 min={35}
                 max={75}
                 step={1}
-                value={[scenario.aFrame.baseAngleDeg]}
-                onValueChange={([value]) => updateAFrame({ baseAngleDeg: value })}
+                value={scenario.aFrame.baseAngleDeg}
+                onChange={(event) => updateAFrame({ baseAngleDeg: Number(event.target.value) })}
+                className="h-8 w-20"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label>Prof. casa</Label>
-                <Input
-                  type="number"
-                  min={2}
-                  step={0.1}
-                  value={scenario.aFrame.houseDepth}
-                  onChange={(event) => updateAFrame({ houseDepth: Number(event.target.value), automaticDepth: false })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Altura util min.</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={2.3}
-                  step={0.05}
-                  value={scenario.aFrame.minimumUsefulHeight}
-                  onChange={(event) => updateAFrame({ minimumUsefulHeight: Number(event.target.value) })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label>Pav. superior</Label>
-                <Select
-                  value={scenario.aFrame.upperFloorMode}
-                  onValueChange={(value) => updateAFrame({ upperFloorMode: value as Scenario["aFrame"]["upperFloorMode"] })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem</SelectItem>
-                    <SelectItem value="full-floor">Completo</SelectItem>
-                    <SelectItem value="mezzanine-percent">Percentual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Area sup. %</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={5}
-                  disabled={scenario.aFrame.upperFloorMode !== "mezzanine-percent"}
-                  value={scenario.aFrame.upperFloorAreaPercent}
-                  onChange={(event) => updateAFrame({ upperFloorAreaPercent: Number(event.target.value) })}
-                />
-              </div>
+            <Slider min={35} max={75} step={1} value={[scenario.aFrame.baseAngleDeg]} onValueChange={([value]) => updateAFrame({ baseAngleDeg: value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2">
+              <Label>Prof. casa</Label>
+              <Input
+                type="number"
+                min={2}
+                step={0.1}
+                value={scenario.aFrame.houseDepth}
+                onChange={(event) => updateAFrame({ houseDepth: Number(event.target.value), automaticDepth: false })}
+              />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label>Altura piso superior</Label>
-                <Input
-                  type="number"
-                  min={1.8}
-                  max={5}
-                  step={0.05}
-                  value={scenario.aFrame.upperFloorLevelHeight}
-                  onChange={(event) => updateAFrame({ upperFloorLevelHeight: Number(event.target.value) })}
-                  className="h-8 w-24"
-                />
-              </div>
-              <Slider
-                min={1.8}
-                max={5}
+              <Label>Altura util min.</Label>
+              <Input
+                type="number"
+                min={1}
+                max={2.3}
                 step={0.05}
-                value={[scenario.aFrame.upperFloorLevelHeight]}
-                onValueChange={([value]) => updateAFrame({ upperFloorLevelHeight: value })}
+                value={scenario.aFrame.minimumUsefulHeight}
+                onChange={(event) => updateAFrame({ minimumUsefulHeight: Number(event.target.value) })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3">
-              <div className="space-y-2">
-                <Label>Largura lote</Label>
-                <Input type="number" step={0.1} value={scenario.terrain.width} onChange={(event) => updateTerrain({ width: Number(event.target.value) })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Prof. lote</Label>
-                <Input type="number" step={0.1} value={scenario.terrain.depth} onChange={(event) => updateTerrain({ depth: Number(event.target.value) })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Recuo frente</Label>
-                <Input type="number" step={0.1} value={scenario.terrain.frontSetback} onChange={(event) => updateTerrain({ frontSetback: Number(event.target.value) })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Recuo lateral</Label>
-                <Input
-                  type="number"
-                  step={0.1}
-                  value={scenario.terrain.leftSetback}
-                  onChange={(event) => updateTerrain({ leftSetback: Number(event.target.value), rightSetback: Number(event.target.value) })}
-                />
-              </div>
-            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <div className="space-y-2">
-              <Label>Modo de cotas</Label>
-              <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
+              <Label>Pav. superior</Label>
+              <Select value={scenario.aFrame.upperFloorMode} onValueChange={(value) => updateAFrame({ upperFloorMode: value as Scenario["aFrame"]["upperFloorMode"] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="basic">Basico</SelectItem>
-                  <SelectItem value="detailed">Detalhado</SelectItem>
+                  <SelectItem value="none">Sem</SelectItem>
+                  <SelectItem value="full-floor">Completo</SelectItem>
+                  <SelectItem value="mezzanine-percent">Percentual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <Label>Transparencia telhas</Label>
-                <span className="text-xs text-muted-foreground">{Math.round(panelOpacity * 100)}%</span>
-              </div>
-              <Slider min={0.25} max={0.95} step={0.01} value={[panelOpacity]} onValueChange={([value]) => setPanelOpacity(value)} />
+              <Label>Area sup. %</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={5}
+                disabled={scenario.aFrame.upperFloorMode !== "mezzanine-percent"}
+                value={scenario.aFrame.upperFloorAreaPercent}
+                onChange={(event) => updateAFrame({ upperFloorAreaPercent: Number(event.target.value) })}
+              />
             </div>
           </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Altura piso superior</Label>
+              <Input
+                type="number"
+                min={1.8}
+                max={5}
+                step={0.05}
+                value={scenario.aFrame.upperFloorLevelHeight}
+                onChange={(event) => updateAFrame({ upperFloorLevelHeight: Number(event.target.value) })}
+                className="h-8 w-24"
+              />
+            </div>
+            <Slider min={1.8} max={5} step={0.05} value={[scenario.aFrame.upperFloorLevelHeight]} onValueChange={([value]) => updateAFrame({ upperFloorLevelHeight: value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3">
+            <div className="space-y-2">
+              <Label>Largura lote</Label>
+              <Input type="number" step={0.1} value={scenario.terrain.width} onChange={(event) => updateTerrain({ width: Number(event.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Prof. lote</Label>
+              <Input type="number" step={0.1} value={scenario.terrain.depth} onChange={(event) => updateTerrain({ depth: Number(event.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Recuo frente</Label>
+              <Input type="number" step={0.1} value={scenario.terrain.frontSetback} onChange={(event) => updateTerrain({ frontSetback: Number(event.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Recuo lateral</Label>
+              <Input
+                type="number"
+                step={0.1}
+                value={scenario.terrain.leftSetback}
+                onChange={(event) => updateTerrain({ leftSetback: Number(event.target.value), rightSetback: Number(event.target.value) })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Modo de cotas</Label>
+            <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="basic">Basico</SelectItem>
+                <SelectItem value="detailed">Detalhado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Transparencia telhas</Label>
+              <span className="text-xs text-muted-foreground">{Math.round(panelOpacity * 100)}%</span>
+            </div>
+            <Slider min={0.25} max={0.95} step={0.01} value={[panelOpacity]} onValueChange={([value]) => setPanelOpacity(value)} />
           </div>
         </div>
-        <div className="rounded-md border p-4">
-          <div className="mb-3 flex items-center gap-2 font-medium">
-            <Camera className="h-4 w-4" />
-            Vistas
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              ["iso", "Isometrica"],
-              ["top", "Topo"],
-              ["front", "Frontal"],
-              ["rear", "Posterior"],
-              ["side", "Lateral"],
-              ["section", "Corte"],
-            ].map(([id, label]) => (
-              <Button key={id} type="button" variant={view === id ? "default" : "outline"} size="sm" onClick={() => setView(id as ViewMode)}>
-                {label}
-              </Button>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setView("iso")}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset
+      </ViewerControlSection>
+      <ViewerControlSection title="Vistas" icon={<Camera className="h-4 w-4" />}>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            ["iso", "Isometrica"],
+            ["top", "Topo"],
+            ["front", "Frontal"],
+            ["rear", "Posterior"],
+            ["side", "Lateral"],
+            ["section", "Corte"],
+          ].map(([id, label]) => (
+            <Button key={id} type="button" variant={view === id ? "default" : "outline"} size="sm" onClick={() => setView(id as ViewMode)}>
+              {label}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={screenshot}>
-              <Download className="mr-2 h-4 w-4" />
-              PNG
-            </Button>
-          </div>
+          ))}
         </div>
-        <div className="rounded-md border p-4">
-          <div className="mb-3 flex items-center gap-2 font-medium">
-            <Eye className="h-4 w-4" />
-            Camadas
-          </div>
-          <div className="grid gap-3">
-            {(Object.keys(toggles) as Array<keyof ToggleState>).map((key) => (
-              <div key={key} className="flex items-center justify-between gap-4">
-                <Label htmlFor={key} className="text-sm">
-                  {toggleLabels[key]}
-                </Label>
-                <Checkbox id={key} checked={toggles[key]} onCheckedChange={(checked) => updateToggle(key, Boolean(checked))} />
-              </div>
-            ))}
-          </div>
+      </ViewerControlSection>
+      <ViewerControlSection title="Camadas" icon={<Eye className="h-4 w-4" />}>
+        <div className="grid gap-3">
+          {(Object.keys(toggles) as Array<keyof ToggleState>).map((key) => (
+            <div key={key} className="flex items-center justify-between gap-4">
+              <Label htmlFor={key} className="text-sm">
+                {toggleLabels[key]}
+              </Label>
+              <Checkbox id={key} checked={toggles[key]} onCheckedChange={(checked) => updateToggle(key, Boolean(checked))} />
+            </div>
+          ))}
         </div>
-      </aside>
+      </ViewerControlSection>
     </div>
+  );
+
+  return (
+    <SceneFirstViewerShell
+      controls={desktopControls}
+      methodLabel="A-frame"
+      mobileControls={mobileControls}
+      onResetView={() => setView("iso")}
+      onScreenshot={screenshot}
+      onViewChange={setView}
+      scene={scene}
+      screenshotEnabled={!isMobileViewport}
+      statusLabel={scenario.name}
+      summary={mobileSummary}
+      title="Visualização interativa"
+      view={view}
+    />
   );
 }
 

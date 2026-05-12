@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Line, OrbitControls, Text } from "@react-three/drei";
-import { Camera, Download, Eye, RotateCcw, Settings2 } from "lucide-react";
+import { Camera, Eye, Settings2 } from "lucide-react";
 import { Mobile3DControls, Mobile3DPreview, type Mobile3DOpeningPreview, type Mobile3DViewMode, useMobile3DViewport } from "@/components/3d/Mobile3DControls";
+import { SceneFirstViewerShell, ViewerControlSection } from "@/components/3d/SceneFirstViewerShell";
 import type { Construction3DLayer, Construction3DPrimitive, Construction3DVector3 } from "@/lib/construction-methods";
 import type { Scenario } from "@/types/project";
 import { Button } from "@/components/ui/button";
@@ -357,168 +358,157 @@ export function GenericConstructionViewer({ layers, scenario, title }: { layers:
     </>
   );
 
-  return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="h-[58svh] min-h-[360px] max-h-[520px] overflow-hidden rounded-2xl border bg-slate-50 xl:h-auto xl:max-h-none xl:min-h-[680px] xl:rounded-md">
-        {isMobileViewport ? (
-          <Mobile3DPreview openings={openingPreview} subtitle="Volume leve por camadas. Use as vistas rápidas e abra camadas/cotas sob demanda." title={title} view={view} />
-        ) : canvasUnavailable ? (
-          <Mobile3DPreview
-            badge="Prévia 3D simplificada"
-            openings={openingPreview}
-            subtitle="WebGL ficou indisponível neste navegador; a prévia mantém volume e aberturas manuais aproximadas."
-            title={title}
-            view={view}
-          />
-        ) : (
-          <Canvas
-            camera={{ position: [16, 12, 16], fov: 45 }}
-            dpr={[1, 1.5]}
-            gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
-            onCreated={({ gl }) => {
-              gl.domElement.addEventListener("webglcontextlost", () => setCanvasFallback({ key: canvasFallbackKeyRef.current, unavailable: true }), { once: true });
-            }}
-            shadows
-          >
-            <GenericScene
-              layers={activeLayers}
-              dimensionMode={dimensionMode}
-              modelOpacity={modelOpacity}
-              showDimensions={showDimensions}
-              view={view}
-            />
-          </Canvas>
-        )}
-      </div>
-      <Mobile3DControls
-        advancedControls={mobileAdvancedControls}
-        onScreenshot={screenshot}
-        onViewChange={setView}
-        showScreenshotAction={!isMobileViewport && !canvasUnavailable}
-        summary={mobileSummary}
-        view={view}
-      />
-      <aside className="hidden space-y-4 xl:sticky xl:top-6 xl:block xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
-        <div className="rounded-md border bg-card">
-          <div className="mb-3 flex items-center gap-2 font-medium">
-            <div className="flex w-full items-center gap-2 px-4 pt-4">
-              <Settings2 className="h-4 w-4" />
-              Geometria do metodo
-            </div>
-          </div>
-          <div className="max-h-[min(640px,calc(100vh-9rem))] overflow-y-auto overflow-x-hidden px-4 pb-6 pr-5">
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{title}</p>
-              {numberControls.map((control) => (
-                <NumberControl
-                  key={control.key}
-                  label={control.label}
-                  max={control.max}
-                  min={control.min}
-                  onChange={(value) => updateMethodNumber(control.key, value)}
-                  step={control.step}
-                  unit={control.unit}
-                  value={control.value}
-                />
-              ))}
-              <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3">
-                <div className="space-y-2">
-                  <Label>Largura lote</Label>
-                  <Input type="number" step={0.1} value={scenario.terrain.width} onChange={(event) => updateTerrain({ width: Number(event.target.value) })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Prof. lote</Label>
-                  <Input type="number" step={0.1} value={scenario.terrain.depth} onChange={(event) => updateTerrain({ depth: Number(event.target.value) })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Recuo frente</Label>
-                  <Input type="number" step={0.1} value={scenario.terrain.frontSetback} onChange={(event) => updateTerrain({ frontSetback: Number(event.target.value) })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Recuo lateral</Label>
-                  <Input
-                    type="number"
-                    step={0.1}
-                    value={scenario.terrain.leftSetback}
-                    onChange={(event) => updateTerrain({ leftSetback: Number(event.target.value), rightSetback: Number(event.target.value) })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Modo de cotas</Label>
-                <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="basic">Basico</SelectItem>
-                    <SelectItem value="detailed">Detalhado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label>Transparencia volumes</Label>
-                  <span className="text-xs text-muted-foreground">{Math.round(modelOpacity * 100)}%</span>
-                </div>
-                <Slider min={0.25} max={1} step={0.01} value={[modelOpacity]} onValueChange={([value]) => setModelOpacity(value)} />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-md border p-4">
-          <div className="mb-3 flex items-center gap-2 font-medium">
-            <Camera className="h-4 w-4" />
-            Vistas
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              ["iso", "Isometrica"],
-              ["top", "Topo"],
-              ["front", "Frontal"],
-              ["rear", "Posterior"],
-              ["side", "Lateral"],
-              ["section", "Corte"],
-            ].map(([id, label]) => (
-              <Button key={id} type="button" variant={view === id ? "default" : "outline"} size="sm" onClick={() => setView(id as ViewMode)}>
-                {label}
-              </Button>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setView("iso")}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={screenshot}>
-              <Download className="mr-2 h-4 w-4" />
-              PNG
-            </Button>
-          </div>
-        </div>
-        <div className="rounded-md border p-4">
-          <div className="mb-3 flex items-center gap-2 font-medium">
-            <Eye className="h-4 w-4" />
-            Camadas
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-              <Label htmlFor="generic-dimensions" className="text-sm font-normal">
-                Cotas principais
-              </Label>
-              <Checkbox id="generic-dimensions" checked={showDimensions} onCheckedChange={(value) => setShowDimensions(Boolean(value))} />
-            </div>
-            {layers.map((layer) => (
-              <div key={layer.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-                <Label htmlFor={layer.id} className="text-sm font-normal">
-                  {layer.label}
-                </Label>
-                <Checkbox id={layer.id} checked={visibleLayers[layer.id] ?? layer.visibleByDefault} onCheckedChange={(value) => toggleLayer(layer.id, Boolean(value))} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </aside>
+  const scene = (
+    <div className="h-full min-h-[58svh] overflow-hidden bg-slate-50 xl:min-h-[calc(100svh-9rem)]">
+      {isMobileViewport ? (
+        <Mobile3DPreview openings={openingPreview} subtitle="Volume leve por camadas. Use as vistas rápidas e abra camadas/cotas sob demanda." title={title} view={view} />
+      ) : canvasUnavailable ? (
+        <Mobile3DPreview
+          badge="Prévia 3D simplificada"
+          openings={openingPreview}
+          subtitle="WebGL ficou indisponível neste navegador; a prévia mantém volume e aberturas manuais aproximadas."
+          title={title}
+          view={view}
+        />
+      ) : (
+        <Canvas
+          camera={{ position: [16, 12, 16], fov: 45 }}
+          dpr={[1, 1.5]}
+          gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
+          onCreated={({ gl }) => {
+            gl.domElement.addEventListener("webglcontextlost", () => setCanvasFallback({ key: canvasFallbackKeyRef.current, unavailable: true }), { once: true });
+          }}
+          shadows
+        >
+          <GenericScene layers={activeLayers} dimensionMode={dimensionMode} modelOpacity={modelOpacity} showDimensions={showDimensions} view={view} />
+        </Canvas>
+      )}
     </div>
+  );
+
+  const mobileControls = (
+    <Mobile3DControls
+      advancedControls={mobileAdvancedControls}
+      onScreenshot={screenshot}
+      onViewChange={setView}
+      showScreenshotAction={!isMobileViewport && !canvasUnavailable}
+      summary={mobileSummary}
+      view={view}
+    />
+  );
+
+  const desktopControls = (
+    <div className="space-y-4">
+      <ViewerControlSection title="Geometria do método" icon={<Settings2 className="h-4 w-4" />}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{title}</p>
+          {numberControls.map((control) => (
+            <NumberControl
+              key={control.key}
+              label={control.label}
+              max={control.max}
+              min={control.min}
+              onChange={(value) => updateMethodNumber(control.key, value)}
+              step={control.step}
+              unit={control.unit}
+              value={control.value}
+            />
+          ))}
+          <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-3">
+            <div className="space-y-2">
+              <Label>Largura lote</Label>
+              <Input type="number" step={0.1} value={scenario.terrain.width} onChange={(event) => updateTerrain({ width: Number(event.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Prof. lote</Label>
+              <Input type="number" step={0.1} value={scenario.terrain.depth} onChange={(event) => updateTerrain({ depth: Number(event.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Recuo frente</Label>
+              <Input type="number" step={0.1} value={scenario.terrain.frontSetback} onChange={(event) => updateTerrain({ frontSetback: Number(event.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Recuo lateral</Label>
+              <Input
+                type="number"
+                step={0.1}
+                value={scenario.terrain.leftSetback}
+                onChange={(event) => updateTerrain({ leftSetback: Number(event.target.value), rightSetback: Number(event.target.value) })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Modo de cotas</Label>
+            <Select value={dimensionMode} onValueChange={(value) => setDimensionMode(value as DimensionMode)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="basic">Basico</SelectItem>
+                <SelectItem value="detailed">Detalhado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Transparencia volumes</Label>
+              <span className="text-xs text-muted-foreground">{Math.round(modelOpacity * 100)}%</span>
+            </div>
+            <Slider min={0.25} max={1} step={0.01} value={[modelOpacity]} onValueChange={([value]) => setModelOpacity(value)} />
+          </div>
+        </div>
+      </ViewerControlSection>
+      <ViewerControlSection title="Vistas" icon={<Camera className="h-4 w-4" />}>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            ["iso", "Isometrica"],
+            ["top", "Topo"],
+            ["front", "Frontal"],
+            ["rear", "Posterior"],
+            ["side", "Lateral"],
+            ["section", "Corte"],
+          ].map(([id, label]) => (
+            <Button key={id} type="button" variant={view === id ? "default" : "outline"} size="sm" onClick={() => setView(id as ViewMode)}>
+              {label}
+            </Button>
+          ))}
+        </div>
+      </ViewerControlSection>
+      <ViewerControlSection title="Camadas" icon={<Eye className="h-4 w-4" />}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+            <Label htmlFor="generic-dimensions" className="text-sm font-normal">
+              Cotas principais
+            </Label>
+            <Checkbox id="generic-dimensions" checked={showDimensions} onCheckedChange={(value) => setShowDimensions(Boolean(value))} />
+          </div>
+          {layers.map((layer) => (
+            <div key={layer.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+              <Label htmlFor={layer.id} className="text-sm font-normal">
+                {layer.label}
+              </Label>
+              <Checkbox id={layer.id} checked={visibleLayers[layer.id] ?? layer.visibleByDefault} onCheckedChange={(value) => toggleLayer(layer.id, Boolean(value))} />
+            </div>
+          ))}
+        </div>
+      </ViewerControlSection>
+    </div>
+  );
+
+  return (
+    <SceneFirstViewerShell
+      controls={desktopControls}
+      methodLabel="Método"
+      mobileControls={mobileControls}
+      onResetView={() => setView("iso")}
+      onScreenshot={screenshot}
+      onViewChange={setView}
+      scene={scene}
+      screenshotEnabled={!isMobileViewport && !canvasUnavailable}
+      statusLabel={scenario.name}
+      summary={mobileSummary}
+      title={title}
+      view={view}
+    />
   );
 }
