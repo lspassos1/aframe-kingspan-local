@@ -23,6 +23,18 @@ describe("external price database schema", () => {
     expect(normalizedSql).not.toContain("security definer");
   });
 
+  it("keeps the public candidate RPC aligned with indexed schema fields", () => {
+    expect(normalizedSql).toContain("tags text[]");
+    expect(normalizedSql).toContain("to_tsvector('portuguese', item.search_text) @@ terms.query");
+    expect(normalizedSql).not.toContain("item.search_text ilike '%' || search_query || '%'");
+  });
+
+  it("does not hard-code UUID defaults to a specific extension schema", () => {
+    expect(normalizedSql).toContain("create extension if not exists pgcrypto");
+    expect(normalizedSql).toContain("default gen_random_uuid()");
+    expect(normalizedSql).not.toContain("extensions.gen_random_uuid()");
+  });
+
   it("limits anon and authenticated roles to safe public reads", () => {
     expect(normalizedSql).toContain("grant select on public.current_price_items to anon, authenticated");
     expect(normalizedSql).toContain("grant execute on function public.search_price_candidates");
