@@ -132,7 +132,14 @@ Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 
 ## Licença
 
-Este repositório está licenciado sob a [GNU General Public License v3.0](LICENSE). Código de terceiros e dependências mantêm suas próprias licenças.
+Este repositório está licenciado sob a [GNU General Public License v3.0 only](LICENSE), identificado como `GPL-3.0-only`.
+
+Leia também:
+
+- [LICENSING.md](LICENSING.md): escopo da licença, declaração de autoria/manutenção, revisões MIT anteriores e observação de que o conteúdo não é aconselhamento jurídico.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): dependências, marcas, nomes de terceiros e regra de atribuição para materiais futuros.
+
+Código de terceiros e dependências mantêm suas próprias licenças.
 
 ## Limitações
 
