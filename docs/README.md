@@ -12,6 +12,7 @@ Este diretório documenta o Estudo Construtivo: uma experiência guiada para pr�
 - `pricing-database-architecture.md`: decisão arquitetural para base externa de preços, Supabase Free, sync mensal e proteção do plano Vercel Hobby.
 - `pricing-database-schema.md`: schema/RLS da base externa de preços e contrato de leitura pública segura.
 - `pricing-database-operations.md`: setup mínimo, status operacional, dados stale, falha de sync e tratamento seguro de erros da base externa.
+- `product-launch-runbook.md`: checklist de merge, produção, Free/Pro/no-AI/no-DB, sync mensal, rollback e limites de Vercel.
 
 ## Contratos Técnicos
 
