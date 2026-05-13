@@ -168,6 +168,25 @@ describe("budget assistant foundation", () => {
     ).toMatchObject({ scope: "manual" });
   });
 
+  it("does not treat state-scoped sources with blank city as national fallback", () => {
+    const scenario = defaultProject.scenarios[0];
+    const stateScopedSource = createCostSource({
+      id: "source-state-only",
+      type: "sinapi",
+      city: "",
+      state: "BA",
+    });
+    const unrelatedScenario = {
+      ...scenario,
+      location: { ...scenario.location, city: "São Paulo", state: "SP" },
+    };
+
+    expect(selectApplicableRegionalCostSources(scenario, [stateScopedSource])).toEqual([
+      expect.objectContaining({ source: stateScopedSource, scope: "state" }),
+    ]);
+    expect(selectApplicableRegionalCostSources(unrelatedScenario, [stateScopedSource])).toEqual([]);
+  });
+
   it("filters matched cost items to the selected regional source scope", () => {
     const scenario = defaultProject.scenarios[0];
     const baseViewModel = createBudgetAssistantViewModel(defaultProject, scenario);

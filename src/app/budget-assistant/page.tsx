@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { BadgeDollarSign, CheckSquare2, CircleAlert, Database, FileCheck2, FileUp, Link2, MapPin, Plus, SearchCheck, TableProperties, WalletCards } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,7 @@ export default function BudgetAssistantPage() {
     []
   );
   const remotePriceDbConfigured = remotePriceDb.isConfigured();
+  const remoteSearchRequestRef = useRef(0);
   const [remoteSearchStatus, setRemoteSearchStatus] = useState<RemoteSearchStatus>("idle");
   const [remoteSearchMessage, setRemoteSearchMessage] = useState("");
   const [remoteCandidates, setRemoteCandidates] = useState<RemoteCandidateResolution[]>([]);
@@ -194,6 +195,7 @@ export default function BudgetAssistantPage() {
   ] as const;
 
   const handleSelectQuantity = (quantityId: string) => {
+    remoteSearchRequestRef.current += 1;
     setSelectedQuantityId(quantityId);
     const quantity = viewModel.quantityItems.find((item) => item.id === quantityId);
     if (quantity) setItemDescription(quantity.description);
@@ -281,6 +283,8 @@ export default function BudgetAssistantPage() {
 
     setRemoteSearchStatus("loading");
     setRemoteSearchMessage("");
+    const requestId = remoteSearchRequestRef.current + 1;
+    remoteSearchRequestRef.current = requestId;
 
     try {
       const result = await resolvePriceCandidates({
@@ -292,6 +296,7 @@ export default function BudgetAssistantPage() {
         maxCandidatesPerQuantity: 6,
       });
       const candidates = result.candidates.filter(isRemoteCandidateResolution);
+      if (remoteSearchRequestRef.current !== requestId) return;
       setRemoteCandidates(candidates);
 
       if (result.remote.error && candidates.length === 0) {
@@ -307,6 +312,7 @@ export default function BudgetAssistantPage() {
           : "Nenhum candidato encontrado. Continue com importação local ou preço manual."
       );
     } catch {
+      if (remoteSearchRequestRef.current !== requestId) return;
       setRemoteCandidates([]);
       setRemoteSearchStatus("error");
       setRemoteSearchMessage("A busca na base central falhou. Continue com importação local ou preço manual.");
@@ -314,10 +320,23 @@ export default function BudgetAssistantPage() {
   };
 
   const handleCreateRemoteMatch = (candidate: RemoteCandidateResolution) => {
-    if (!selectedQuantity) return;
-    const entry = createCentralPriceCandidateEntry({ quantityItem: selectedQuantity, candidate: candidate.remoteCandidate });
+    const quantityItem = viewModel.quantityItems.find((item) => item.id === candidate.quantityId);
+    if (!quantityItem) {
+      setRemoteSearchStatus("error");
+      setRemoteSearchMessage("Candidato desatualizado. Selecione o quantitativo e busque novamente.");
+      return;
+    }
+    const entry = createCentralPriceCandidateEntry({ quantityItem, candidate: candidate.remoteCandidate });
+    const matchExists = project.budgetAssistant.matches.some((match) => match.id === entry.match.id);
+    if (matchExists) {
+      setRemoteSearchMessage("Match pendente já criado para este candidato.");
+      return;
+    }
     if (!sourceById.has(entry.source.id)) addBudgetCostSource(entry.source);
-    if (!project.budgetAssistant.costItems.some((item) => item.id === entry.costItem.id)) {
+    const costItemExists = project.budgetAssistant.costItems.some((item) => item.id === entry.costItem.id);
+    if (costItemExists) {
+      addBudgetMatchSuggestion(entry.match);
+    } else {
       addBudgetCostItem(entry.costItem, entry.match);
     }
     setRemoteSearchMessage("Match pendente criado. Revise a fonte antes de aprovar o orçamento.");
@@ -476,8 +495,10 @@ export default function BudgetAssistantPage() {
             <div className="grid gap-3 lg:grid-cols-2">
               {remoteCandidates.map((candidate) => {
                 const remote = candidate.remoteCandidate;
-                const existingCostItemId = createCentralPriceCostItemId(candidate.quantityId ?? selectedQuantity?.id ?? "", remote.id);
+                const targetQuantityId = candidate.quantityId ?? "";
+                const existingCostItemId = createCentralPriceCostItemId(targetQuantityId, remote.id);
                 const matchAlreadyCreated = viewModel.matches.some((match) => match.costItemId === existingCostItemId);
+                const candidateHasQuantity = Boolean(targetQuantityId);
                 return (
                   <div key={candidate.id} className="rounded-md border p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -511,7 +532,7 @@ export default function BudgetAssistantPage() {
                       size="sm"
                       className="mt-3"
                       variant={matchAlreadyCreated ? "outline" : "default"}
-                      disabled={matchAlreadyCreated}
+                      disabled={matchAlreadyCreated || !candidateHasQuantity}
                       onClick={() => handleCreateRemoteMatch(candidate)}
                     >
                       {matchAlreadyCreated ? "Match pendente criado" : "Criar match pendente"}
