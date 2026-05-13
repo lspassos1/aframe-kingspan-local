@@ -172,11 +172,23 @@ function isActiveSource(source: ExternalPriceDbSourceSnapshot | undefined) {
 
 function normalizeReferenceMonth(value: string | undefined) {
   const normalized = String(value ?? "").trim();
-  const match = normalized.match(/^(\d{4})-(\d{2})$/);
+  const match = normalized.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
   if (!match) return "";
+  const year = Number(match[1]);
   const month = Number(match[2]);
-  if (!Number.isInteger(month) || month < 1 || month > 12) return "";
+  const day = match[3] ? Number(match[3]) : 1;
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(day) || day < 1 || day > 31) return "";
+  if (day > getDaysInMonth(year, month)) return "";
   return `${match[1]}-${match[2]}`;
+}
+
+function getDaysInMonth(year: number, month: number) {
+  const daysByMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return daysByMonth[month - 1] ?? 0;
+}
+
+function isLeapYear(year: number) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
 function isReferenceMonthStale(referenceMonth: string, now: Date | string | undefined, staleAfterDays: number) {
