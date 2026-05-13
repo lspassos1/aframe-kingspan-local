@@ -67,7 +67,7 @@ User-facing copy should say what action is safe:
 
 ## Stale Data Policy
 
-The first operational freshness window is 45 days from the active reference month. Stale data should not block the app, but it must keep candidates review-required and guide the user to local/manual fallback if a fresher base is needed.
+The default operational freshness window is 210 days from the active reference month, matching the January/July SINAPI cadence with a short operational grace period. Stale data should not block the app, but it must keep candidates review-required and guide the user to local/manual fallback if a fresher base is needed.
 
 ## Validation Expectations
 
