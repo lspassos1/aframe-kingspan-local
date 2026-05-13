@@ -45,12 +45,19 @@ const freeCloudStatus: PlanImportProviderUiStatus = {
 };
 
 describe("plan import UI state", () => {
-  it("classifies cache hit, review ready, limit and error responses", () => {
+  it("classifies cache hit, review ready, real quota limit and error responses", () => {
     expect(getPlanImportStateFromResponse({ ok: true, status: 200, cacheHeader: "HIT" })).toBe("cache-hit");
     expect(getPlanImportStateFromResponse({ ok: true, status: 200, cached: true })).toBe("cache-hit");
     expect(getPlanImportStateFromResponse({ ok: true, status: 200 })).toBe("review-ready");
-    expect(getPlanImportStateFromResponse({ ok: false, status: 429 })).toBe("limit-exceeded");
+    expect(getPlanImportStateFromResponse({ ok: false, status: 429, reason: "user-daily-limit-exceeded" })).toBe("limit-exceeded");
     expect(getPlanImportStateFromResponse({ ok: false, status: 415 })).toBe("error");
+  });
+
+  it("does not classify rate-limit setup failures as daily quota exhaustion", () => {
+    expect(getPlanImportStateFromResponse({ ok: false, status: 503, reason: "rate-limit-salt-required" })).toBe("temporarily-unavailable");
+    expect(getPlanImportStateFromResponse({ ok: false, status: 503, reason: "rate-limit-storage-unavailable" })).toBe("temporarily-unavailable");
+    expect(getPlanImportStateFromResponse({ ok: false, status: 429, reason: "rate-limit-store-error" })).toBe("error");
+    expect(getPlanImportStateFromResponse({ ok: false, status: 429 })).toBe("error");
   });
 
   it("keeps accented copy for upload, cache hit and limit states", () => {
@@ -71,6 +78,9 @@ describe("plan import UI state", () => {
 
   it("uses concise API messages for the limit state", () => {
     expect(getPlanImportPayloadMessage({ message: "Modo Pro de IA nao esta configurado no servidor." }, "error")).toContain("Modo Pro");
+    expect(getPlanImportStateCopy("temporarily-unavailable", freeCloudStatus).title).toBe("Upload assistido temporariamente indisponível");
+    expect(getPlanImportStateCopy("temporarily-unavailable", freeCloudStatus).description).toBe("Continue manualmente enquanto a configuração é verificada.");
+    expect(getPlanImportPayloadMessage(null, "temporarily-unavailable")).toBe("Continue manualmente enquanto a configuração é verificada.");
     const limitMessage = getPlanImportPayloadMessage(null, "limit-exceeded");
     expect(limitMessage).toBe("Continue manualmente ou tente novamente amanhã.");
     expect(limitMessage).not.toContain("Envio por IA indisponível hoje");

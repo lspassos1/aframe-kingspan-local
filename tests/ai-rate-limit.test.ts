@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { checkAndConsumeAiDailyLimit, createAiRateLimitHeaders, createMemoryAiRateLimitStore, createRedisAiRateLimitStore, getClientIpFromHeaders } from "@/lib/ai/rate-limit";
+import {
+  checkAndConsumeAiDailyLimit,
+  createAiRateLimitHeaders,
+  createMemoryAiRateLimitStore,
+  createRedisAiRateLimitStore,
+  getClientIpFromHeaders,
+  isAiDailyLimitReason,
+  isAiRateLimitSetupReason,
+} from "@/lib/ai/rate-limit";
 
 const baseEnv = {
   NODE_ENV: "development",
@@ -10,6 +18,19 @@ const baseEnv = {
 };
 
 describe("AI daily rate limit", () => {
+  it("separates quota reasons from operational setup reasons", () => {
+    expect(isAiDailyLimitReason("user-daily-limit-exceeded")).toBe(true);
+    expect(isAiDailyLimitReason("ip-daily-limit-exceeded")).toBe(true);
+    expect(isAiDailyLimitReason("global-daily-limit-exceeded")).toBe(true);
+    expect(isAiDailyLimitReason("rate-limit-salt-required")).toBe(false);
+    expect(isAiDailyLimitReason("rate-limit-storage-unavailable")).toBe(false);
+
+    expect(isAiRateLimitSetupReason("rate-limit-salt-required")).toBe(true);
+    expect(isAiRateLimitSetupReason("rate-limit-storage-unavailable")).toBe(true);
+    expect(isAiRateLimitSetupReason("rate-limit-store-error")).toBe(true);
+    expect(isAiRateLimitSetupReason("user-daily-limit-exceeded")).toBe(false);
+  });
+
   it("blocks the fourth user request in the same day", async () => {
     const store = createMemoryAiRateLimitStore(new Map());
     const input = {

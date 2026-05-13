@@ -31,6 +31,7 @@ type PlanExtractApiPayload = {
   model?: string;
   tokens?: number;
   cached?: boolean;
+  reason?: string;
   review?: PlanExtractReviewPayload;
 };
 
@@ -157,7 +158,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
   const canUpload = canUsePlanImportUpload({ planExtractEnabled, state });
   const currentValues = getCurrentPlanExtractValues(project);
   const showReview = (state === "review-ready" || state === "cache-hit") && result;
-  const canShowManualRecovery = !planExtractEnabled || state === "error" || state === "limit-exceeded";
+  const canShowManualRecovery = !planExtractEnabled || state === "error" || state === "limit-exceeded" || state === "temporarily-unavailable";
   const reviewStatusLabel = getReviewStatusLabel(providerMeta.review, aiProviderStatus);
   const shouldShowMessage = Boolean(message) && state !== "limit-exceeded";
   const providerCopy =
@@ -202,6 +203,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
         status: response.status,
         cached: payload?.cached,
         cacheHeader: response.headers.get("X-AI-Cache"),
+        reason: typeof payload?.reason === "string" ? payload.reason : undefined,
       });
 
       if (!response.ok) {
@@ -303,7 +305,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
       className={cn(
         "rounded-lg border bg-background/85 p-4 shadow-sm shadow-foreground/5 transition-all",
         isDragging && "border-primary/45 bg-primary/5",
-        state === "error" && "border-destructive/40 bg-destructive/5",
+        (state === "error" || state === "temporarily-unavailable") && "border-destructive/40 bg-destructive/5",
         state === "limit-exceeded" && "border-amber-500/45 bg-amber-500/5",
         state === "applied" && "border-primary/25 bg-primary/5",
         state === "cache-hit" && "border-primary/30 bg-primary/5",
@@ -345,13 +347,13 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : state === "cache-hit" || state === "review-ready" ? (
               <FileCheck2 className="h-5 w-5" />
-            ) : state === "limit-exceeded" ? (
+            ) : state === "limit-exceeded" || state === "temporarily-unavailable" ? (
               <AlertTriangle className="h-5 w-5 text-amber-600" />
             ) : (
               <UploadCloud className="h-5 w-5" />
             )}
           </span>
-          <Badge variant={state === "limit-exceeded" || state === "error" ? "destructive" : "secondary"} className="mt-4">
+          <Badge variant={state === "limit-exceeded" || state === "error" || state === "temporarily-unavailable" ? "destructive" : "secondary"} className="mt-4">
             {copy.badge}
           </Badge>
           <span className="mt-3 text-lg font-semibold">{copy.title}</span>
@@ -380,12 +382,12 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
 
             {shouldShowMessage ? (
               <div className="mt-4 flex items-start gap-2 rounded-lg border bg-background/75 p-3 text-sm">
-                {state === "error" ? (
+                {state === "error" || state === "temporarily-unavailable" ? (
                   <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
                 ) : (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
                 )}
-                <span className={cn(state === "error" && "text-destructive")}>{message}</span>
+                <span className={cn((state === "error" || state === "temporarily-unavailable") && "text-destructive")}>{message}</span>
               </div>
             ) : null}
           </div>

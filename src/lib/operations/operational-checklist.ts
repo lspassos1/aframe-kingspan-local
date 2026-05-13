@@ -9,6 +9,8 @@ export interface OperationalEnvironmentStatus {
   aiMode: "free-cloud" | "paid";
   aiProviderConfigured: boolean;
   aiModelConfigured: boolean;
+  aiRateLimitSaltConfigured: boolean;
+  aiRateLimitStorageConfigured: boolean;
   providerLabel: string;
   dailyLimitLabel: string;
   centralPriceDbConfigured: boolean;
@@ -93,7 +95,7 @@ export function createOperationalChecklist(
   );
   const hasSinapiBase = sinapiSources.length > 0 || hasSinapiCompositions;
   const aiOperational = environment.aiPlanExtractEnabled && environment.aiProviderConfigured;
-  const planExtractPending = environment.aiPlanExtractEnabled && !environment.aiProviderConfigured;
+  const rateLimitReady = environment.aiRateLimitSaltConfigured && environment.aiRateLimitStorageConfigured;
   const scenarioLocation = scenario?.location as Partial<Scenario["location"]> | undefined;
   const scenarioState = typeof scenarioLocation?.state === "string" ? scenarioLocation.state.trim() : "";
   const latestReferenceMonth = getLatestReferenceMonth(project);
@@ -114,15 +116,17 @@ export function createOperationalChecklist(
     {
       id: "plan-extract",
       label: "Upload assistido",
-      status: aiOperational ? "ativo" : planExtractPending ? "pendente" : "desligado",
-      detail: aiOperational
+      status: aiOperational && rateLimitReady ? "ativo" : environment.aiPlanExtractEnabled ? "pendente" : "desligado",
+      detail: aiOperational && rateLimitReady
         ? "Análise de planta pode ser usada; dados extraídos continuam exigindo revisão."
-        : "Continue pelo preenchimento manual até a análise assistida estar pronta.",
+        : rateLimitReady
+          ? "Continue pelo preenchimento manual até a análise assistida estar pronta."
+          : "Continue pelo preenchimento manual enquanto a proteção diária é configurada.",
       technicalDetail:
         environment.aiMode === "paid"
           ? "Verifique AI_PLAN_EXTRACT_ENABLED, OPENAI_API_KEY e AI_OPENAI_MODEL no servidor."
-          : "Verifique AI_PLAN_EXTRACT_ENABLED, AI_MODE=free-cloud, GEMINI_API_KEY e GEMINI_MODEL no servidor.",
-      tone: aiOperational ? "ok" : "warning",
+          : "Verifique AI_PLAN_EXTRACT_ENABLED, AI_MODE=free-cloud, GEMINI_API_KEY, GEMINI_MODEL, AI_RATE_LIMIT_SALT e storage persistente no servidor.",
+      tone: aiOperational && rateLimitReady ? "ok" : "warning",
     },
     {
       id: "manual-fallback",
@@ -149,9 +153,10 @@ export function createOperationalChecklist(
     {
       id: "daily-limit",
       label: "Limite diário",
-      status: "disponível",
-      detail: environment.dailyLimitLabel,
-      tone: "ok",
+      status: rateLimitReady ? "disponível" : "configurar",
+      detail: rateLimitReady ? environment.dailyLimitLabel : "Configure proteção diária persistente antes de liberar upload assistido em produção.",
+      technicalDetail: `Salt: ${environment.aiRateLimitSaltConfigured ? "configurado" : "ausente"}. Storage persistente: ${environment.aiRateLimitStorageConfigured ? "configurado" : "ausente"}.`,
+      tone: rateLimitReady ? "ok" : "warning",
     },
     {
       id: "local-price-base",

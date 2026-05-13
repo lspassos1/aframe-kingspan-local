@@ -28,6 +28,8 @@ export function createOperationalEnvironmentStatus(env: Record<string, string | 
     aiMode: aiMode.mode,
     aiProviderConfigured: aiMode.primaryConfigured && aiMode.primaryModelConfigured,
     aiModelConfigured: aiMode.primaryModelConfigured,
+    aiRateLimitSaltConfigured: hasEnv(env, "AI_RATE_LIMIT_SALT"),
+    aiRateLimitStorageConfigured: hasEnv(env, "UPSTASH_REDIS_REST_URL") && hasEnv(env, "UPSTASH_REDIS_REST_TOKEN"),
     providerLabel: aiMode.publicModeLabel,
     dailyLimitLabel: `${perUserLimit}/usuário · ${perIpLimit}/IP · ${globalLimit}/global`,
     centralPriceDbConfigured,

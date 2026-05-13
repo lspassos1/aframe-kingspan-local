@@ -12,6 +12,8 @@ const disabledEnvironment: OperationalEnvironmentStatus = {
   aiMode: "free-cloud",
   aiProviderConfigured: false,
   aiModelConfigured: false,
+  aiRateLimitSaltConfigured: false,
+  aiRateLimitStorageConfigured: false,
   providerLabel: "Modo gratuito",
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,
@@ -35,7 +37,7 @@ describe("operational checklist", () => {
     expect(getStatus(checklist, "plan-extract")).toBe("desligado");
     expect(getStatus(checklist, "manual-fallback")).toBe("disponível");
     expect(getStatus(checklist, "ai-config")).toBe("ausente");
-    expect(getStatus(checklist, "daily-limit")).toBe("disponível");
+    expect(getStatus(checklist, "daily-limit")).toBe("configurar");
     expect(getStatus(checklist, "local-price-base")).toBe("ausente");
     expect(getStatus(checklist, "central-db")).toBe("não configurada");
     expect(getStatus(checklist, "sinapi")).toBe("base ausente");
@@ -75,6 +77,8 @@ describe("operational checklist", () => {
         aiPlanExtractEnabled: true,
         aiProviderConfigured: true,
         aiModelConfigured: true,
+        aiRateLimitSaltConfigured: true,
+        aiRateLimitStorageConfigured: true,
       },
       project
     );
@@ -94,12 +98,33 @@ describe("operational checklist", () => {
         aiPlanExtractEnabled: true,
         aiProviderConfigured: true,
         aiModelConfigured: false,
+        aiRateLimitSaltConfigured: true,
+        aiRateLimitStorageConfigured: true,
       },
       defaultProject
     );
 
     expect(getStatus(checklist, "plan-extract")).toBe("ativo");
     expect(getStatus(checklist, "ai-config")).toBe("ausente");
+  });
+
+  it("keeps upload assistido pending when rate-limit storage is not ready", () => {
+    const checklist = createOperationalChecklist(
+      {
+        ...disabledEnvironment,
+        aiPlanExtractEnabled: true,
+        aiProviderConfigured: true,
+        aiModelConfigured: true,
+        aiRateLimitSaltConfigured: true,
+        aiRateLimitStorageConfigured: false,
+      },
+      defaultProject
+    );
+
+    expect(getStatus(checklist, "plan-extract")).toBe("pendente");
+    expect(getStatus(checklist, "daily-limit")).toBe("configurar");
+    expect(checklist.find((item) => item.id === "daily-limit")?.detail).toContain("proteção diária persistente");
+    expect(checklist.find((item) => item.id === "daily-limit")?.technicalDetail).toContain("Storage persistente: ausente");
   });
 
   it("reports central DB as optional and keeps local fallback available when remote DB is absent", () => {
