@@ -48,12 +48,13 @@ function createApprovedProjectCandidates(input: PriceResolverInput): PriceResolu
   const compositionsById = new Map(input.serviceCompositions.map((composition) => [composition.id, composition]));
   const sourceTypeById = new Map((input.priceSources ?? []).map((source) => [source.id, source.type]));
   const candidates: PriceResolutionCandidate[] = [];
+  const hasPriceSources = Boolean(input.priceSources?.length);
 
   for (const link of input.approvedLinks ?? []) {
     const quantity = quantitiesById.get(link.quantityId);
     const composition = compositionsById.get(link.compositionId);
     if (!quantity || !composition) continue;
-    if (!link.approvedByUser && sourceTypeById.get(composition.sourceId) !== "manual") continue;
+    if (!link.approvedByUser && !isManualProjectComposition(composition, sourceTypeById, hasPriceSources)) continue;
 
     const quality = evaluateServiceCompositionPriceQuality(composition, {
       expectedState: input.location?.state,
@@ -127,16 +128,22 @@ async function createRemoteCandidates(input: PriceResolverInput, remoteDb: Remot
   let error: string | undefined;
 
   for (const quantity of input.quantities) {
-    const result = await remoteDb.searchCandidates({
-      query: quantity.description,
-      state: input.location?.state ?? "",
-      referenceMonth: input.referenceMonth,
-      regime: input.regime,
-      unit: quantity.unit,
-      category: quantity.category,
-      constructionMethod: quantity.constructionMethod,
-      limit: input.maxCandidatesPerQuantity,
-    });
+    let result;
+    try {
+      result = await remoteDb.searchCandidates({
+        query: quantity.description,
+        state: input.location?.state ?? "",
+        referenceMonth: input.referenceMonth,
+        regime: input.regime,
+        unit: quantity.unit,
+        category: quantity.category,
+        constructionMethod: quantity.constructionMethod,
+        limit: input.maxCandidatesPerQuantity,
+      });
+    } catch (searchError) {
+      if (!error) error = getRemoteSearchErrorMessage(searchError);
+      continue;
+    }
 
     if (result.error && !error) error = result.error;
     remoteCandidates.push(...result.candidates);
@@ -177,6 +184,24 @@ function createManualEntryCandidates(quantities: BudgetQuantity[]): PriceResolut
     requiresReview: true,
     qualityIssues: [],
   }));
+}
+
+function isManualProjectComposition(composition: ServiceComposition, sourceTypeById: Map<string, PriceSource["type"]>, hasPriceSources: boolean) {
+  if (sourceTypeById.get(composition.sourceId) === "manual") return true;
+  if (hasPriceSources) return false;
+  return hasManualCompositionMarker(composition);
+}
+
+function hasManualCompositionMarker(composition: ServiceComposition) {
+  const sourceId = composition.sourceId.trim().toLowerCase();
+  const sourceCode = composition.sourceCode.trim().toUpperCase();
+  const serviceCode = composition.serviceCode.trim().toUpperCase();
+  return sourceId.startsWith("manual-") || sourceCode === "MANUAL" || sourceCode.startsWith("MANUAL-") || serviceCode === "MANUAL" || serviceCode.startsWith("MANUAL-");
+}
+
+function getRemoteSearchErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) return `Remote price database search failed: ${error.message}`;
+  return "Remote price database search failed.";
 }
 
 function createQuantityCompositionKey(quantityId?: string, compositionId?: string) {
