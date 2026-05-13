@@ -124,8 +124,8 @@ export function createOperationalChecklist(
           : "Continue pelo preenchimento manual enquanto a proteção diária é configurada.",
       technicalDetail:
         environment.aiMode === "paid"
-          ? "Verifique AI_PLAN_EXTRACT_ENABLED, OPENAI_API_KEY e AI_OPENAI_MODEL no servidor."
-          : "Verifique AI_PLAN_EXTRACT_ENABLED, AI_MODE=free-cloud, GEMINI_API_KEY, GEMINI_MODEL, AI_RATE_LIMIT_SALT e storage persistente no servidor.",
+          ? "Verifique AI_PLAN_EXTRACT_ENABLED, OPENAI_API_KEY, AI_OPENAI_MODEL, AI_RATE_LIMIT_SALT e storage persistente (UPSTASH_REDIS_REST_URL/TOKEN ou KV_REST_API_URL/TOKEN) no servidor."
+          : "Verifique AI_PLAN_EXTRACT_ENABLED, AI_MODE=free-cloud, GEMINI_API_KEY, GEMINI_MODEL, AI_RATE_LIMIT_SALT e storage persistente (UPSTASH_REDIS_REST_URL/TOKEN ou KV_REST_API_URL/TOKEN) no servidor.",
       tone: aiOperational && rateLimitReady ? "ok" : "warning",
     },
     {
@@ -155,7 +155,9 @@ export function createOperationalChecklist(
       label: "Limite diário",
       status: rateLimitReady ? "disponível" : "configurar",
       detail: rateLimitReady ? environment.dailyLimitLabel : "Configure proteção diária persistente antes de liberar upload assistido em produção.",
-      technicalDetail: `Salt: ${environment.aiRateLimitSaltConfigured ? "configurado" : "ausente"}. Storage persistente: ${environment.aiRateLimitStorageConfigured ? "configurado" : "ausente"}.`,
+      technicalDetail: `Salt: ${environment.aiRateLimitSaltConfigured ? "configurado" : "ausente"}. Storage persistente: ${
+        environment.aiRateLimitStorageConfigured ? "configurado" : "ausente"
+      }. Aceita UPSTASH_REDIS_REST_URL/TOKEN ou KV_REST_API_URL/TOKEN no servidor.`,
       tone: rateLimitReady ? "ok" : "warning",
     },
     {

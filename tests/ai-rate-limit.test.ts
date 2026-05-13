@@ -244,6 +244,26 @@ describe("AI daily rate limit", () => {
     expect(signals[1]).toBeInstanceOf(AbortSignal);
   });
 
+  it("accepts Vercel Marketplace KV env vars for Redis REST storage", async () => {
+    const calls: string[] = [];
+    const fetcher: typeof fetch = async (input) => {
+      calls.push(String(input));
+      return Response.json({ result: 1 });
+    };
+    const store = createRedisAiRateLimitStore(
+      {
+        KV_REST_API_URL: "https://kv.example.com",
+        KV_REST_API_TOKEN: "kv-token",
+      },
+      fetcher
+    );
+
+    await store?.increment("ai:plan-extract:global:2026-05-04:test", 60);
+
+    expect(store?.kind).toBe("redis");
+    expect(calls[0]).toContain("https://kv.example.com/incr/");
+  });
+
   it("rolls back a first Redis increment when setting the expiration fails", async () => {
     const calls: string[] = [];
     const fetcher: typeof fetch = async (input) => {

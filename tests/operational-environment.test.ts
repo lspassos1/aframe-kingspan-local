@@ -92,8 +92,8 @@ describe("operational environment status", () => {
   it("reports rate-limit salt and persistent storage readiness without exposing values", () => {
     const status = createOperationalEnvironmentStatus({
       AI_RATE_LIMIT_SALT: "super-secret-salt",
-      UPSTASH_REDIS_REST_URL: "https://safe-example.upstash.io",
-      UPSTASH_REDIS_REST_TOKEN: "super-secret-token",
+      KV_REST_API_URL: "https://safe-example.upstash.io",
+      KV_REST_API_TOKEN: "super-secret-token",
     });
 
     expect(status.aiRateLimitSaltConfigured).toBe(true);
