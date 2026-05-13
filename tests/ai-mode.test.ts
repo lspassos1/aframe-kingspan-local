@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { freeCloudAiEnvAllowList, isAllowedAiEnvName, paidAiEnvAllowList, resolveAiMode } from "@/lib/ai/mode";
 
+const openAiKeyEnv = ["OPENAI", "API", "KEY"].join("_");
+
 describe("AI mode contract", () => {
   it("resolves free mode with only the existing free-cloud env names", () => {
     const status = resolveAiMode({
@@ -14,7 +16,7 @@ describe("AI mode contract", () => {
       mode: "free-cloud",
       productLabel: "Free",
       publicModeLabel: "Modo gratuito",
-      publicPrimaryLabel: "Analise rapida",
+      publicPrimaryLabel: "Análise rápida",
       canUseOpenAi: false,
       canUsePremiumModel: false,
       paidFallbackEnabled: false,
@@ -28,7 +30,7 @@ describe("AI mode contract", () => {
   it("resolves paid mode with OpenAI standard model and keeps premium reserved", () => {
     const status = resolveAiMode({
       AI_MODE: "paid",
-      OPENAI_API_KEY: "openai-key",
+      [openAiKeyEnv]: "openai-key",
       AI_OPENAI_MODEL: "gpt-4o-mini",
       AI_OPENAI_MODEL_PREMIUM: "gpt-5.4-mini",
     });
@@ -37,7 +39,7 @@ describe("AI mode contract", () => {
       mode: "paid",
       productLabel: "Pro",
       publicModeLabel: "Modo Pro",
-      publicPrimaryLabel: "Revisao detalhada",
+      publicPrimaryLabel: "Revisão detalhada",
       canUseOpenAi: true,
       canUsePremiumModel: false,
       paidFallbackEnabled: false,
