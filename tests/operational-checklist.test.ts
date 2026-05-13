@@ -18,7 +18,7 @@ const disabledEnvironment: OperationalEnvironmentStatus = {
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,
   centralPriceDbLabel: "não configurada",
-  lastMonthlySyncLabel: "sem configuração",
+  lastSemiannualSyncLabel: "sem configuração",
   centralPriceDbOperational: createExternalPriceDbOperationalStatus({ configured: false }),
 };
 
@@ -43,7 +43,7 @@ describe("operational checklist", () => {
     expect(getStatus(checklist, "sinapi")).toBe("base ausente");
     expect(getStatus(checklist, "state")).toBe("definida");
     expect(getStatus(checklist, "reference")).toBe("ausente");
-    expect(getStatus(checklist, "monthly-sync")).toBe("sem configuração");
+    expect(getStatus(checklist, "semiannual-sync")).toBe("sem configuração");
     expect(getStatus(checklist, "export")).toBe("preliminar");
     expect(getStatus(checklist, "regime")).toBe("ausente");
     expect(publicDetails).not.toContain("OPENAI_API_KEY");
@@ -149,15 +149,15 @@ describe("operational checklist", () => {
         ...disabledEnvironment,
         centralPriceDbConfigured: true,
         centralPriceDbLabel: failedStatus.centralLabel,
-        lastMonthlySyncLabel: failedStatus.syncLabel,
+        lastSemiannualSyncLabel: failedStatus.syncLabel,
         centralPriceDbOperational: failedStatus,
       },
       defaultProject
     );
 
     expect(getStatus(checklist, "central-db")).toBe("configurada");
-    expect(getStatus(checklist, "monthly-sync")).toBe("falha no sync");
-    expect(checklist.find((item) => item.id === "monthly-sync")?.tone).toBe("warning");
+    expect(getStatus(checklist, "semiannual-sync")).toBe("falha no sync");
+    expect(checklist.find((item) => item.id === "semiannual-sync")?.tone).toBe("warning");
     expect(JSON.stringify(checklist)).not.toContain("secret-token");
     expect(JSON.stringify(checklist)).not.toContain("example.supabase.co");
   });

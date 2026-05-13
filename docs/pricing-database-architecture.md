@@ -4,7 +4,7 @@ Refs #200
 
 ## Purpose
 
-This document defines the first architecture decision for a central price database that can support compositions, inputs, H/H, losses and monthly SINAPI references without overloading the Vercel Hobby app runtime.
+This document defines the first architecture decision for a central price database that can support compositions, inputs, H/H, losses and SINAPI reference months without overloading the Vercel Hobby app runtime.
 
 The current app already has a strong local/imported price model:
 
@@ -28,10 +28,10 @@ Do not use Railway or Docker as the first implementation path. They may be usefu
 Supabase is the best first fit because:
 
 - it is managed Postgres, which fits relational construction price data;
-- the SQL dashboard is useful for debugging imported rows and monthly versions;
+- the SQL dashboard is useful for debugging imported rows and reference versions;
 - Row Level Security can expose active reference data as read-only;
 - the client can read safe public price candidates without using Vercel Functions for every query;
-- monthly writes can run from GitHub Actions using a service role secret;
+- scheduled writes can run from GitHub Actions using a service role secret;
 - Vercel stays focused on the app UI and light runtime queries.
 
 Free-plan quotas can change. Product copy and docs must not promise that Supabase Free is production-grade for commercial scale. This decision is for low-volume/personal usage and should be reviewed before commercial launch.
@@ -40,7 +40,7 @@ Free-plan quotas can change. Product copy and docs must not promise that Supabas
 
 Vercel must not run:
 
-- monthly SINAPI import jobs;
+- SINAPI import jobs;
 - heavy file parsing;
 - bulk database upserts;
 - large ETL jobs;
@@ -55,7 +55,7 @@ Vercel may run:
 The preferred first implementation is:
 
 ```txt
-GitHub Actions monthly sync -> Supabase central database -> app reads active candidates
+GitHub Actions semiannual sync -> Supabase central database -> app reads active candidates
 ```
 
 ## Data Ownership Model
@@ -68,7 +68,7 @@ The central price database stores reference data:
 - material/labor/equipment breakdown;
 - H/H;
 - waste/loss rules;
-- monthly version and status;
+- reference version and status;
 - import audit records.
 
 The project store remains responsible for project-specific decisions:
@@ -96,10 +96,11 @@ The app should resolve prices in this order:
 
 This keeps the existing local/manual flow intact and makes the central database an enhancement, not a hard dependency.
 
-## Target Monthly Sync Flow
+## Target Semiannual Sync Flow
 
 ```txt
-Monthly GitHub Actions workflow
+Semiannual GitHub Actions dry-run
+Manual/admin write workflow
   -> read official or normalized SINAPI input
   -> normalize rows using current SINAPI importer concepts
   -> insert new source/version as staging
@@ -229,7 +230,7 @@ Docker is useful for local testing or a future external ETL service. It must not
 
 ### Static JSON As Main Database
 
-Static JSON is cheap but weak for search, versioning, monthly updates, metadata, H/H and future user overrides.
+Static JSON is cheap but weak for search, versioning, semiannual updates, metadata, H/H and future user overrides.
 
 ### Automatic AI Pricing
 
@@ -242,8 +243,8 @@ This architecture should be delivered through small PRs:
 1. Architecture documentation.
 2. Schema and RLS.
 3. Remote price adapter and resolver contract.
-4. Monthly sync dry-run.
-5. Monthly sync write mode.
+4. Semiannual sync dry-run.
+5. Manual sync write mode.
 6. Budget Assistant central DB search.
 7. Operational hardening.
 

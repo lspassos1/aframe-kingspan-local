@@ -27,14 +27,14 @@ describe("operational environment status", () => {
       dailyLimitLabel: "4/usuário · 6/IP · 80/global",
       centralPriceDbConfigured: false,
       centralPriceDbLabel: "não configurada",
-      lastMonthlySyncLabel: "sem configuração",
+      lastSemiannualSyncLabel: "sem configuração",
       centralPriceDbOperational: {
         configured: false,
         status: "missing-config",
         centralLabel: "não configurada",
         syncLabel: "sem configuração",
         detail: "Base central não é dependência: use importação local ou fonte manual revisável.",
-        syncDetail: "Configure leitura pública antes de tratar sync mensal como disponível.",
+        syncDetail: "Configure leitura pública antes de tratar a atualização semestral como disponível.",
         technicalDetail: "Runtime sem configuração pública de leitura. Chave de serviço não pertence ao app.",
         tone: "muted",
         stale: false,
@@ -72,7 +72,7 @@ describe("operational environment status", () => {
 
     expect(status.centralPriceDbConfigured).toBe(true);
     expect(status.centralPriceDbLabel).toBe("configurada");
-    expect(status.lastMonthlySyncLabel).toBe("sem registro");
+    expect(status.lastSemiannualSyncLabel).toBe("sem registro");
     expect(status.centralPriceDbOperational.status).toBe("missing-sync");
     expect(JSON.stringify(status)).not.toContain("supabase.co");
     expect(JSON.stringify(status)).not.toContain("anon-public-read-key");

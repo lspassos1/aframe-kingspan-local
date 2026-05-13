@@ -5,7 +5,7 @@ import { createPriceItemRows, parseSinapiSyncArgs, readSinapiSyncInput, runSinap
 
 const fixturePath = join(process.cwd(), "scripts/fixtures/sinapi-monthly-dry-run-sample.json");
 
-describe("SINAPI monthly sync write mode", () => {
+describe("SINAPI manual sync write mode", () => {
   it("keeps dry-run as the default mode", () => {
     expect(parseSinapiSyncArgs([])).toMatchObject({ dryRun: true, write: false });
     expect(parseSinapiSyncArgs(["--write"])).toMatchObject({ dryRun: false, write: true });
@@ -16,6 +16,7 @@ describe("SINAPI monthly sync write mode", () => {
     const workflow = readFileSync(join(process.cwd(), ".github/workflows/sinapi-monthly-sync-write.yml"), "utf8");
 
     expect(workflow).toContain("required: true");
+    expect(workflow).toContain("Manual SINAPI Sync Write");
     expect(workflow).not.toContain("default: \"scripts/fixtures/sinapi-monthly-dry-run-sample.json\"");
   });
 

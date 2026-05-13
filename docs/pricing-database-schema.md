@@ -14,11 +14,11 @@ supabase/migrations/20260512215000_price_database_schema.sql
 
 ## Tables
 
-- `price_sources`: monthly source/version metadata, including UF, reference month, regime and active/staging/archive status.
+- `price_sources`: source/version metadata, including UF, reference month, regime and active/staging/archive status.
 - `price_items`: composition and input rows with unit, category, construction method, cost breakdown, H/H, review status and search text.
 - `composition_inputs`: material/labor/equipment/third-party/other rows inside a composition.
 - `waste_rules`: loss assumptions tied to a source or generic category/method.
-- `price_sync_runs`: audit records for future monthly sync runs.
+- `price_sync_runs`: audit records for future sync runs.
 
 ## Public Read Layer
 
