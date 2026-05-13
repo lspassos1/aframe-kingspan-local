@@ -127,6 +127,27 @@ describe("operational checklist", () => {
     expect(checklist.find((item) => item.id === "daily-limit")?.technicalDetail).toContain("Storage persistente: ausente");
   });
 
+  it("points paid-mode operators to rate-limit storage when upload assistido is pending", () => {
+    const checklist = createOperationalChecklist(
+      {
+        ...disabledEnvironment,
+        aiMode: "paid",
+        providerLabel: "Modo Pro",
+        aiPlanExtractEnabled: true,
+        aiProviderConfigured: true,
+        aiModelConfigured: true,
+        aiRateLimitSaltConfigured: true,
+        aiRateLimitStorageConfigured: false,
+      },
+      defaultProject
+    );
+    const planExtract = checklist.find((item) => item.id === "plan-extract");
+
+    expect(planExtract?.status).toBe("pendente");
+    expect(planExtract?.technicalDetail).toContain("AI_RATE_LIMIT_SALT");
+    expect(planExtract?.technicalDetail).toContain("KV_REST_API_URL/TOKEN");
+  });
+
   it("reports central DB as optional and keeps local fallback available when remote DB is absent", () => {
     const checklist = createOperationalChecklist(disabledEnvironment, defaultProject);
 

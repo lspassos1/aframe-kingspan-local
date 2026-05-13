@@ -69,11 +69,14 @@ export function createMemoryAiRateLimitStore(entries = sharedMemoryStore): AiRat
 }
 
 export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, fetcher: typeof fetch = fetch): AiRateLimitStore | null {
-  const url = env.UPSTASH_REDIS_REST_URL;
-  const token = env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  const redisUrl = url;
-  const redisToken = token;
+  const upstashUrl = env.UPSTASH_REDIS_REST_URL?.trim();
+  const upstashToken = env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const kvUrl = env.KV_REST_API_URL?.trim();
+  const kvToken = env.KV_REST_API_TOKEN?.trim();
+  const [redisUrl, redisToken] = upstashUrl && upstashToken ? [upstashUrl, upstashToken] : kvUrl && kvToken ? [kvUrl, kvToken] : [undefined, undefined];
+  if (!redisUrl || !redisToken) return null;
+  const redisEndpointBase: string = redisUrl;
+  const redisAuthorizationToken: string = redisToken;
   const timeoutMs = getNumberEnv(env, "AI_RATE_LIMIT_REDIS_TIMEOUT_MS", 2500);
 
   async function fetchRedis(path: string) {
@@ -82,7 +85,7 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
     try {
       return await fetcher(path, {
         signal: controller.signal,
-        headers: { Authorization: `Bearer ${redisToken}` },
+        headers: { Authorization: `Bearer ${redisAuthorizationToken}` },
       });
     } finally {
       clearTimeout(timeout);
@@ -90,7 +93,7 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
   }
 
   async function decrementRedis(key: string) {
-    const endpoint = redisUrl.replace(/\/$/, "");
+    const endpoint = redisEndpointBase.replace(/\/$/, "");
     const response = await fetchRedis(`${endpoint}/decr/${encodeURIComponent(key)}`);
     if (!response.ok) throw new Error(`Redis DECR failed with ${response.status}.`);
   }
@@ -98,7 +101,7 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
   return {
     kind: "redis",
     async increment(key, ttlSeconds) {
-      const endpoint = redisUrl.replace(/\/$/, "");
+      const endpoint = redisEndpointBase.replace(/\/$/, "");
       const incrementResponse = await fetchRedis(`${endpoint}/incr/${encodeURIComponent(key)}`);
       if (!incrementResponse.ok) throw new Error(`Redis INCR failed with ${incrementResponse.status}.`);
       const incrementPayload = (await incrementResponse.json()) as { result?: number };

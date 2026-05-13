@@ -13,6 +13,10 @@ function hasEnv(env: Record<string, string | undefined>, key: string) {
   return Boolean(env[key]?.trim());
 }
 
+function hasPersistentRateLimitStorage(env: Record<string, string | undefined>) {
+  return (hasEnv(env, "UPSTASH_REDIS_REST_URL") && hasEnv(env, "UPSTASH_REDIS_REST_TOKEN")) || (hasEnv(env, "KV_REST_API_URL") && hasEnv(env, "KV_REST_API_TOKEN"));
+}
+
 export function createOperationalEnvironmentStatus(env: Record<string, string | undefined> = process.env): OperationalEnvironmentStatus {
   const perUserLimit = getPositiveNumberEnv(env, "AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER", 3);
   const perIpLimit = getPositiveNumberEnv(env, "AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP", 5);
@@ -29,7 +33,7 @@ export function createOperationalEnvironmentStatus(env: Record<string, string | 
     aiProviderConfigured: aiMode.primaryConfigured && aiMode.primaryModelConfigured,
     aiModelConfigured: aiMode.primaryModelConfigured,
     aiRateLimitSaltConfigured: hasEnv(env, "AI_RATE_LIMIT_SALT"),
-    aiRateLimitStorageConfigured: hasEnv(env, "UPSTASH_REDIS_REST_URL") && hasEnv(env, "UPSTASH_REDIS_REST_TOKEN"),
+    aiRateLimitStorageConfigured: hasPersistentRateLimitStorage(env),
     providerLabel: aiMode.publicModeLabel,
     dailyLimitLabel: `${perUserLimit}/usuário · ${perIpLimit}/IP · ${globalLimit}/global`,
     centralPriceDbConfigured,
