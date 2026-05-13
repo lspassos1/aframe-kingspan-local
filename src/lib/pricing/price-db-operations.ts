@@ -178,9 +178,17 @@ function normalizeReferenceMonth(value: string | undefined) {
   const month = Number(match[2]);
   const day = match[3] ? Number(match[3]) : 1;
   if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(day) || day < 1 || day > 31) return "";
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return "";
+  if (day > getDaysInMonth(year, month)) return "";
   return `${match[1]}-${match[2]}`;
+}
+
+function getDaysInMonth(year: number, month: number) {
+  const daysByMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return daysByMonth[month - 1] ?? 0;
+}
+
+function isLeapYear(year: number) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
 function isReferenceMonthStale(referenceMonth: string, now: Date | string | undefined, staleAfterDays: number) {

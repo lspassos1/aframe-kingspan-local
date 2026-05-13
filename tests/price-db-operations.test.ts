@@ -84,6 +84,30 @@ describe("external price DB operational status", () => {
     });
   });
 
+  it("preserves four-digit years below 0100 in reference snapshots", () => {
+    const yearOneStatus = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "0001-01-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "0001-01-02T00:00:00Z" },
+      now: "0001-01-03T00:00:00Z",
+    });
+    const yearNinetyNineStatus = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "0099-12", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "0099-12-02T00:00:00Z" },
+      now: "0099-12-03T00:00:00Z",
+    });
+
+    expect(yearOneStatus).toMatchObject({
+      status: "ready",
+      lastReferenceMonth: "0001-01",
+    });
+    expect(yearNinetyNineStatus).toMatchObject({
+      status: "ready",
+      lastReferenceMonth: "0099-12",
+    });
+  });
+
   it("requires an active source with a reference month before reporting ready", () => {
     const status = createExternalPriceDbOperationalStatus({
       configured: true,
