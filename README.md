@@ -1,8 +1,23 @@
 # Estudo Construtivo
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-
 Aplicação para estudo construtivo modular, pré-orçamento assistido e revisão de quantitativos a partir de planta baixa, medidas manuais ou projeto exemplo.
+
+[![GitHub stars](https://img.shields.io/github/stars/lspassos1/aframe-kingspan-local?style=social)](https://github.com/lspassos1/aframe-kingspan-local/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/lspassos1/aframe-kingspan-local?style=social)](https://github.com/lspassos1/aframe-kingspan-local/network/members)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Vercel](https://img.shields.io/badge/Vercel-Live-000000?style=flat&logo=vercel&logoColor=white)](https://aframe-kingspan-local.vercel.app)
+[![Supabase](https://img.shields.io/badge/Supabase-Price_DB-3ECF8E?style=flat&logo=supabase&logoColor=white)](docs/pricing-database-operations.md)
+[![Slack](https://img.shields.io/badge/Slack-Lucas_Review-4A154B?style=flat&logo=slack&logoColor=white)](docs/slack-github-review-bridge.md)
+[![Last commit](https://img.shields.io/github/last-commit/lspassos1/aframe-kingspan-local)](https://github.com/lspassos1/aframe-kingspan-local/commits/main)
+
+<p align="center">
+  <a href="https://aframe-kingspan-local.vercel.app"><img src="https://img.shields.io/badge/App-Estudo_Construtivo-111827?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Estudo Construtivo"></a>&nbsp;
+  <a href="https://aframe-kingspan-local.vercel.app/start"><img src="https://img.shields.io/badge/Fluxo-Enviar_Planta-0f766e?style=for-the-badge&logo=upload&logoColor=white" alt="Enviar planta"></a>&nbsp;
+  <a href="https://aframe-kingspan-local.vercel.app/budget-assistant"><img src="https://img.shields.io/badge/Orcamento-Assistente-2563eb?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Assistente de orçamento"></a>&nbsp;
+  <a href="https://aframe-kingspan-local.vercel.app/model-3d"><img src="https://img.shields.io/badge/Visual-3D-7c3aed?style=for-the-badge&logo=three.js&logoColor=white" alt="Visual 3D"></a>
+</p>
 
 O produto não começa pelo método construtivo. O fluxo principal é:
 
@@ -112,11 +127,26 @@ A IA nunca deve:
 - aplicar método construtivo incerto automaticamente;
 - substituir revisão humana.
 
-## SINAPI
+## Base De Preços E SINAPI
 
-Não há crawler SINAPI nesta entrega. O usuário deve importar arquivo oficial, ZIP oficial, CSV/XLSX/JSON ou base normalizada equivalente.
+O banco central de preços definido para o produto é **Supabase**, com leitura pública segura, RLS, candidatos revisáveis e sync administrativo fora do runtime da Vercel.
 
-Enquanto não houver banco externo configurado, bases importadas persistem no modelo atual do app: project store, export/import JSON, `budgetAssistant.priceSources`, `budgetAssistant.serviceCompositions` e coleções técnicas existentes. Arquivos SINAPI não devem ser gravados no filesystem runtime da Vercel/serverless.
+O repositório já contém:
+
+- schema/RLS em `supabase/migrations/20260512215000_price_database_schema.sql`;
+- resolver e adapter de candidatos remotos em `src/lib/pricing`;
+- busca de candidatos centrais no Budget Assistant;
+- workflows de dry-run/write sync em GitHub Actions;
+- runbook operacional em [docs/product-launch-runbook.md](docs/product-launch-runbook.md).
+
+O estado operacional correto é:
+
+- app lê apenas `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`;
+- `SUPABASE_SERVICE_ROLE_KEY` fica somente em GitHub Actions/admin sync, nunca no app Vercel ou no client;
+- preços centrais entram como candidatos pendentes de revisão, nunca como preço aprovado automático;
+- importação local e preenchimento manual continuam disponíveis quando a base central não estiver configurada, vazia, stale ou com sync falho.
+
+A carga inicial aprovada e a rotina semestral de atualização da base central são rastreadas separadamente na stack de prontidão Supabase. Arquivos SINAPI não devem ser gravados no filesystem runtime da Vercel/serverless.
 
 Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 
@@ -127,6 +157,9 @@ Preço `0`, vazio ou ausente nunca entra como preço válido revisado.
 - [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md): variáveis locais, Vercel, OpenAI API e SINAPI.
 - [docs/free-cloud-ai-routing.md](docs/free-cloud-ai-routing.md): modo free-cloud, providers gratuitos e OpenAI em standby.
 - [docs/sinapi-integration.md](docs/sinapi-integration.md): regras da base SINAPI controlada.
+- [docs/pricing-database-architecture.md](docs/pricing-database-architecture.md): arquitetura Supabase da base central de preços.
+- [docs/pricing-database-schema.md](docs/pricing-database-schema.md): schema/RLS e camada de leitura pública segura.
+- [docs/pricing-database-operations.md](docs/pricing-database-operations.md): setup mínimo, stale data, sync failure e diagnóstico seguro.
 - [docs/AI_PLAN_EXTRACT.md](docs/AI_PLAN_EXTRACT.md): contrato técnico da extração de planta por IA.
 - [docs/budget-assistant.md](docs/budget-assistant.md): Assistente de orçamento e revisão humana.
 
