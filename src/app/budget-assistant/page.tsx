@@ -35,9 +35,11 @@ import {
   type BudgetConfidenceLevel,
   type PriceSourceType,
 } from "@/lib/budget-assistant";
+import { createCentralPriceCandidateEntry, createCentralPriceCostItemId } from "@/lib/budget-assistant/central-price-search";
 import { formatLocalDateInputValue } from "@/lib/date";
 import { formatCompactNumber, formatCurrency, formatDate } from "@/lib/format";
 import { isBrazilCityInState, isBrazilState, normalizeBrazilStateName } from "@/lib/locations/brazil";
+import { createRemotePriceDbAdapter, resolvePriceCandidates, type PriceResolutionCandidate } from "@/lib/pricing";
 import { useProjectStore, useSelectedScenario } from "@/lib/store/project-store";
 import { createBudgetAssistantGuidance } from "@/lib/ux/guided-actions";
 
@@ -62,6 +64,10 @@ interface SourceLocationFormState {
   city: string;
   state: string;
 }
+
+type RemoteCandidateResolution = PriceResolutionCandidate & { remoteCandidate: NonNullable<PriceResolutionCandidate["remoteCandidate"]> };
+
+type RemoteSearchStatus = "idle" | "loading" | "success" | "error";
 
 export default function BudgetAssistantPage() {
   const project = useProjectStore((state) => state.project);
@@ -92,6 +98,19 @@ export default function BudgetAssistantPage() {
   const [unitPrice, setUnitPrice] = useState("");
   const [confidence, setConfidence] = useState<BudgetConfidenceLevel>("unverified");
   const [itemNotes, setItemNotes] = useState("");
+  const remotePriceDb = useMemo(
+    () =>
+      createRemotePriceDbAdapter({
+        NEXT_PUBLIC_PRICE_DB_PROVIDER: process.env.NEXT_PUBLIC_PRICE_DB_PROVIDER,
+        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      }),
+    []
+  );
+  const remotePriceDbConfigured = remotePriceDb.isConfigured();
+  const [remoteSearchStatus, setRemoteSearchStatus] = useState<RemoteSearchStatus>("idle");
+  const [remoteSearchMessage, setRemoteSearchMessage] = useState("");
+  const [remoteCandidates, setRemoteCandidates] = useState<RemoteCandidateResolution[]>([]);
   const viewModel = useMemo(() => createBudgetAssistantViewModel(project, scenario), [project, scenario]);
   const selectedQuantity = viewModel.quantityItems.find((item) => item.id === selectedQuantityId) ?? viewModel.pendingPriceItems[0] ?? viewModel.quantityItems[0];
   const applicableSourceById = new Map(viewModel.applicableCostSources.map((item) => [item.source.id, item]));
@@ -110,7 +129,7 @@ export default function BudgetAssistantPage() {
     applicableCostSourceCount: viewModel.applicableCostSources.length,
     pendingPriceCount: viewModel.pendingPriceItems.length,
     lowConfidenceCount: viewModel.lowConfidenceCount,
-    remotePriceDbConfigured: false,
+    remotePriceDbConfigured,
   });
   const sourceCity = sourceLocation.locationKey === scenarioLocationKey ? sourceLocation.city : scenario.location.city;
   const sourceState = sourceLocation.locationKey === scenarioLocationKey ? normalizeBrazilStateName(sourceLocation.state) || sourceLocation.state : scenarioState;
@@ -123,6 +142,19 @@ export default function BudgetAssistantPage() {
   const canAddManualPrice = Boolean(
     scenarioHasValidRegion && selectedQuantity && sourceSelectValue && itemDescription.trim() && Number.isFinite(priceNumber) && priceNumber > 0
   );
+  const selectedBudgetQuantity = selectedQuantity
+    ? {
+        id: selectedQuantity.id,
+        scenarioId: scenario.id,
+        constructionMethod: selectedQuantity.constructionMethod,
+        category: selectedQuantity.category,
+        description: selectedQuantity.description,
+        quantity: selectedQuantity.quantity,
+        unit: selectedQuantity.unit,
+        notes: selectedQuantity.notes,
+      }
+    : undefined;
+  const canSearchCentralPrices = Boolean(remotePriceDbConfigured && scenarioHasValidRegion && selectedBudgetQuantity && remoteSearchStatus !== "loading");
   const workflowSteps = [
     {
       title: "Importar base",
@@ -165,6 +197,9 @@ export default function BudgetAssistantPage() {
     setSelectedQuantityId(quantityId);
     const quantity = viewModel.quantityItems.find((item) => item.id === quantityId);
     if (quantity) setItemDescription(quantity.description);
+    setRemoteCandidates([]);
+    setRemoteSearchStatus("idle");
+    setRemoteSearchMessage("");
   };
 
   const handleSourceCityChange = (city: string) => {
@@ -234,6 +269,58 @@ export default function BudgetAssistantPage() {
     });
 
     suggestions.forEach(addBudgetMatchSuggestion);
+  };
+
+  const handleSearchCentralPrices = async () => {
+    if (!selectedBudgetQuantity) return;
+    if (!remotePriceDbConfigured) {
+      setRemoteSearchStatus("error");
+      setRemoteSearchMessage("Base central não configurada. Use importação local ou preço manual.");
+      return;
+    }
+
+    setRemoteSearchStatus("loading");
+    setRemoteSearchMessage("");
+
+    try {
+      const result = await resolvePriceCandidates({
+        quantities: [selectedBudgetQuantity],
+        priceSources: project.budgetAssistant.priceSources,
+        serviceCompositions: project.budgetAssistant.serviceCompositions,
+        location: { city: scenario.location.city, state: scenarioState },
+        remoteDb: remotePriceDb,
+        maxCandidatesPerQuantity: 6,
+      });
+      const candidates = result.candidates.filter(isRemoteCandidateResolution);
+      setRemoteCandidates(candidates);
+
+      if (result.remote.error && candidates.length === 0) {
+        setRemoteSearchStatus("error");
+        setRemoteSearchMessage("A busca na base central falhou. Continue com importação local ou preço manual.");
+        return;
+      }
+
+      setRemoteSearchStatus("success");
+      setRemoteSearchMessage(
+        candidates.length > 0
+          ? `${candidates.length} candidato${candidates.length === 1 ? "" : "s"} encontrado${candidates.length === 1 ? "" : "s"} para revisão.`
+          : "Nenhum candidato encontrado. Continue com importação local ou preço manual."
+      );
+    } catch {
+      setRemoteCandidates([]);
+      setRemoteSearchStatus("error");
+      setRemoteSearchMessage("A busca na base central falhou. Continue com importação local ou preço manual.");
+    }
+  };
+
+  const handleCreateRemoteMatch = (candidate: RemoteCandidateResolution) => {
+    if (!selectedQuantity) return;
+    const entry = createCentralPriceCandidateEntry({ quantityItem: selectedQuantity, candidate: candidate.remoteCandidate });
+    if (!sourceById.has(entry.source.id)) addBudgetCostSource(entry.source);
+    if (!project.budgetAssistant.costItems.some((item) => item.id === entry.costItem.id)) {
+      addBudgetCostItem(entry.costItem, entry.match);
+    }
+    setRemoteSearchMessage("Match pendente criado. Revise a fonte antes de aprovar o orçamento.");
   };
 
   return (
@@ -323,6 +410,117 @@ export default function BudgetAssistantPage() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card id="central-price-search" className="rounded-2xl border bg-card/90 shadow-sm shadow-foreground/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Base central de preços
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill tone={remotePriceDbConfigured ? "success" : "warning"} icon={false}>
+                  {remotePriceDbConfigured ? "Base central disponível" : "Base central não configurada"}
+                </StatusPill>
+                <StatusPill tone="warning" icon={false}>
+                  Preço pendente de revisão
+                </StatusPill>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Busque candidatos para o quantitativo selecionado. A base central apenas sugere preços; o match nasce pendente e nunca é aprovado automaticamente.
+              </p>
+              {selectedQuantity ? (
+                <p className="text-xs text-muted-foreground">
+                  Item selecionado: {selectedQuantity.description} · {formatCompactNumber(selectedQuantity.quantity)} {selectedQuantity.unit}
+                </p>
+              ) : null}
+            </div>
+            <Button type="button" onClick={handleSearchCentralPrices} disabled={!canSearchCentralPrices}>
+              {remoteSearchStatus === "loading" ? "Buscando..." : "Buscar na base central"}
+            </Button>
+          </div>
+
+          {!remotePriceDbConfigured ? (
+            <EmptyState
+              title="Base central ainda não disponível"
+              description="Continue com importação local ou preço manual. A busca central só aparece quando a base pública estiver configurada."
+              action={
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild size="sm">
+                    <a href="#price-base-import">Importar base de preços</a>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <a href="#manual-price-link">Continuar manualmente</a>
+                  </Button>
+                </div>
+              }
+            />
+          ) : null}
+
+          {remoteSearchMessage ? (
+            <p
+              className={`rounded-md border p-3 text-sm ${
+                remoteSearchStatus === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "bg-muted/40 text-muted-foreground"
+              }`}
+            >
+              {remoteSearchMessage}
+            </p>
+          ) : null}
+
+          {remoteCandidates.length > 0 ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {remoteCandidates.map((candidate) => {
+                const remote = candidate.remoteCandidate;
+                const existingCostItemId = createCentralPriceCostItemId(candidate.quantityId ?? selectedQuantity?.id ?? "", remote.id);
+                const matchAlreadyCreated = viewModel.matches.some((match) => match.costItemId === existingCostItemId);
+                return (
+                  <div key={candidate.id} className="rounded-md border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{remote.description}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {remote.sourceTitle} | {remote.supplier} | {remote.code}
+                        </p>
+                      </div>
+                      <ConfidenceBadge level={remote.confidence} />
+                    </div>
+                    <dl className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                      <CandidateFact label="UF" value={remote.state || "-"} />
+                      <CandidateFact label="Mês" value={formatReferenceMonth(remote.referenceMonth)} />
+                      <CandidateFact label="Regime" value={formatRegime(remote.regime)} />
+                      <CandidateFact label="Unidade" value={remote.unit} />
+                      <CandidateFact label="Preço" value={formatCurrency(remote.directUnitCostBRL)} />
+                      <CandidateFact label="H/H" value={formatCompactNumber(remote.totalLaborHoursPerUnit)} />
+                    </dl>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <StatusPill tone="warning" icon={false}>
+                        Preço pendente de revisão
+                      </StatusPill>
+                      <StatusPill tone={candidate.unitCompatible ? "success" : "warning"} icon={false}>
+                        {candidate.unitCompatible ? "Unidade compatível" : "Unidade divergente"}
+                      </StatusPill>
+                    </div>
+                    {remote.pendingReason ? <p className="mt-3 text-xs text-muted-foreground">{remote.pendingReason}</p> : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-3"
+                      variant={matchAlreadyCreated ? "outline" : "default"}
+                      disabled={matchAlreadyCreated}
+                      onClick={() => handleCreateRemoteMatch(candidate)}
+                    >
+                      {matchAlreadyCreated ? "Match pendente criado" : "Criar match pendente"}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -706,4 +904,32 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
       <div className="flex h-10 items-center rounded-md border px-3 text-sm text-muted-foreground">{value}</div>
     </div>
   );
+}
+
+function CandidateFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-medium text-foreground">{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function isRemoteCandidateResolution(candidate: PriceResolutionCandidate): candidate is RemoteCandidateResolution {
+  return candidate.origin === "remote-db" && Boolean(candidate.remoteCandidate);
+}
+
+function formatRegime(regime: string) {
+  if (regime === "onerado") return "Onerado";
+  if (regime === "nao_desonerado") return "Não desonerado";
+  if (regime === "desonerado") return "Desonerado";
+  return "Revisar";
+}
+
+function formatReferenceMonth(value: string) {
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const [year, month] = value.split("-");
+    return `${month}/${year}`;
+  }
+  return formatDate(value);
 }
