@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import { createOperationalChecklist, type OperationalEnvironmentStatus } from "@/lib/operations/operational-checklist";
+import { createExternalPriceDbOperationalStatus } from "@/lib/pricing/price-db-operations";
 import type { PriceSource } from "@/lib/budget-assistant";
 import type { Project } from "@/types/project";
 
@@ -15,7 +16,8 @@ const disabledEnvironment: OperationalEnvironmentStatus = {
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,
   centralPriceDbLabel: "não configurada",
-  lastMonthlySyncLabel: "sem registro",
+  lastMonthlySyncLabel: "sem configuração",
+  centralPriceDbOperational: createExternalPriceDbOperationalStatus({ configured: false }),
 };
 
 function getStatus(items: ReturnType<typeof createOperationalChecklist>, id: string) {
@@ -39,7 +41,7 @@ describe("operational checklist", () => {
     expect(getStatus(checklist, "sinapi")).toBe("base ausente");
     expect(getStatus(checklist, "state")).toBe("definida");
     expect(getStatus(checklist, "reference")).toBe("ausente");
-    expect(getStatus(checklist, "monthly-sync")).toBe("sem registro");
+    expect(getStatus(checklist, "monthly-sync")).toBe("sem configuração");
     expect(getStatus(checklist, "export")).toBe("preliminar");
     expect(getStatus(checklist, "regime")).toBe("ausente");
     expect(publicDetails).not.toContain("OPENAI_API_KEY");
@@ -106,6 +108,33 @@ describe("operational checklist", () => {
     expect(getStatus(checklist, "central-db")).toBe("não configurada");
     expect(getStatus(checklist, "manual-fallback")).toBe("disponível");
     expect(checklist.find((item) => item.id === "central-db")?.detail).toContain("Base central não é dependência");
+  });
+
+  it("reports failed central sync as a warning without exposing raw errors", () => {
+    const failedStatus = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05", status: "active" },
+      latestSyncRun: {
+        status: "failed",
+        errorMessage: "Authorization Bearer secret-token-12345678901234567890 failed at https://example.supabase.co/rest/v1",
+      },
+    });
+    const checklist = createOperationalChecklist(
+      {
+        ...disabledEnvironment,
+        centralPriceDbConfigured: true,
+        centralPriceDbLabel: failedStatus.centralLabel,
+        lastMonthlySyncLabel: failedStatus.syncLabel,
+        centralPriceDbOperational: failedStatus,
+      },
+      defaultProject
+    );
+
+    expect(getStatus(checklist, "central-db")).toBe("configurada");
+    expect(getStatus(checklist, "monthly-sync")).toBe("falha no sync");
+    expect(checklist.find((item) => item.id === "monthly-sync")?.tone).toBe("warning");
+    expect(JSON.stringify(checklist)).not.toContain("secret-token");
+    expect(JSON.stringify(checklist)).not.toContain("example.supabase.co");
   });
 
   it("keeps a safe UF status when a legacy project has no scenarios", () => {

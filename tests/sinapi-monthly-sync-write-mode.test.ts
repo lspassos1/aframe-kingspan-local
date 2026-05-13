@@ -175,6 +175,15 @@ describe("SINAPI monthly sync write mode", () => {
     });
   });
 
+  it("stores row reference months under the monthly source reference", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const rows = createPriceItemRows([{ ...input.rows[0], data_base: "2026-05-15" }], "source-staging-1", input.source);
+
+    expect(rows[0]).toMatchObject({
+      reference_month: "2026-05-01",
+    });
+  });
+
   it("records sync failure after a started run", async () => {
     const input = await readSinapiSyncInput(fixturePath);
     const calls = [];
@@ -287,6 +296,47 @@ describe("SINAPI monthly sync write mode", () => {
       "PATCH price_sync_runs failed",
     ]);
     expect(calls[5].url).toContain("id=eq.source-active-previous");
+  });
+
+  it("surfaces restore failures before marking the staged source failed", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const calls = [];
+    const fetcher = vi.fn(async (url, init) => {
+      const body = init.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ method: init.method, table: getTableName(url), url: String(url), body });
+      if (String(url).includes("/price_sync_runs") && init.method === "POST") return jsonResponse([{ id: "sync-run-1" }]);
+      if (String(url).includes("/price_sources") && init.method === "POST") return jsonResponse([{ id: "source-staging-1" }]);
+      if (String(url).includes("/price_items") && init.method === "POST") {
+        return jsonResponse(body.map((row, index) => ({ ...row, id: `price-item-${index + 1}` })));
+      }
+      if (String(url).includes("/price_sources") && init.method === "PATCH" && body?.status === "archived") return jsonResponse([{ id: "source-active-previous" }]);
+      if (String(url).includes("/price_sources") && init.method === "PATCH" && body?.status === "active") {
+        return jsonResponse({ error: "restore failed" }, 500);
+      }
+      if (init.method === "PATCH") return jsonResponse([{ id: "patched" }]);
+      return jsonResponse([]);
+    });
+
+    await expect(
+      runSinapiSyncWrite(input, {
+        env: {
+          SUPABASE_URL: "https://prices.example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role-test-key",
+        },
+        fetcher,
+      })
+    ).rejects.toThrow("could not restore");
+
+    expect(calls.map((call) => `${call.method} ${call.table} ${call.body?.status ?? ""}`)).toEqual([
+      "POST price_sync_runs started",
+      "POST price_sources staging",
+      "POST price_items ",
+      "PATCH price_sources archived",
+      "PATCH price_sources active",
+      "PATCH price_sources active",
+      "PATCH price_sync_runs failed",
+    ]);
+    expect(calls).not.toEqual(expect.arrayContaining([expect.objectContaining({ table: "price_sources", body: expect.objectContaining({ status: "failed" }) })]));
   });
 
   it("keeps service role key references out of app and client runtime code", () => {

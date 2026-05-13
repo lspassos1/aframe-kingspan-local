@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import type { OperationalEnvironmentStatus } from "@/lib/operations/operational-checklist";
+import { createExternalPriceDbOperationalStatus } from "@/lib/pricing/price-db-operations";
 
 vi.mock("@/lib/store/project-store", () => ({
   useProjectStore: (selector: (state: { project: typeof defaultProject }) => unknown) => selector({ project: defaultProject }),
@@ -19,7 +20,8 @@ const paidEnvironment: OperationalEnvironmentStatus = {
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,
   centralPriceDbLabel: "não configurada",
-  lastMonthlySyncLabel: "sem registro",
+  lastMonthlySyncLabel: "sem configuração",
+  centralPriceDbOperational: createExternalPriceDbOperationalStatus({ configured: false }),
 };
 
 describe("OperationalChecklist UI", () => {

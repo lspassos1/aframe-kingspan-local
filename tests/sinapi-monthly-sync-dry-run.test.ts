@@ -112,6 +112,39 @@ describe("SINAPI monthly sync dry-run", () => {
     );
   });
 
+  it("rejects malformed source reference months before write mode", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const result = runSinapiSyncDryRun({
+      ...input,
+      source: { ...input.source, referenceDate: "2026/05" },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid-source-reference-month", severity: "invalid" })]));
+  });
+
+  it("rejects malformed row reference months before write mode", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const result = runSinapiSyncDryRun({
+      ...input,
+      rows: [{ ...input.rows[0], data_base: "May-2026" }],
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid-reference-month", severity: "invalid" })]));
+  });
+
+  it("rejects row reference months that do not match the monthly source", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const result = runSinapiSyncDryRun({
+      ...input,
+      rows: [{ ...input.rows[0], data_base: "2026-06-01" }],
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "reference-month-mismatch", severity: "invalid" })]));
+  });
+
   it("fails clearly when --input is missing a value", () => {
     expect(() => parseSinapiSyncArgs(["--input"])).toThrow("--input requires a value.");
     expect(() => parseSinapiSyncArgs(["--input", "--json"])).toThrow("--input requires a value.");

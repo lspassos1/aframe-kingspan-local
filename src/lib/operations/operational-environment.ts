@@ -2,6 +2,7 @@ import "server-only";
 
 import { resolveAiMode } from "@/lib/ai/mode";
 import type { OperationalEnvironmentStatus } from "@/lib/operations/operational-checklist";
+import { createExternalPriceDbOperationalStatus } from "@/lib/pricing/price-db-operations";
 
 function getPositiveNumberEnv(env: Record<string, string | undefined>, key: string, fallback: number) {
   const value = Number(env[key]);
@@ -18,6 +19,9 @@ export function createOperationalEnvironmentStatus(env: Record<string, string | 
   const globalLimit = getPositiveNumberEnv(env, "AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT", 50);
   const aiMode = resolveAiMode(env);
   const centralPriceDbConfigured = hasEnv(env, "NEXT_PUBLIC_SUPABASE_URL") && hasEnv(env, "NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const centralPriceDbOperational = createExternalPriceDbOperationalStatus({
+    configured: centralPriceDbConfigured,
+  });
 
   return {
     aiPlanExtractEnabled: env.AI_PLAN_EXTRACT_ENABLED === "true",
@@ -27,7 +31,8 @@ export function createOperationalEnvironmentStatus(env: Record<string, string | 
     providerLabel: aiMode.publicModeLabel,
     dailyLimitLabel: `${perUserLimit}/usuário · ${perIpLimit}/IP · ${globalLimit}/global`,
     centralPriceDbConfigured,
-    centralPriceDbLabel: centralPriceDbConfigured ? "configurada" : "não configurada",
-    lastMonthlySyncLabel: "sem registro",
+    centralPriceDbLabel: centralPriceDbOperational.centralLabel,
+    lastMonthlySyncLabel: centralPriceDbOperational.syncLabel,
+    centralPriceDbOperational,
   };
 }

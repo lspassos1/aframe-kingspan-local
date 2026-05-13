@@ -57,6 +57,7 @@ export function runSinapiSyncDryRun(input, options = {}) {
   const rows = Array.isArray(input?.rows) ? input.rows : [];
   const sourceState = normalizeState(source.state);
   const sourceRegime = normalizeRegime(source.regime);
+  const sourceReferenceMonth = parseReferenceMonth(source.referenceDate);
   const expectedState = normalizeState(options.expectedState ?? sourceState);
   const issues = [];
 
@@ -71,11 +72,14 @@ export function runSinapiSyncDryRun(input, options = {}) {
   if (source.regime && sourceRegime === "unknown" && String(source.regime).trim() !== "unknown") {
     issues.push(createIssue("unknown-regime", `Source regime "${source.regime}" is not supported.`, undefined, "invalid"));
   }
+  if (hasValue(source.referenceDate) && !sourceReferenceMonth.monthKey) {
+    issues.push(createIssue("invalid-source-reference-month", `Source referenceDate "${source.referenceDate}" must be YYYY-MM or YYYY-MM-DD.`, undefined, "invalid"));
+  }
   if (rows.length === 0) {
     issues.push(createIssue("empty-input", "Dry-run input has no rows.", undefined, "invalid"));
   }
 
-  const normalizedRows = rows.map((row, index) => validateSinapiDryRunRow(row, index + 2, expectedState));
+  const normalizedRows = rows.map((row, index) => validateSinapiDryRunRow(row, index + 2, expectedState, sourceReferenceMonth.monthKey));
   for (const row of normalizedRows) issues.push(...row.issues);
 
   const statusCounts = createStatusCounts(normalizedRows.map((row) => row.status));
@@ -89,7 +93,7 @@ export function runSinapiSyncDryRun(input, options = {}) {
       title: source.title ?? "",
       supplier: source.supplier ?? "",
       state: sourceState,
-      referenceDate: source.referenceDate ?? "",
+      referenceDate: sourceReferenceMonth.monthKey || source.referenceDate || "",
       regime: sourceRegime,
       version: source.version ?? "",
     },
@@ -175,7 +179,14 @@ export async function runSinapiSyncWrite(input, options = {}) {
     };
   } catch (error) {
     if (!activeSourcePromoted && archivedPreviousActiveSources.length > 0) {
-      await restorePreviousActiveSources(client, archivedPreviousActiveSources).catch(() => undefined);
+      try {
+        await restorePreviousActiveSources(client, archivedPreviousActiveSources);
+      } catch (restoreError) {
+        await recordWriteFailure(client, syncRun, source, error, { failSource: false }).catch(() => undefined);
+        throw new Error(
+          `SINAPI write failed after archiving previous active source and could not restore it: ${getErrorMessage(restoreError)}. Original write failure: ${getErrorMessage(error)}`
+        );
+      }
     }
     await recordWriteFailure(client, syncRun, source, error, { failSource: !keepActiveSourceOnFailure });
     throw error;
@@ -190,7 +201,7 @@ export function createStatusCounts(statuses) {
   return counts;
 }
 
-export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
+export function validateSinapiDryRunRow(row, rowNumber, expectedState = "", sourceReferenceMonth = "") {
   const issues = [];
   const data = isRecord(row) ? row : {};
   if (!isRecord(row)) {
@@ -206,6 +217,7 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
   const total = toNumber(data.preco_total);
   const state = normalizeState(data.uf);
   const regime = normalizeRegime(data.regime ?? "unknown");
+  const rowReferenceMonth = parseReferenceMonth(data.data_base);
   let status = "valid";
 
   if (issues.length > 0) status = "invalid";
@@ -240,6 +252,20 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
   if (regime === "unknown" && hasValue(data.regime) && String(data.regime).trim() !== "unknown") {
     issues.push(createIssue("unknown-regime", `Row ${rowNumber} has unsupported regime "${regime}".`, rowNumber));
     if (status === "valid") status = "requires_review";
+  }
+  if (hasValue(data.data_base) && !rowReferenceMonth.monthKey) {
+    issues.push(createIssue("invalid-reference-month", `Row ${rowNumber} data_base must be YYYY-MM or YYYY-MM-DD.`, rowNumber, "invalid"));
+    status = "invalid";
+  } else if (sourceReferenceMonth && rowReferenceMonth.monthKey && rowReferenceMonth.monthKey !== sourceReferenceMonth) {
+    issues.push(
+      createIssue(
+        "reference-month-mismatch",
+        `Row ${rowNumber} data_base "${data.data_base}" does not match source reference month "${sourceReferenceMonth}".`,
+        rowNumber,
+        "invalid"
+      )
+    );
+    status = "invalid";
   }
   for (const componentIssue of getComponentValueIssues(data, rowNumber)) {
     issues.push(componentIssue);
@@ -378,8 +404,10 @@ export function createSupabaseWriteClient(config, options = {}) {
 }
 
 export function createPriceItemRows(rows, sourceId, source, options = {}) {
+  const sourceReferenceMonth = parseReferenceMonth(source.referenceDate).monthKey;
+  const sourceReferenceDate = toReferenceMonth(source.referenceDate);
   return rows.map((row, index) => {
-    const normalized = validateSinapiDryRunRow(row, index + 2, normalizeState(options.expectedState ?? source.state));
+    const normalized = validateSinapiDryRunRow(row, index + 2, normalizeState(options.expectedState ?? source.state), sourceReferenceMonth);
     const materialCost = toNonNegativeNumber(row.material);
     const laborCost = toNonNegativeNumber(row.mao_obra);
     const equipmentCost = toNonNegativeNumber(row.equipamento);
@@ -402,7 +430,7 @@ export function createPriceItemRows(rows, sourceId, source, options = {}) {
       construction_method: constructionMethod,
       state: normalizeState(row.uf || source.state),
       city: source.city || null,
-      reference_month: toReferenceMonth(row.data_base || source.referenceDate),
+      reference_month: sourceReferenceDate,
       regime: normalizeRegime(row.regime ?? source.regime ?? "unknown"),
       material_cost_brl: materialCost,
       labor_cost_brl: laborCost,
@@ -538,9 +566,27 @@ async function readResponseText(response) {
 }
 
 function toReferenceMonth(value) {
+  const parsed = parseReferenceMonth(value);
+  if (parsed.date) return parsed.date;
+  throw new Error(`Invalid reference month "${value}". Expected YYYY-MM or YYYY-MM-DD.`);
+}
+
+function parseReferenceMonth(value) {
   const normalized = String(value ?? "").trim();
-  if (/^\d{4}-\d{2}$/.test(normalized)) return `${normalized}-01`;
-  return normalized;
+  const match = normalized.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
+  if (!match) return { monthKey: "", date: "" };
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = match[3] ? Number(match[3]) : 1;
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(day) || day < 1 || day > 31) {
+    return { monthKey: "", date: "" };
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return { monthKey: "", date: "" };
+  }
+  const monthText = String(month).padStart(2, "0");
+  return { monthKey: `${year}-${monthText}`, date: `${year}-${monthText}-01` };
 }
 
 function parseTags(value) {
@@ -560,6 +606,10 @@ function toNumber(value) {
 function toNonNegativeNumber(value) {
   const parsed = toNumber(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function getErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function getComponentValueIssues(data, rowNumber) {
