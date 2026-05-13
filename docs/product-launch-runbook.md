@@ -281,7 +281,7 @@ Check:
 Dry-run is always the first step:
 
 ```bash
-node scripts/sinapi-sync-monthly.mjs --dry-run --json
+node scripts/sinapi-sync-monthly.mjs --dry-run --json --input ./path/to/normalized-sinapi-source.json
 ```
 
 Dry-run must report:
@@ -300,13 +300,14 @@ with repository/admin secrets configured. For a local admin shell, avoid putting
 read -r SUPABASE_URL
 read -rs SUPABASE_SERVICE_ROLE_KEY
 export SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
-node scripts/sinapi-sync-monthly.mjs --write --json
+node scripts/sinapi-sync-monthly.mjs --write --json --input ./path/to/normalized-sinapi-source.json
 unset SUPABASE_SERVICE_ROLE_KEY
 ```
 
 Write-mode expectations:
 
 - `--write` flag is explicit.
+- `--input` points to the same reviewed normalized source file used in dry-run.
 - missing secrets fail safely.
 - source starts as staging.
 - row counts and status counts are validated.
