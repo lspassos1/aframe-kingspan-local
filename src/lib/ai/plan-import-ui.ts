@@ -1,4 +1,4 @@
-export type PlanImportState = "idle" | "uploading" | "analyzing" | "cache-hit" | "review-ready" | "error" | "limit-exceeded" | "applied";
+export type PlanImportState = "idle" | "uploading" | "analyzing" | "cache-hit" | "review-ready" | "error" | "limit-exceeded" | "temporarily-unavailable" | "applied";
 
 export type PlanImportStateCopy = {
   badge: string;
@@ -68,6 +68,11 @@ export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> =
     title: "Envio por IA indisponível hoje",
     description: "Continue manualmente ou tente novamente amanhã.",
   },
+  "temporarily-unavailable": {
+    badge: "Continuar manualmente",
+    title: "Upload assistido temporariamente indisponível",
+    description: "Continue manualmente enquanto a configuração é verificada.",
+  },
   applied: {
     badge: "Aplicado",
     title: "Campos aplicados",
@@ -108,6 +113,11 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
       title: "Envio por IA indisponível hoje",
       description: "Continue manualmente ou tente novamente amanhã.",
     },
+    "temporarily-unavailable": {
+      badge: "Continuar manualmente",
+      title: "Upload assistido temporariamente indisponível",
+      description: "Continue manualmente enquanto a configuração é verificada.",
+    },
   };
 
   return freeCloudCopy[state] ?? planImportStateCopy[state];
@@ -120,7 +130,7 @@ export function canUsePlanImportUpload({
   planExtractEnabled: boolean;
   state: PlanImportState;
 }) {
-  return planExtractEnabled && state !== "uploading" && state !== "analyzing" && state !== "limit-exceeded";
+  return planExtractEnabled && state !== "uploading" && state !== "analyzing" && state !== "limit-exceeded" && state !== "temporarily-unavailable";
 }
 
 export function getPlanImportStateFromResponse({
@@ -128,18 +138,25 @@ export function getPlanImportStateFromResponse({
   status,
   cached,
   cacheHeader,
+  reason,
 }: {
   ok: boolean;
   status: number;
   cached?: boolean;
   cacheHeader?: string | null;
+  reason?: string;
 }): PlanImportState {
-  if (!ok) return status === 429 ? "limit-exceeded" : "error";
+  if (!ok) {
+    if (status === 429 && reason?.endsWith("-daily-limit-exceeded")) return "limit-exceeded";
+    if (status === 503) return "temporarily-unavailable";
+    return "error";
+  }
   return cached || cacheHeader?.toUpperCase() === "HIT" ? "cache-hit" : "review-ready";
 }
 
 export function getPlanImportPayloadMessage(payload: unknown, state: PlanImportState) {
   if (state === "limit-exceeded") return planImportStateCopy["limit-exceeded"].description;
+  if (state === "temporarily-unavailable") return planImportStateCopy["temporarily-unavailable"].description;
 
   if (typeof payload === "object" && payload !== null && "message" in payload && typeof payload.message === "string") {
     return payload.message;

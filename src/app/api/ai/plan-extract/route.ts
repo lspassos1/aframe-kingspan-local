@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
-import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders } from "@/lib/ai/rate-limit";
+import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders, isAiDailyLimitReason, isAiRateLimitSetupReason } from "@/lib/ai/rate-limit";
 import {
   createMemoryPlanExtractCacheStore,
   createPlanExtractCacheKey,
@@ -102,8 +102,31 @@ export async function POST(request: NextRequest) {
   });
   const rateLimitHeaders = createAiRateLimitHeaders(rateLimitDecision);
   if (!rateLimitDecision.allowed) {
-    const status = rateLimitDecision.reason === "anonymous-not-allowed" ? 401 : 429;
-    return jsonResponse({ message: "Limite diario de IA atingido. Voce ainda pode preencher manualmente.", reason: rateLimitDecision.reason }, { status, headers: rateLimitHeaders });
+    if (rateLimitDecision.reason === "anonymous-not-allowed") {
+      return jsonResponse({ message: "Entre na conta para usar a importacao por IA.", reason: rateLimitDecision.reason }, { status: 401, headers: rateLimitHeaders });
+    }
+
+    if (isAiDailyLimitReason(rateLimitDecision.reason)) {
+      return jsonResponse({ message: "Limite diario de IA atingido. Voce ainda pode preencher manualmente.", reason: rateLimitDecision.reason }, { status: 429, headers: rateLimitHeaders });
+    }
+
+    if (isAiRateLimitSetupReason(rateLimitDecision.reason)) {
+      return jsonResponse(
+        {
+          message: "Upload assistido temporariamente indisponivel. Continue manualmente enquanto a configuracao e verificada.",
+          reason: rateLimitDecision.reason,
+        },
+        { status: 503, headers: rateLimitHeaders }
+      );
+    }
+
+    return jsonResponse(
+      {
+        message: "Upload assistido temporariamente indisponivel. Continue manualmente enquanto a configuracao e verificada.",
+        reason: "rate-limit-unavailable",
+      },
+      { status: 503, headers: rateLimitHeaders }
+    );
   }
 
   try {

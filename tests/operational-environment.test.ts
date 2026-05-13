@@ -21,6 +21,8 @@ describe("operational environment status", () => {
       aiMode: "free-cloud",
       aiProviderConfigured: true,
       aiModelConfigured: true,
+      aiRateLimitSaltConfigured: false,
+      aiRateLimitStorageConfigured: false,
       providerLabel: "Modo gratuito",
       dailyLimitLabel: "4/usuário · 6/IP · 80/global",
       centralPriceDbConfigured: false,
@@ -55,6 +57,8 @@ describe("operational environment status", () => {
       aiMode: "paid",
       aiProviderConfigured: true,
       aiModelConfigured: true,
+      aiRateLimitSaltConfigured: false,
+      aiRateLimitStorageConfigured: false,
       providerLabel: "Modo Pro",
     });
     expect(JSON.stringify(status)).not.toContain("sk-secret-value");
@@ -83,5 +87,18 @@ describe("operational environment status", () => {
     });
 
     expect(status.dailyLimitLabel).toBe(defaultStatus.dailyLimitLabel);
+  });
+
+  it("reports rate-limit salt and persistent storage readiness without exposing values", () => {
+    const status = createOperationalEnvironmentStatus({
+      AI_RATE_LIMIT_SALT: "super-secret-salt",
+      UPSTASH_REDIS_REST_URL: "https://safe-example.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "super-secret-token",
+    });
+
+    expect(status.aiRateLimitSaltConfigured).toBe(true);
+    expect(status.aiRateLimitStorageConfigured).toBe(true);
+    expect(JSON.stringify(status)).not.toContain("super-secret");
+    expect(JSON.stringify(status)).not.toContain("upstash.io");
   });
 });

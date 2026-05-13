@@ -16,6 +16,8 @@ const paidEnvironment: OperationalEnvironmentStatus = {
   aiMode: "paid",
   aiProviderConfigured: false,
   aiModelConfigured: false,
+  aiRateLimitSaltConfigured: false,
+  aiRateLimitStorageConfigured: false,
   providerLabel: "Modo Pro",
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,
@@ -29,7 +31,7 @@ describe("OperationalChecklist UI", () => {
     const html = renderToStaticMarkup(createElement(OperationalChecklist, { environment: paidEnvironment }));
 
     expect(html).toContain("Diagnóstico seguro de IA, preços, importação e exportação");
-    expect(html).toContain("Continue pelo preenchimento manual até a análise assistida estar pronta.");
+    expect(html).toContain("Continue pelo preenchimento manual enquanto a proteção diária é configurada.");
     expect(html).toContain("Complete a configuração do modo atual no servidor.");
     expect(html).toContain("Base central não é dependência");
     expect(html).toContain("Fallback manual");

@@ -161,6 +161,14 @@ export function createAiRateLimitHeaders(decision: AiRateLimitDecision) {
   };
 }
 
+export function isAiDailyLimitReason(reason: string | undefined) {
+  return Boolean(reason?.endsWith("-daily-limit-exceeded"));
+}
+
+export function isAiRateLimitSetupReason(reason: string | undefined) {
+  return reason === "rate-limit-salt-required" || reason === "rate-limit-storage-unavailable" || reason === "rate-limit-store-error";
+}
+
 export async function checkAndConsumeAiDailyLimit(
   input: AiRateLimitInput,
   options: {
