@@ -69,9 +69,59 @@ describe("external price DB operational status", () => {
     expect(status.detail).toContain("preços ainda exigem aprovação");
   });
 
+  it("requires an active source with a reference month before reporting ready", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      now: "2026-05-13T00:00:00Z",
+    });
+
+    expect(status).toMatchObject({
+      status: "missing-sync",
+      syncLabel: "sem registro",
+      tone: "warning",
+      lastReferenceMonth: "",
+    });
+  });
+
+  it("does not report non-active source snapshots as ready", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05", status: "staging" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      now: "2026-05-13T00:00:00Z",
+    });
+
+    expect(status.status).toBe("missing-sync");
+    expect(status.detail).toContain("sem fonte ativa");
+  });
+
+  it("does not treat invalid reference months as ready", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-13", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      now: "2026-05-13T00:00:00Z",
+    });
+
+    expect(status.status).toBe("missing-sync");
+    expect(status.lastReferenceMonth).toBe("");
+    expect(JSON.stringify(status)).not.toContain("2026-13");
+  });
+
   it("sanitizes secret-shaped operational errors", () => {
-    expect(sanitizeOperationalError("SUPABASE_SERVICE_ROLE_KEY=abc https://host/path apikey: verylongsecretvalue1234567890")).toBe(
-      "[redacted]=abc [url] apikey [redacted]"
+    const sanitized = sanitizeOperationalError(
+      "SUPABASE_SERVICE_ROLE_KEY=abc123 service_role=short Authorization: Bearer token123 Bearer loose456 https://host/path apikey: verylongsecretvalue1234567890"
     );
+
+    expect(sanitized).toContain("[url]");
+    expect(sanitized).toContain("Authorization [redacted]");
+    expect(sanitized).toContain("Bearer [redacted]");
+    expect(sanitized).toContain("apikey [redacted]");
+    expect(sanitized).not.toContain("abc123");
+    expect(sanitized).not.toContain("short");
+    expect(sanitized).not.toContain("token123");
+    expect(sanitized).not.toContain("loose456");
   });
 });

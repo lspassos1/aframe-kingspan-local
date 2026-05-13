@@ -41,6 +41,7 @@ export interface ExternalPriceDbOperationalStatus {
 const defaultStaleAfterDays = 45;
 const serviceRoleKeyPattern = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
 const serviceRolePattern = ["service", "role"].join("_");
+const secretAssignmentPattern = new RegExp(`\\b(${serviceRoleKeyPattern}|${serviceRolePattern})\\s*[:=]\\s*\\S+`, "gi");
 
 export function createExternalPriceDbOperationalStatus(input: ExternalPriceDbOperationalInput): ExternalPriceDbOperationalStatus {
   if (!input.configured) {
@@ -91,7 +92,7 @@ export function createExternalPriceDbOperationalStatus(input: ExternalPriceDbOpe
   }
 
   const referenceMonth = normalizeReferenceMonth(input.latestSource?.referenceMonth);
-  if (!input.latestSyncRun && !referenceMonth) {
+  if (!isActiveSource(input.latestSource) || !referenceMonth) {
     return {
       configured: true,
       status: "missing-sync",
@@ -139,7 +140,11 @@ export function createExternalPriceDbOperationalStatus(input: ExternalPriceDbOpe
 export function sanitizeOperationalError(message: string | undefined): string {
   const sanitized = String(message ?? "")
     .replace(/https?:\/\/\S+/gi, "[url]")
-    .replace(/\b(Bearer|apikey|Authorization)\s*[:=]?\s*\S+/gi, "$1 [redacted]")
+    .replace(secretAssignmentPattern, "$1=[redacted]")
+    .replace(/\bAuthorization\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/gi, "Authorization [redacted]")
+    .replace(/\bAuthorization\s+Bearer\s+[^\s,;]+/gi, "Authorization [redacted]")
+    .replace(/\bBearer\s+[^\s,;]+/gi, "Bearer [redacted]")
+    .replace(/\bapikey\s*[:=]\s*[^\s,;]+/gi, "apikey [redacted]")
     .replace(new RegExp(`\\b(${serviceRoleKeyPattern}|${serviceRolePattern})\\b`, "gi"), "[redacted]")
     .replace(/[A-Za-z0-9_-]{28,}/g, "[redacted]")
     .trim();
@@ -154,10 +159,17 @@ function isRunningRun(run: ExternalPriceDbSyncRunSnapshot | undefined) {
   return run?.status === "started" || run?.status === "running";
 }
 
+function isActiveSource(source: ExternalPriceDbSourceSnapshot | undefined) {
+  return source?.status === "active";
+}
+
 function normalizeReferenceMonth(value: string | undefined) {
   const normalized = String(value ?? "").trim();
   const match = normalized.match(/^(\d{4})-(\d{2})/);
-  return match ? `${match[1]}-${match[2]}` : "";
+  if (!match) return "";
+  const month = Number(match[2]);
+  if (!Number.isInteger(month) || month < 1 || month > 12) return "";
+  return `${match[1]}-${match[2]}`;
 }
 
 function isReferenceMonthStale(referenceMonth: string, now: Date | string | undefined, staleAfterDays: number) {
