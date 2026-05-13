@@ -30,8 +30,8 @@ export type AiModeStatus = {
   mode: AiProductMode;
   productLabel: "Free" | "Pro";
   publicModeLabel: "Modo gratuito" | "Modo Pro";
-  publicPrimaryLabel: "Analise rapida" | "Revisao detalhada";
-  publicReviewLabel: "Revisao detalhada" | "Validacao Pro";
+  publicPrimaryLabel: "Análise rápida" | "Revisão detalhada";
+  publicReviewLabel: "Revisão detalhada" | "Validação Pro";
   canUseOpenAi: boolean;
   canUsePremiumModel: false;
   paidFallbackEnabled: false;
@@ -57,8 +57,8 @@ export function resolveAiMode(env: AiModeEnv = process.env): AiModeStatus {
       mode,
       productLabel: "Pro",
       publicModeLabel: "Modo Pro",
-      publicPrimaryLabel: "Revisao detalhada",
-      publicReviewLabel: "Validacao Pro",
+      publicPrimaryLabel: "Revisão detalhada",
+      publicReviewLabel: "Validação Pro",
       canUseOpenAi: true,
       canUsePremiumModel: false,
       paidFallbackEnabled: false,
@@ -73,8 +73,8 @@ export function resolveAiMode(env: AiModeEnv = process.env): AiModeStatus {
     mode,
     productLabel: "Free",
     publicModeLabel: "Modo gratuito",
-    publicPrimaryLabel: "Analise rapida",
-    publicReviewLabel: "Revisao detalhada",
+    publicPrimaryLabel: "Análise rápida",
+    publicReviewLabel: "Revisão detalhada",
     canUseOpenAi: false,
     canUsePremiumModel: false,
     paidFallbackEnabled: false,

@@ -147,7 +147,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
     ? getPlanImportStateCopy(state, aiProviderStatus)
     : {
         badge: "IA desligada",
-        title: "Upload assistido indisponivel",
+        title: "Upload assistido indisponível",
         description:
           aiProviderStatus.mode === "free-cloud"
             ? "Configure o modo gratuito no servidor."
@@ -159,6 +159,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
   const showReview = (state === "review-ready" || state === "cache-hit") && result;
   const canShowManualRecovery = !planExtractEnabled || state === "error" || state === "limit-exceeded";
   const reviewStatusLabel = getReviewStatusLabel(providerMeta.review, aiProviderStatus);
+  const shouldShowMessage = Boolean(message) && state !== "limit-exceeded";
   const providerCopy =
     aiProviderStatus.mode === "free-cloud"
       ? `${aiProviderStatus.primaryProviderLabel} sugere campos preliminares; o sistema não aplica nada sem revisão humana.`
@@ -212,7 +213,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
       const parsed = planExtractResultSchema.safeParse(payload?.result);
       if (!parsed.success) {
         setState("error");
-        setMessage("A resposta da extracao veio em formato invalido.");
+        setMessage("A resposta da extração veio em formato inválido.");
         return;
       }
 
@@ -334,6 +335,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
           onDrop={handleDrop}
           className={cn(
             "group flex min-h-56 flex-1 flex-col items-center justify-center rounded-lg border border-dashed bg-card p-5 text-center transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/35 aria-disabled:cursor-not-allowed aria-disabled:opacity-75",
+            state === "limit-exceeded" && "min-h-48 p-4 sm:min-h-56 sm:p-5",
             canUpload && "hover:border-primary/45 hover:bg-primary/[0.035]",
             isDragging && "border-primary bg-primary/5"
           )}
@@ -354,11 +356,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
           </Badge>
           <span className="mt-3 text-lg font-semibold">{copy.title}</span>
           <span className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{copy.description}</span>
-          {canUpload ? (
-            <span className="mt-4 text-xs font-medium text-primary">Clique para selecionar ou solte o arquivo aqui</span>
-          ) : state === "limit-exceeded" ? (
-            <span className="mt-4 text-xs font-medium text-amber-700">Continue manualmente ou tente novamente amanha</span>
-          ) : null}
+          {canUpload ? <span className="mt-4 text-xs font-medium text-primary">Clique para selecionar ou solte o arquivo aqui</span> : null}
         </button>
 
         <div className="flex min-w-0 flex-1 flex-col justify-between rounded-lg border bg-background/70 p-4">
@@ -380,14 +378,14 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
               </div>
             ) : null}
 
-            {message ? (
+            {shouldShowMessage ? (
               <div className="mt-4 flex items-start gap-2 rounded-lg border bg-background/75 p-3 text-sm">
-                {state === "error" || state === "limit-exceeded" ? (
+                {state === "error" ? (
                   <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
                 ) : (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
                 )}
-                <span className={cn((state === "error" || state === "limit-exceeded") && "text-destructive")}>{message}</span>
+                <span className={cn(state === "error" && "text-destructive")}>{message}</span>
               </div>
             ) : null}
           </div>
@@ -408,7 +406,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
               <p>Resposta: {formatPlanImportProviderName(providerMeta.provider)}.</p>
             ) : null}
             {reviewStatusLabel ? <p>{reviewStatusLabel}</p> : null}
-            {providerMeta.cached ? <p>Cache reaproveitado; limite diario nao foi consumido.</p> : null}
+            {providerMeta.cached ? <p>Cache reaproveitado; limite diário não foi consumido.</p> : null}
             {providerMeta.remaining && providerMeta.limit ? <p>Limite restante hoje: {providerMeta.remaining}/{providerMeta.limit}.</p> : null}
             {aiProviderStatus.mode === "free-cloud" ? <p>Sem cobrança automática; continue manualmente se a análise não estiver disponível.</p> : null}
             {!planExtractEnabled ? (

@@ -137,8 +137,8 @@ describe("PlanExtractReview", () => {
         currentValues,
         analysisStatus: {
           modeLabel: "Modo gratuito",
-          primaryProviderLabel: "Analise rapida",
-          reviewProviderLabel: "Revisao detalhada",
+          primaryProviderLabel: "Análise rápida",
+          reviewProviderLabel: "Revisão detalhada",
           cached: true,
           paidFallbackEnabled: false,
           review: {
@@ -182,7 +182,7 @@ describe("PlanExtractReview", () => {
     expect(html).toContain("Resposta registrada nesta revisao");
     expect(html).toContain("Alertas estruturados");
     expect(html).toContain("Modo gratuito");
-    expect(html).toContain("Analise rapida");
+    expect(html).toContain("Análise rápida");
     expect(html).not.toContain("Gemini");
     expect(html).not.toContain("OpenRouter");
     expect(html).toContain("1 pendências para revisão");

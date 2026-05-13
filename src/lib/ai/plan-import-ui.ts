@@ -24,7 +24,7 @@ export type PlanImportProviderUiStatus = {
 export const defaultPlanImportProviderUiStatus: PlanImportProviderUiStatus = {
   mode: "paid",
   modeLabel: "Modo Pro",
-  primaryProviderLabel: "Revisao detalhada",
+  primaryProviderLabel: "Revisão detalhada",
   paidFallbackEnabled: false,
   primaryConfigured: false,
   reviewConfigured: false,
@@ -34,7 +34,7 @@ export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> =
   idle: {
     badge: "Modo Pro",
     title: "Arraste a planta aqui",
-    description: "PNG, JPG, WebP ou PDF. Nada sera aplicado sem revisao.",
+    description: "PNG, JPG, WebP ou PDF. Nada será aplicado sem revisão.",
   },
   uploading: {
     badge: "Enviando",
@@ -45,33 +45,33 @@ export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> =
   analyzing: {
     badge: "Analisando",
     title: "Analisando em Modo Pro",
-    description: "Extraindo campos preliminares, evidencias e incertezas.",
+    description: "Extraindo campos preliminares, evidências e incertezas.",
     progress: 68,
   },
   "cache-hit": {
     badge: "Cache hit",
-    title: "Revisao pronta pelo cache",
-    description: "Resultado reaproveitado pelo hash do arquivo. O limite diario nao foi consumido.",
+    title: "Revisão pronta pelo cache",
+    description: "Resultado reaproveitado pelo hash do arquivo. O limite diário não foi consumido.",
   },
   "review-ready": {
-    badge: "Revisao pronta",
+    badge: "Revisão pronta",
     title: "Revise antes de aplicar",
-    description: "Selecione, edite ou descarte os campos extraidos.",
+    description: "Selecione, edite ou descarte os campos extraídos.",
   },
   error: {
-    badge: "Requer atencao",
-    title: "Nao foi possivel analisar",
+    badge: "Requer atenção",
+    title: "Não foi possível analisar",
     description: "Confira o arquivo ou continue pelo preenchimento manual.",
   },
   "limit-exceeded": {
-    badge: "Limite diario",
-    title: "Envio por IA indisponivel hoje",
-    description: "Continue manualmente ou tente novamente amanha.",
+    badge: "Limite diário",
+    title: "Envio por IA indisponível hoje",
+    description: "Continue manualmente ou tente novamente amanhã.",
   },
   applied: {
     badge: "Aplicado",
     title: "Campos aplicados",
-    description: "Revise as medidas antes de seguir para metodo e orcamento.",
+    description: "Revise as medidas antes de seguir para método e orçamento.",
   },
 };
 
@@ -82,7 +82,7 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
     idle: {
       badge: "Modo gratuito",
       title: "Arraste a planta aqui",
-      description: "PDF, PNG, JPG ou WebP. A análise sugere; voce revisa antes de aplicar.",
+      description: "PDF, PNG, JPG ou WebP. A análise sugere; você revisa antes de aplicar.",
     },
     uploading: {
       badge: "Enviando",
@@ -94,19 +94,19 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
       badge: "Analisando",
       title: providerStatus.primaryProviderLabel,
       description: providerStatus.reviewProviderLabel
-        ? `${providerStatus.reviewProviderLabel} opcional; divergencias ficam pendentes.`
-        : "Extraindo campos preliminares, evidencias e incertezas.",
+        ? `${providerStatus.reviewProviderLabel} opcional; divergências ficam pendentes.`
+        : "Extraindo campos preliminares, evidências e incertezas.",
       progress: 68,
     },
     error: {
       badge: "Continuar manualmente",
-      title: "Análise indisponivel",
+      title: "Análise indisponível",
       description: "Continue pelo preenchimento manual ou tente outro arquivo quando o limite externo liberar.",
     },
     "limit-exceeded": {
       badge: "Limite gratuito",
-      title: "Envio por IA indisponivel hoje",
-      description: "Continue manualmente ou tente novamente amanha.",
+      title: "Envio por IA indisponível hoje",
+      description: "Continue manualmente ou tente novamente amanhã.",
     },
   };
 
@@ -139,15 +139,15 @@ export function getPlanImportStateFromResponse({
 }
 
 export function getPlanImportPayloadMessage(payload: unknown, state: PlanImportState) {
-  if (state === "limit-exceeded") return "Envio por IA indisponivel hoje. Continue manualmente ou tente novamente amanha.";
+  if (state === "limit-exceeded") return planImportStateCopy["limit-exceeded"].description;
 
   if (typeof payload === "object" && payload !== null && "message" in payload && typeof payload.message === "string") {
     return payload.message;
   }
 
   if (state === "cache-hit") return planImportStateCopy["cache-hit"].description;
-  if (state === "review-ready") return "Extracao concluida. Revise os campos antes de aplicar.";
-  return "Nao foi possivel analisar a planta agora.";
+  if (state === "review-ready") return "Extração concluída. Revise os campos antes de aplicar.";
+  return "Não foi possível analisar a planta agora.";
 }
 
 export function formatPlanImportProviderName(provider?: string) {

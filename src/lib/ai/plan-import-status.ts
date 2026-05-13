@@ -33,7 +33,7 @@ export function getSafePlanImportProviderUiStatus(env: AiRouterEnv = process.env
     modeLabel: aiMode.publicModeLabel,
     primaryProviderLabel: aiMode.publicPrimaryLabel,
     reviewProviderLabel: aiMode.publicReviewLabel,
-    textProviderLabel: "Resumo de pendencias",
+    textProviderLabel: "Resumo de pendências",
     textFallbackProviderLabel: "Resumo alternativo",
     paidFallbackEnabled: aiMode.paidFallbackEnabled,
     primaryConfigured: isProviderConfigured(primaryProvider, env) && aiMode.primaryModelConfigured,
