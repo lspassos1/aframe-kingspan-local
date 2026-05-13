@@ -130,7 +130,7 @@ export function canUsePlanImportUpload({
   planExtractEnabled: boolean;
   state: PlanImportState;
 }) {
-  return planExtractEnabled && state !== "uploading" && state !== "analyzing" && state !== "limit-exceeded";
+  return planExtractEnabled && state !== "uploading" && state !== "analyzing" && state !== "limit-exceeded" && state !== "temporarily-unavailable";
 }
 
 export function getPlanImportStateFromResponse({

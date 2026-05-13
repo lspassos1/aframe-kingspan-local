@@ -160,7 +160,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
   const showReview = (state === "review-ready" || state === "cache-hit") && result;
   const canShowManualRecovery = !planExtractEnabled || state === "error" || state === "limit-exceeded" || state === "temporarily-unavailable";
   const reviewStatusLabel = getReviewStatusLabel(providerMeta.review, aiProviderStatus);
-  const shouldShowMessage = Boolean(message) && state !== "limit-exceeded";
+  const shouldShowMessage = Boolean(message) && state !== "limit-exceeded" && state !== "temporarily-unavailable";
   const providerCopy =
     aiProviderStatus.mode === "free-cloud"
       ? `${aiProviderStatus.primaryProviderLabel} sugere campos preliminares; o sistema não aplica nada sem revisão humana.`
@@ -382,12 +382,12 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
 
             {shouldShowMessage ? (
               <div className="mt-4 flex items-start gap-2 rounded-lg border bg-background/75 p-3 text-sm">
-                {state === "error" || state === "temporarily-unavailable" ? (
+                {state === "error" ? (
                   <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
                 ) : (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
                 )}
-                <span className={cn((state === "error" || state === "temporarily-unavailable") && "text-destructive")}>{message}</span>
+                <span className={cn(state === "error" && "text-destructive")}>{message}</span>
               </div>
             ) : null}
           </div>

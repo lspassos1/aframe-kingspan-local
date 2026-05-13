@@ -56,7 +56,7 @@ describe("plan import UI state", () => {
   it("does not classify rate-limit setup failures as daily quota exhaustion", () => {
     expect(getPlanImportStateFromResponse({ ok: false, status: 503, reason: "rate-limit-salt-required" })).toBe("temporarily-unavailable");
     expect(getPlanImportStateFromResponse({ ok: false, status: 503, reason: "rate-limit-storage-unavailable" })).toBe("temporarily-unavailable");
-    expect(getPlanImportStateFromResponse({ ok: false, status: 429, reason: "rate-limit-store-error" })).toBe("error");
+    expect(getPlanImportStateFromResponse({ ok: false, status: 503, reason: "rate-limit-store-error" })).toBe("temporarily-unavailable");
     expect(getPlanImportStateFromResponse({ ok: false, status: 429 })).toBe("error");
   });
 
@@ -89,6 +89,7 @@ describe("plan import UI state", () => {
   it("blocks upload activation while the daily limit fallback is active", () => {
     expect(canUsePlanImportUpload({ planExtractEnabled: true, state: "idle" })).toBe(true);
     expect(canUsePlanImportUpload({ planExtractEnabled: true, state: "limit-exceeded" })).toBe(false);
+    expect(canUsePlanImportUpload({ planExtractEnabled: true, state: "temporarily-unavailable" })).toBe(false);
     expect(canUsePlanImportUpload({ planExtractEnabled: false, state: "idle" })).toBe(false);
   });
 
