@@ -64,7 +64,7 @@ export function createCentralPriceSource(candidate: PriceCandidate): CostSource 
     title: candidate.sourceTitle,
     supplier: candidate.supplier,
     state: candidate.state,
-    city: candidate.city || "Nacional",
+    city: candidate.city,
     referenceDate: candidate.referenceMonth,
     reliability: candidate.confidence === "high" || candidate.confidence === "medium" ? candidate.confidence : "low",
     notes: "Fonte candidata da base central; itens criados a partir dela continuam pendentes de revisão.",

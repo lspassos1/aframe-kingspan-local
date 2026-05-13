@@ -21,6 +21,7 @@ describe("budget assistant central price search", () => {
       type: "sinapi",
       title: "SINAPI BA Maio 2026",
       state: "BA",
+      city: "Salvador",
       referenceDate: "2026-05",
       reliability: "medium",
     });
@@ -53,6 +54,19 @@ describe("budget assistant central price search", () => {
     expect(entry.match.approvedByUser).toBe(false);
     expect(entry.match.requiresReview).toBe(true);
     expect(entry.costItem.notes).toContain("Unidade divergente");
+  });
+
+  it("keeps state-scoped remote sources out of the national fallback", () => {
+    const entry = createCentralPriceCandidateEntry({
+      quantityItem: createQuantityItem(),
+      candidate: createRemoteCandidate({ city: "" }),
+    });
+
+    expect(entry.source).toMatchObject({
+      state: "BA",
+      city: "",
+    });
+    expect(entry.source.city).not.toBe("Nacional");
   });
 
   it("uses deterministic ids without referencing service-role secrets in app code", () => {
