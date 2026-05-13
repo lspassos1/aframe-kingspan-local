@@ -69,6 +69,21 @@ describe("external price DB operational status", () => {
     expect(status.detail).toContain("preços ainda exigem aprovação");
   });
 
+  it("accepts SQL date snapshots as operational reference months", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      now: "2026-05-13T00:00:00Z",
+    });
+
+    expect(status).toMatchObject({
+      status: "ready",
+      syncLabel: "atualizada 2026-05",
+      lastReferenceMonth: "2026-05",
+    });
+  });
+
   it("requires an active source with a reference month before reporting ready", () => {
     const status = createExternalPriceDbOperationalStatus({
       configured: true,
@@ -121,6 +136,19 @@ describe("external price DB operational status", () => {
     expect(status.status).toBe("missing-sync");
     expect(status.lastReferenceMonth).toBe("");
     expect(JSON.stringify(status)).not.toContain("2026-05-extra");
+  });
+
+  it("rejects invalid SQL date snapshots before ready status", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-02-30", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      now: "2026-05-13T00:00:00Z",
+    });
+
+    expect(status.status).toBe("missing-sync");
+    expect(status.lastReferenceMonth).toBe("");
+    expect(JSON.stringify(status)).not.toContain("2026-02-30");
   });
 
   it("sanitizes secret-shaped operational errors", () => {
