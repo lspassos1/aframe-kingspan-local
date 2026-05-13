@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { applyPlanExtractToProject, getDefaultPlanExtractSelectedFields, type PlanExtractSelectedFields } from "@/lib/ai/apply-plan-extract";
 import {
   defaultPlanImportProviderUiStatus,
+  canUsePlanImportUpload,
   formatPlanImportProviderName,
   getPlanImportPayloadMessage,
   getPlanImportStateCopy,
@@ -53,6 +54,7 @@ type PlanImportCardProps = {
   planExtractEnabled?: boolean;
   aiProviderStatus?: PlanImportProviderUiStatus;
   onManualFallback?: () => void;
+  initialState?: PlanImportState;
 };
 
 function getActiveScenario(project: Project): Scenario {
@@ -128,11 +130,11 @@ function getReviewStatusLabel(review?: PlanExtractReviewPayload, providerStatus:
   return undefined;
 }
 
-export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = defaultPlanImportProviderUiStatus, onManualFallback }: PlanImportCardProps) {
+export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = defaultPlanImportProviderUiStatus, onManualFallback, initialState = "idle" }: PlanImportCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const project = useProjectStore((state) => state.project);
   const setProject = useProjectStore((state) => state.setProject);
-  const [state, setState] = useState<PlanImportState>("idle");
+  const [state, setState] = useState<PlanImportState>(initialState);
   const [isDragging, setIsDragging] = useState(false);
   const [result, setResult] = useState<PlanExtractResult | null>(null);
   const [selectedFields, setSelectedFields] = useState<PlanExtractSelectedFields>({});
@@ -152,7 +154,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
             : "Configure o Modo Pro no servidor.",
       };
   const isBusy = state === "uploading" || state === "analyzing";
-  const canUpload = planExtractEnabled && !isBusy;
+  const canUpload = canUsePlanImportUpload({ planExtractEnabled, state });
   const currentValues = getCurrentPlanExtractValues(project);
   const showReview = (state === "review-ready" || state === "cache-hit") && result;
   const canShowManualRecovery = !planExtractEnabled || state === "error" || state === "limit-exceeded";
@@ -173,7 +175,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
   }
 
   async function uploadFile(file: File) {
-    if (!planExtractEnabled) return;
+    if (!canUpload) return;
 
     setState("uploading");
     setMessage("");
@@ -337,14 +339,26 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
           )}
         >
           <span className="flex h-12 w-12 items-center justify-center rounded-lg border bg-background text-muted-foreground">
-            {isBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : state === "cache-hit" || state === "review-ready" ? <FileCheck2 className="h-5 w-5" /> : <UploadCloud className="h-5 w-5" />}
+            {isBusy ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : state === "cache-hit" || state === "review-ready" ? (
+              <FileCheck2 className="h-5 w-5" />
+            ) : state === "limit-exceeded" ? (
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            ) : (
+              <UploadCloud className="h-5 w-5" />
+            )}
           </span>
           <Badge variant={state === "limit-exceeded" || state === "error" ? "destructive" : "secondary"} className="mt-4">
             {copy.badge}
           </Badge>
           <span className="mt-3 text-lg font-semibold">{copy.title}</span>
           <span className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{copy.description}</span>
-          {canUpload ? <span className="mt-4 text-xs font-medium text-primary">Clique para selecionar ou solte o arquivo aqui</span> : null}
+          {canUpload ? (
+            <span className="mt-4 text-xs font-medium text-primary">Clique para selecionar ou solte o arquivo aqui</span>
+          ) : state === "limit-exceeded" ? (
+            <span className="mt-4 text-xs font-medium text-amber-700">Continue manualmente ou tente novamente amanha</span>
+          ) : null}
         </button>
 
         <div className="flex min-w-0 flex-1 flex-col justify-between rounded-lg border bg-background/70 p-4">
@@ -410,6 +424,11 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
               <Button type="button" onClick={openManualFallback}>
                 Continuar manualmente
               </Button>
+              {state === "limit-exceeded" ? (
+                <Button type="button" variant="outline" onClick={resetReview}>
+                  Tentar novamente depois
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </div>

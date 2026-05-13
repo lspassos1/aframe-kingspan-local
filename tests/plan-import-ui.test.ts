@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import { getSafePlanImportProviderUiStatus } from "@/lib/ai/plan-import-status";
 import {
+  canUsePlanImportUpload,
   formatPlanImportProviderName,
   getPlanImportPayloadMessage,
   getPlanImportStateCopy,
@@ -55,19 +56,27 @@ describe("plan import UI state", () => {
     expect(planImportStateCopy.uploading.badge).toBe("Enviando");
     expect(planImportStateCopy.analyzing.title).toContain("Modo Pro");
     expect(planImportStateCopy["cache-hit"].description).toContain("limite diario nao foi consumido");
-    expect(planImportStateCopy["limit-exceeded"].description).toContain("preenchimento manual");
+    expect(planImportStateCopy["limit-exceeded"].title).toContain("Envio por IA indisponivel hoje");
+    expect(planImportStateCopy["limit-exceeded"].description).toContain("Continue manualmente");
   });
 
   it("switches upload copy to free-cloud mode without promising a paid provider", () => {
     expect(getPlanImportStateCopy("idle", freeCloudStatus).badge).toBe("Modo gratuito");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).title).toContain("Analise rapida");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).description).toContain("Revisao detalhada");
-    expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).description).toContain("sem acionar cobrança automática");
+    expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).title).toContain("Envio por IA indisponivel hoje");
+    expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).description).toContain("Continue manualmente");
   });
 
   it("uses safe API messages without exposing provider secrets", () => {
     expect(getPlanImportPayloadMessage({ message: "Modo Pro de IA nao esta configurado no servidor." }, "error")).toContain("Modo Pro");
-    expect(getPlanImportPayloadMessage(null, "limit-exceeded")).toContain("Limite diario");
+    expect(getPlanImportPayloadMessage(null, "limit-exceeded")).toContain("Envio por IA indisponivel hoje");
+  });
+
+  it("blocks upload activation while the daily limit fallback is active", () => {
+    expect(canUsePlanImportUpload({ planExtractEnabled: true, state: "idle" })).toBe(true);
+    expect(canUsePlanImportUpload({ planExtractEnabled: true, state: "limit-exceeded" })).toBe(false);
+    expect(canUsePlanImportUpload({ planExtractEnabled: false, state: "idle" })).toBe(false);
   });
 
   it("formats provider responses as product modes", () => {
@@ -166,6 +175,29 @@ describe("PlanImportCard", () => {
     expect(html).toContain("Continuar manualmente");
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
+  });
+
+  it("renders daily limit fallback without active upload instructions or technical terms", () => {
+    const html = renderToStaticMarkup(
+      createElement(PlanImportCard, {
+        planExtractEnabled: true,
+        aiProviderStatus: freeCloudStatus,
+        initialState: "limit-exceeded",
+      })
+    );
+
+    expect(html).toContain('data-state="limit-exceeded"');
+    expect(html).toContain("Envio por IA indisponivel hoje");
+    expect(html).toContain("Continue manualmente ou tente novamente amanha");
+    expect(html).toContain("Continuar manualmente");
+    expect(html).toContain("Tentar novamente depois");
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
+    expect(html).not.toContain("OPENAI_API_KEY");
+    expect(html).not.toContain("router");
+    expect(html).not.toContain("fallback pago");
   });
 
   it("renders free-cloud setup copy when extraction is disabled", () => {
