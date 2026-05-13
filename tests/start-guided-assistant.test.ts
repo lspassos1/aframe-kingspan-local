@@ -36,9 +36,9 @@ import { StartGuidedAssistant } from "@/components/onboarding/StartGuidedAssista
 const freeCloudStatus: PlanImportProviderUiStatus = {
   mode: "free-cloud",
   modeLabel: "Modo gratuito",
-  primaryProviderLabel: "Analise rapida",
-  reviewProviderLabel: "Revisao detalhada",
-  textProviderLabel: "Resumo de pendencias",
+  primaryProviderLabel: "Análise rápida",
+  reviewProviderLabel: "Revisão detalhada",
+  textProviderLabel: "Resumo de pendências",
   textFallbackProviderLabel: "Resumo alternativo",
   paidFallbackEnabled: false,
   primaryConfigured: true,
@@ -151,10 +151,10 @@ describe("StartGuidedAssistant", () => {
 
     expect(html).toContain("Modo gratuito");
     expect(html).toContain("Análise");
-    expect(html).toContain("Analise rapida");
-    expect(html).toContain("Revisao detalhada quando disponível");
+    expect(html).toContain("Análise rápida");
+    expect(html).toContain("Revisão detalhada quando disponível");
     expect(html).toContain("Análise gratuita depende de limites externos");
-    expect(planImportCardProps.latest?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Analise rapida" });
+    expect(planImportCardProps.latest?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Análise rápida" });
     expect(html).not.toContain("OPENAI_API_KEY");
     expect(html).not.toContain("Gemini");
     expect(html).not.toContain("OpenRouter");
