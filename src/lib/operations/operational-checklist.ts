@@ -13,7 +13,7 @@ export interface OperationalEnvironmentStatus {
   dailyLimitLabel: string;
   centralPriceDbConfigured: boolean;
   centralPriceDbLabel: string;
-  lastMonthlySyncLabel: string;
+  lastSemiannualSyncLabel: string;
   centralPriceDbOperational: ExternalPriceDbOperationalStatus;
 }
 
@@ -193,9 +193,9 @@ export function createOperationalChecklist(
       tone: latestReferenceMonth ? "ok" : "warning",
     },
     {
-      id: "monthly-sync",
+      id: "semiannual-sync",
       label: "Sync semestral",
-      status: environment.lastMonthlySyncLabel,
+      status: environment.lastSemiannualSyncLabel,
       detail: environment.centralPriceDbOperational.syncDetail,
       technicalDetail: environment.centralPriceDbOperational.safeError
         ? "Erro sanitizado para diagnóstico; logs completos devem ficar apenas no workflow/admin."

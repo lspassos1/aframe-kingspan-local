@@ -25,7 +25,7 @@ describe("operational environment status", () => {
       dailyLimitLabel: "4/usuário · 6/IP · 80/global",
       centralPriceDbConfigured: false,
       centralPriceDbLabel: "não configurada",
-      lastMonthlySyncLabel: "sem configuração",
+      lastSemiannualSyncLabel: "sem configuração",
       centralPriceDbOperational: {
         configured: false,
         status: "missing-config",
@@ -68,7 +68,7 @@ describe("operational environment status", () => {
 
     expect(status.centralPriceDbConfigured).toBe(true);
     expect(status.centralPriceDbLabel).toBe("configurada");
-    expect(status.lastMonthlySyncLabel).toBe("sem registro");
+    expect(status.lastSemiannualSyncLabel).toBe("sem registro");
     expect(status.centralPriceDbOperational.status).toBe("missing-sync");
     expect(JSON.stringify(status)).not.toContain("supabase.co");
     expect(JSON.stringify(status)).not.toContain("anon-public-read-key");

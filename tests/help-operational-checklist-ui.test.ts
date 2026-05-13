@@ -20,7 +20,7 @@ const paidEnvironment: OperationalEnvironmentStatus = {
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,
   centralPriceDbLabel: "não configurada",
-  lastMonthlySyncLabel: "sem configuração",
+  lastSemiannualSyncLabel: "sem configuração",
   centralPriceDbOperational: createExternalPriceDbOperationalStatus({ configured: false }),
 };
 

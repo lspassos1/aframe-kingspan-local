@@ -32,7 +32,7 @@ export function createOperationalEnvironmentStatus(env: Record<string, string | 
     dailyLimitLabel: `${perUserLimit}/usuário · ${perIpLimit}/IP · ${globalLimit}/global`,
     centralPriceDbConfigured,
     centralPriceDbLabel: centralPriceDbOperational.centralLabel,
-    lastMonthlySyncLabel: centralPriceDbOperational.syncLabel,
+    lastSemiannualSyncLabel: centralPriceDbOperational.syncLabel,
     centralPriceDbOperational,
   };
 }
