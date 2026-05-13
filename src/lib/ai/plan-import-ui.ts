@@ -65,8 +65,8 @@ export const planImportStateCopy: Record<PlanImportState, PlanImportStateCopy> =
   },
   "limit-exceeded": {
     badge: "Limite diario",
-    title: "Limite de IA atingido",
-    description: "O preenchimento manual continua disponivel.",
+    title: "Envio por IA indisponivel hoje",
+    description: "Continue manualmente ou tente novamente amanha.",
   },
   applied: {
     badge: "Aplicado",
@@ -105,12 +105,22 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
     },
     "limit-exceeded": {
       badge: "Limite gratuito",
-      title: "Limite gratuito atingido",
-      description: "O preenchimento manual continua disponivel sem acionar cobrança automática.",
+      title: "Envio por IA indisponivel hoje",
+      description: "Continue manualmente ou tente novamente amanha.",
     },
   };
 
   return freeCloudCopy[state] ?? planImportStateCopy[state];
+}
+
+export function canUsePlanImportUpload({
+  planExtractEnabled,
+  state,
+}: {
+  planExtractEnabled: boolean;
+  state: PlanImportState;
+}) {
+  return planExtractEnabled && state !== "uploading" && state !== "analyzing" && state !== "limit-exceeded";
 }
 
 export function getPlanImportStateFromResponse({
@@ -129,11 +139,12 @@ export function getPlanImportStateFromResponse({
 }
 
 export function getPlanImportPayloadMessage(payload: unknown, state: PlanImportState) {
+  if (state === "limit-exceeded") return "Envio por IA indisponivel hoje. Continue manualmente ou tente novamente amanha.";
+
   if (typeof payload === "object" && payload !== null && "message" in payload && typeof payload.message === "string") {
     return payload.message;
   }
 
-  if (state === "limit-exceeded") return "Limite diario de IA atingido. Voce ainda pode preencher manualmente.";
   if (state === "cache-hit") return planImportStateCopy["cache-hit"].description;
   if (state === "review-ready") return "Extracao concluida. Revise os campos antes de aplicar.";
   return "Nao foi possivel analisar a planta agora.";
