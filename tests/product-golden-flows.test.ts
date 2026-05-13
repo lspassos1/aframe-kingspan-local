@@ -114,7 +114,7 @@ describe("golden product flows", () => {
     expect(html).toContain("Exportação");
     expect(html).toContain("Modo gratuito");
     expect(html).toContain("Análise");
-    expect(html).toContain("Revisao detalhada");
+    expect(html).toContain("Revisão detalhada");
     expect(html).toContain("Continuar manualmente disponível");
     expect(html).toContain("Sem cobrança automática");
     expectNoPublicProviderLeakage(html);

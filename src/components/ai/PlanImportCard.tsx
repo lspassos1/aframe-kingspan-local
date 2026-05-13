@@ -380,12 +380,12 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
 
             {shouldShowMessage ? (
               <div className="mt-4 flex items-start gap-2 rounded-lg border bg-background/75 p-3 text-sm">
-                {state === "error" || state === "limit-exceeded" ? (
+                {state === "error" ? (
                   <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
                 ) : (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
                 )}
-                <span className={cn((state === "error" || state === "limit-exceeded") && "text-destructive")}>{message}</span>
+                <span className={cn(state === "error" && "text-destructive")}>{message}</span>
               </div>
             ) : null}
           </div>
