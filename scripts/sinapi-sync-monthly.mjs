@@ -323,7 +323,7 @@ export function parseSinapiSyncArgs(argv) {
 
 export function formatSinapiDryRunSummary(result) {
   return [
-    "SINAPI monthly sync dry-run",
+    "SINAPI semiannual sync dry-run",
     `Source: ${result.source.title || "unknown"} (${result.source.state || "UF?"} ${result.source.referenceDate || "reference?"})`,
     `Rows: ${result.importedRows}`,
     `Rows requiring review: ${result.reviewRows}`,

@@ -194,7 +194,7 @@ export function createOperationalChecklist(
     },
     {
       id: "monthly-sync",
-      label: "Sync mensal",
+      label: "Sync semestral",
       status: environment.lastMonthlySyncLabel,
       detail: environment.centralPriceDbOperational.syncDetail,
       technicalDetail: environment.centralPriceDbOperational.safeError

@@ -1,9 +1,9 @@
-name: Monthly SINAPI Sync Dry Run
+name: Semiannual SINAPI Sync Dry Run
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 6 1 * *"
+    - cron: "17 6 1 1,7 *"
 
 permissions:
   contents: read

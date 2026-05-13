@@ -32,7 +32,7 @@ describe("operational environment status", () => {
         centralLabel: "não configurada",
         syncLabel: "sem configuração",
         detail: "Base central não é dependência: use importação local ou fonte manual revisável.",
-        syncDetail: "Configure leitura pública antes de tratar sync mensal como disponível.",
+        syncDetail: "Configure leitura pública antes de tratar a atualização semestral como disponível.",
         technicalDetail: "Runtime sem configuração pública de leitura. Chave de serviço não pertence ao app.",
         tone: "muted",
         stale: false,

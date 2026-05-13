@@ -276,7 +276,7 @@ Check:
 - Spreadsheet/PDF export does not call AI or remote DB.
 - Export text stays preliminary.
 
-## Monthly SINAPI Sync Procedure
+## Semiannual SINAPI Sync Procedure
 
 Dry-run is always the first step:
 
@@ -318,7 +318,7 @@ Write-mode expectations:
 
 GitHub Actions:
 
-- dry-run may run on schedule.
+- dry-run may run on the semiannual schedule.
 - write mode must be manual or explicitly gated.
 - write mode must not run on `pull_request`.
 - write mode must use repository/admin secrets only.

@@ -8,7 +8,7 @@
     "referenceDate": "2026-05",
     "regime": "desonerado",
     "version": "2026-05-dry-run",
-    "notes": "Fixture sanitizada para validar o fluxo mensal sem escrita."
+    "notes": "Fixture sanitizada para validar o fluxo semestral sem escrita."
   },
   "rows": [
     {

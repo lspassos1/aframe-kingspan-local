@@ -1,4 +1,4 @@
-name: Monthly SINAPI Sync Write
+name: Manual SINAPI Sync Write
 
 on:
   workflow_dispatch:

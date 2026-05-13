@@ -11,7 +11,7 @@ import {
 
 const fixturePath = join(process.cwd(), "scripts/fixtures/sinapi-monthly-dry-run-sample.json");
 
-describe("SINAPI monthly sync dry-run", () => {
+describe("SINAPI semiannual sync dry-run", () => {
   it("validates fixture rows without enabling write mode", async () => {
     const input = await readSinapiSyncInput(fixturePath);
     const result = runSinapiSyncDryRun(input);
@@ -164,5 +164,12 @@ describe("SINAPI monthly sync dry-run", () => {
     expect(content).not.toContain(forbiddenCredentialRole);
     expect(content).not.toMatch(new RegExp(forbiddenWriteTerms, "i"));
     expect(content).toContain("--dry-run");
+  });
+
+  it("runs the scheduled dry-run on the semiannual cadence", () => {
+    const workflow = readFileSync(join(process.cwd(), ".github/workflows/sinapi-monthly-sync-dry-run.yml"), "utf8");
+
+    expect(workflow).toContain('cron: "17 6 1 1,7 *"');
+    expect(workflow).toContain("Semiannual SINAPI Sync Dry Run");
   });
 });
