@@ -9,6 +9,14 @@ describe("SINAPI monthly sync write mode", () => {
   it("keeps dry-run as the default mode", () => {
     expect(parseSinapiSyncArgs([])).toMatchObject({ dryRun: true, write: false });
     expect(parseSinapiSyncArgs(["--write"])).toMatchObject({ dryRun: false, write: true });
+    expect(parseSinapiSyncArgs(["--write", "--input", fixturePath])).toMatchObject({ dryRun: false, write: true, inputProvided: true });
+  });
+
+  it("requires an explicit input path in the manual write workflow", () => {
+    const workflow = readFileSync(join(process.cwd(), ".github/workflows/sinapi-monthly-sync-write.yml"), "utf8");
+
+    expect(workflow).toContain("required: true");
+    expect(workflow).not.toContain("default: \"scripts/fixtures/sinapi-monthly-dry-run-sample.json\"");
   });
 
   it("requires Supabase admin-only secrets before writing", async () => {
@@ -56,8 +64,8 @@ describe("SINAPI monthly sync write mode", () => {
       "POST price_sync_runs started",
       "POST price_sources staging",
       "POST price_items ",
-      "PATCH price_sources active",
       "PATCH price_sources archived",
+      "PATCH price_sources active",
       "PATCH price_sync_runs completed",
     ]);
     expect(calls[2].body).toHaveLength(3);
@@ -71,10 +79,11 @@ describe("SINAPI monthly sync write mode", () => {
       price_status: "valid",
       requires_review: false,
     });
-    expect(calls[3].body).toMatchObject({ status: "active" });
-    expect(calls[4].url).toContain("status=eq.active");
-    expect(calls[4].url).toContain("state=eq.BA");
-    expect(calls[4].url).toContain("id=neq.source-staging-1");
+    expect(calls[3].body).toMatchObject({ status: "archived" });
+    expect(calls[3].url).toContain("status=eq.active");
+    expect(calls[3].url).toContain("state=eq.BA");
+    expect(calls[3].url).toContain("id=neq.source-staging-1");
+    expect(calls[4].body).toMatchObject({ status: "active" });
   });
 
   it("normalizes source state before creating active source keys", async () => {
@@ -122,6 +131,28 @@ describe("SINAPI monthly sync write mode", () => {
 
     expect(dryRun.valid).toBe(false);
     expect(dryRun.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "negative-component-cost", severity: "invalid" })]));
+    await expect(
+      runSinapiSyncWrite(invalidInput, {
+        env: {
+          SUPABASE_URL: "https://prices.example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role-test-key",
+        },
+        fetcher: vi.fn(),
+      })
+    ).rejects.toThrow("Cannot write invalid SINAPI input.");
+  });
+
+  it("rejects non-numeric component costs before write mode creates audit records", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const invalidInput = {
+      ...input,
+      rows: [{ ...input.rows[0], hh: "--" }],
+    };
+
+    const dryRun = runSinapiSyncDryRun(invalidInput);
+
+    expect(dryRun.valid).toBe(false);
+    expect(dryRun.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "invalid-component-cost", severity: "invalid" })]));
     await expect(
       runSinapiSyncWrite(invalidInput, {
         env: {
@@ -208,12 +239,54 @@ describe("SINAPI monthly sync write mode", () => {
       "POST price_sync_runs started",
       "POST price_sources staging",
       "POST price_items ",
-      "PATCH price_sources active",
       "PATCH price_sources archived",
+      "PATCH price_sources active",
       "PATCH price_sync_runs completed",
       "PATCH price_sync_runs failed",
     ]);
     expect(calls).not.toEqual(expect.arrayContaining([expect.objectContaining({ table: "price_sources", body: expect.objectContaining({ status: "failed" }) })]));
+  });
+
+  it("restores the previous active source if promotion fails after archiving", async () => {
+    const input = await readSinapiSyncInput(fixturePath);
+    const calls = [];
+    const fetcher = vi.fn(async (url, init) => {
+      const body = init.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ method: init.method, table: getTableName(url), url: String(url), body });
+      if (String(url).includes("/price_sync_runs") && init.method === "POST") return jsonResponse([{ id: "sync-run-1" }]);
+      if (String(url).includes("/price_sources") && init.method === "POST") return jsonResponse([{ id: "source-staging-1" }]);
+      if (String(url).includes("/price_items") && init.method === "POST") {
+        return jsonResponse(body.map((row, index) => ({ ...row, id: `price-item-${index + 1}` })));
+      }
+      if (String(url).includes("/price_sources") && init.method === "PATCH" && body?.status === "archived") return jsonResponse([{ id: "source-active-previous" }]);
+      if (String(url).includes("/price_sources") && init.method === "PATCH" && body?.status === "active" && String(url).includes("source-staging-1")) {
+        return jsonResponse({ error: "unique active source violation" }, 409);
+      }
+      if (init.method === "PATCH") return jsonResponse([{ id: "patched" }]);
+      return jsonResponse([]);
+    });
+
+    await expect(
+      runSinapiSyncWrite(input, {
+        env: {
+          SUPABASE_URL: "https://prices.example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "service-role-test-key",
+        },
+        fetcher,
+      })
+    ).rejects.toThrow("Supabase price_sources PATCH failed with status 409");
+
+    expect(calls.map((call) => `${call.method} ${call.table} ${call.body?.status ?? ""}`)).toEqual([
+      "POST price_sync_runs started",
+      "POST price_sources staging",
+      "POST price_items ",
+      "PATCH price_sources archived",
+      "PATCH price_sources active",
+      "PATCH price_sources active",
+      "PATCH price_sources failed",
+      "PATCH price_sync_runs failed",
+    ]);
+    expect(calls[5].url).toContain("id=eq.source-active-previous");
   });
 
   it("keeps service role key references out of app and client runtime code", () => {

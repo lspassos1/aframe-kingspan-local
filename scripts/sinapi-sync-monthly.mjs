@@ -123,6 +123,8 @@ export async function runSinapiSyncWrite(input, options = {}) {
   };
   let syncRun;
   let source;
+  let archivedPreviousActiveSources = [];
+  let activeSourcePromoted = false;
   let keepActiveSourceOnFailure = false;
 
   try {
@@ -146,8 +148,9 @@ export async function runSinapiSyncWrite(input, options = {}) {
     const insertedItems = await client.insertMany("price_items", priceItems, options.batchSize ?? defaultWriteBatchSize);
     validateWriteCounts(dryRun, insertedItems);
 
+    archivedPreviousActiveSources = await archivePreviousActiveSource(client, { sourceId, sourceType, source: dryRun.source, referenceMonth });
     await client.patch("price_sources", { status: "active" }, { id: `eq.${sourceId}` });
-    await archivePreviousActiveSource(client, { sourceId, sourceType, source: dryRun.source, referenceMonth });
+    activeSourcePromoted = true;
     keepActiveSourceOnFailure = true;
     await client.patch(
       "price_sync_runs",
@@ -171,6 +174,9 @@ export async function runSinapiSyncWrite(input, options = {}) {
       archivedPreviousActive: true,
     };
   } catch (error) {
+    if (!activeSourcePromoted && archivedPreviousActiveSources.length > 0) {
+      await restorePreviousActiveSources(client, archivedPreviousActiveSources).catch(() => undefined);
+    }
     await recordWriteFailure(client, syncRun, source, error, { failSource: !keepActiveSourceOnFailure });
     throw error;
   }
@@ -235,7 +241,7 @@ export function validateSinapiDryRunRow(row, rowNumber, expectedState = "") {
     issues.push(createIssue("unknown-regime", `Row ${rowNumber} has unsupported regime "${regime}".`, rowNumber));
     if (status === "valid") status = "requires_review";
   }
-  for (const componentIssue of getNegativeComponentIssues(data, rowNumber)) {
+  for (const componentIssue of getComponentValueIssues(data, rowNumber)) {
     issues.push(componentIssue);
     status = "invalid";
   }
@@ -256,6 +262,7 @@ export function parseSinapiSyncArgs(argv) {
     dryRun: true,
     write: false,
     inputPath: defaultInputPath,
+    inputProvided: false,
     expectedState: undefined,
     json: false,
   };
@@ -269,6 +276,7 @@ export function parseSinapiSyncArgs(argv) {
     else if (value === "--json") args.json = true;
     else if (value === "--input") {
       args.inputPath = path.resolve(readRequiredArgValue(argv, index, "--input"));
+      args.inputProvided = true;
       index += 1;
     } else if (value === "--expected-state") {
       args.expectedState = readRequiredArgValue(argv, index, "--expected-state");
@@ -303,9 +311,10 @@ export function formatSinapiDryRunSummary(result) {
 async function main() {
   const args = parseSinapiSyncArgs(process.argv.slice(2));
   if (args.help) {
-    console.log("Usage: node scripts/sinapi-sync-monthly.mjs --dry-run [--input file.json] [--expected-state UF] [--json]");
+    console.log("Usage: node scripts/sinapi-sync-monthly.mjs --dry-run [--input file.json] [--expected-state UF] [--json]\n       node scripts/sinapi-sync-monthly.mjs --write --input file.json [--expected-state UF] [--json]");
     return;
   }
+  if (args.write && !args.inputProvided) throw new Error("SINAPI write mode requires --input with an explicit source file.");
   const input = await readSinapiSyncInput(args.inputPath);
   const result = args.write ? await runSinapiSyncWrite(input, { expectedState: args.expectedState }) : runSinapiSyncDryRun(input, { expectedState: args.expectedState });
   console.log(args.json ? JSON.stringify(result, null, 2) : formatSinapiDryRunSummary(result));
@@ -469,7 +478,7 @@ function validateWriteCounts(dryRun, insertedItems) {
 }
 
 async function archivePreviousActiveSource(client, { sourceId, sourceType, source, referenceMonth }) {
-  await client.patch(
+  return client.patch(
     "price_sources",
     { status: "archived" },
     {
@@ -481,6 +490,12 @@ async function archivePreviousActiveSource(client, { sourceId, sourceType, sourc
       id: `neq.${sourceId}`,
     }
   );
+}
+
+async function restorePreviousActiveSources(client, sources) {
+  for (const source of sources) {
+    if (source?.id) await client.patch("price_sources", { status: "active" }, { id: `eq.${source.id}` });
+  }
 }
 
 async function recordWriteFailure(client, syncRun, source, error, options = {}) {
@@ -547,7 +562,7 @@ function toNonNegativeNumber(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function getNegativeComponentIssues(data, rowNumber) {
+function getComponentValueIssues(data, rowNumber) {
   return [
     ["material", "material"],
     ["mao_obra", "labor"],
@@ -558,7 +573,8 @@ function getNegativeComponentIssues(data, rowNumber) {
   ].flatMap(([key, label]) => {
     if (!hasValue(data[key])) return [];
     const value = toNumber(data[key]);
-    if (!Number.isFinite(value) || value >= 0) return [];
+    if (!Number.isFinite(value)) return [createIssue("invalid-component-cost", `Row ${rowNumber} has non-numeric ${label} value.`, rowNumber, "invalid")];
+    if (value >= 0) return [];
     return [createIssue("negative-component-cost", `Row ${rowNumber} has negative ${label} value.`, rowNumber, "invalid")];
   });
 }

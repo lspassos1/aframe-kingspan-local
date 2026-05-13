@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       input_path:
-        description: "Repository fixture/input path to sync"
-        required: false
-        default: "scripts/fixtures/sinapi-monthly-dry-run-sample.json"
+        description: "Repository input path to sync; must be an intentional production source, not the sample fixture"
+        required: true
       expected_state:
         description: "Expected UF/state for validation"
         required: false
