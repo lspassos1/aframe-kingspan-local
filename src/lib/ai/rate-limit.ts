@@ -69,8 +69,11 @@ export function createMemoryAiRateLimitStore(entries = sharedMemoryStore): AiRat
 }
 
 export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, fetcher: typeof fetch = fetch): AiRateLimitStore | null {
-  const redisUrl = env.UPSTASH_REDIS_REST_URL?.trim() || env.KV_REST_API_URL?.trim();
-  const redisToken = env.UPSTASH_REDIS_REST_TOKEN?.trim() || env.KV_REST_API_TOKEN?.trim();
+  const upstashUrl = env.UPSTASH_REDIS_REST_URL?.trim();
+  const upstashToken = env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const kvUrl = env.KV_REST_API_URL?.trim();
+  const kvToken = env.KV_REST_API_TOKEN?.trim();
+  const [redisUrl, redisToken] = upstashUrl && upstashToken ? [upstashUrl, upstashToken] : kvUrl && kvToken ? [kvUrl, kvToken] : [undefined, undefined];
   if (!redisUrl || !redisToken) return null;
   const redisEndpointBase: string = redisUrl;
   const redisAuthorizationToken: string = redisToken;

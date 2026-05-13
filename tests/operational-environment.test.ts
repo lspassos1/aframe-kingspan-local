@@ -101,4 +101,17 @@ describe("operational environment status", () => {
     expect(JSON.stringify(status)).not.toContain("super-secret");
     expect(JSON.stringify(status)).not.toContain("upstash.io");
   });
+
+  it("keeps UPSTASH Redis env vars compatible for rate-limit storage readiness", () => {
+    const status = createOperationalEnvironmentStatus({
+      AI_RATE_LIMIT_SALT: "super-secret-salt",
+      UPSTASH_REDIS_REST_URL: "https://safe-example.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "super-secret-token",
+    });
+
+    expect(status.aiRateLimitSaltConfigured).toBe(true);
+    expect(status.aiRateLimitStorageConfigured).toBe(true);
+    expect(JSON.stringify(status)).not.toContain("super-secret");
+    expect(JSON.stringify(status)).not.toContain("upstash.io");
+  });
 });
