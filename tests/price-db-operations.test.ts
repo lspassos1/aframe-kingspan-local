@@ -69,6 +69,36 @@ describe("external price DB operational status", () => {
     expect(status.detail).toContain("preços ainda exigem aprovação");
   });
 
+  it("keeps semiannual references fresh until the next cadence window", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-01-01T00:00:00Z" },
+      now: "2026-07-01T00:00:00Z",
+    });
+
+    expect(status).toMatchObject({
+      status: "ready",
+      syncLabel: "atualizada 2026-01",
+      stale: false,
+    });
+  });
+
+  it("marks semiannual references stale after the operational grace window", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-01-01T00:00:00Z" },
+      now: "2026-08-01T00:00:00Z",
+    });
+
+    expect(status).toMatchObject({
+      status: "stale-data",
+      syncLabel: "dados antigos",
+      stale: true,
+    });
+  });
+
   it("accepts SQL date snapshots as operational reference months", () => {
     const status = createExternalPriceDbOperationalStatus({
       configured: true,

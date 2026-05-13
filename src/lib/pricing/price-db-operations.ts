@@ -38,7 +38,8 @@ export interface ExternalPriceDbOperationalStatus {
   safeError?: string;
 }
 
-const defaultStaleAfterDays = 45;
+// Jan/Jul SINAPI cadence plus operational grace before warning as stale.
+const defaultStaleAfterDays = 210;
 const serviceRoleKeyPattern = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
 const serviceRolePattern = ["service", "role"].join("_");
 const secretAssignmentPattern = new RegExp(`\\b(${serviceRoleKeyPattern}|${serviceRolePattern})\\s*[:=]\\s*\\S+`, "gi");
