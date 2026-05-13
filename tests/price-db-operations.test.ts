@@ -110,18 +110,35 @@ describe("external price DB operational status", () => {
     expect(JSON.stringify(status)).not.toContain("2026-13");
   });
 
+  it("rejects malformed reference month suffixes before ready status", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05-extra", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      now: "2026-05-13T00:00:00Z",
+    });
+
+    expect(status.status).toBe("missing-sync");
+    expect(status.lastReferenceMonth).toBe("");
+    expect(JSON.stringify(status)).not.toContain("2026-05-extra");
+  });
+
   it("sanitizes secret-shaped operational errors", () => {
     const sanitized = sanitizeOperationalError(
-      "SUPABASE_SERVICE_ROLE_KEY=abc123 service_role=short Authorization: Bearer token123 Bearer loose456 https://host/path apikey: verylongsecretvalue1234567890"
+      "SUPABASE_SERVICE_ROLE_KEY=abc123 service_role=short Authorization: Bearer token123 Bearer loose456 https://host/path apikey: verylongsecretvalue1234567890 x-api-key: short123 api_key=short456\n    at query (/repo/src/db.ts:10:3)"
     );
 
     expect(sanitized).toContain("[url]");
     expect(sanitized).toContain("Authorization [redacted]");
     expect(sanitized).toContain("Bearer [redacted]");
     expect(sanitized).toContain("apikey [redacted]");
+    expect(sanitized).toContain("x-api-key [redacted]");
+    expect(sanitized).toContain("api_key [redacted]");
     expect(sanitized).not.toContain("abc123");
     expect(sanitized).not.toContain("short");
     expect(sanitized).not.toContain("token123");
     expect(sanitized).not.toContain("loose456");
+    expect(sanitized).not.toContain("/repo/src/db.ts");
+    expect(sanitized).not.toContain(" at query");
   });
 });

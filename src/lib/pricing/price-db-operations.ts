@@ -138,17 +138,24 @@ export function createExternalPriceDbOperationalStatus(input: ExternalPriceDbOpe
 }
 
 export function sanitizeOperationalError(message: string | undefined): string {
-  const sanitized = String(message ?? "")
+  const sanitized = removeStackTraceLines(message)
     .replace(/https?:\/\/\S+/gi, "[url]")
     .replace(secretAssignmentPattern, "$1=[redacted]")
     .replace(/\bAuthorization\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/gi, "Authorization [redacted]")
     .replace(/\bAuthorization\s+Bearer\s+[^\s,;]+/gi, "Authorization [redacted]")
     .replace(/\bBearer\s+[^\s,;]+/gi, "Bearer [redacted]")
-    .replace(/\bapikey\s*[:=]\s*[^\s,;]+/gi, "apikey [redacted]")
+    .replace(/\b(x-api-key|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "$1 [redacted]")
     .replace(new RegExp(`\\b(${serviceRoleKeyPattern}|${serviceRolePattern})\\b`, "gi"), "[redacted]")
     .replace(/[A-Za-z0-9_-]{28,}/g, "[redacted]")
     .trim();
   return sanitized.slice(0, 180);
+}
+
+function removeStackTraceLines(message: string | undefined) {
+  return String(message ?? "")
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*at\s+/.test(line))
+    .join(" ");
 }
 
 function isFailedRun(run: ExternalPriceDbSyncRunSnapshot | undefined) {
@@ -165,7 +172,7 @@ function isActiveSource(source: ExternalPriceDbSourceSnapshot | undefined) {
 
 function normalizeReferenceMonth(value: string | undefined) {
   const normalized = String(value ?? "").trim();
-  const match = normalized.match(/^(\d{4})-(\d{2})/);
+  const match = normalized.match(/^(\d{4})-(\d{2})$/);
   if (!match) return "";
   const month = Number(match[2]);
   if (!Number.isInteger(month) || month < 1 || month > 12) return "";
