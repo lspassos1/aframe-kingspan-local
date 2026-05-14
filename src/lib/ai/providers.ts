@@ -4,6 +4,7 @@ import { parsePlanExtractResult, type PlanExtractResult } from "@/lib/ai/plan-ex
 import { AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError, getAiTaskProviderId, resolveAiTaskProvider, type AiCloudProviderId } from "@/lib/ai/free-cloud-router";
 import { readAiProductMode } from "@/lib/ai/mode";
+import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 export type AiPlanExtractProviderId = "gemini" | "openai" | "openrouter" | "groq";
 
@@ -378,7 +379,7 @@ function isRetryableReviewError(error: unknown) {
 
 function serializeReviewError(error: unknown, retryable: boolean) {
   return {
-    message: error instanceof Error ? error.message : "Erro desconhecido.",
+    message: sanitizeAiDiagnosticMessage(error instanceof Error ? error.message : "Erro desconhecido."),
     code: error instanceof AiRouterError ? error.code : error instanceof AiProviderUnavailableError ? error.code : undefined,
     retryable,
   };

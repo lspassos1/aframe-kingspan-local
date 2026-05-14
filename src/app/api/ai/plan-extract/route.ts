@@ -13,6 +13,7 @@ import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtrac
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError } from "@/lib/ai/free-cloud-router";
 import { readAiProductMode } from "@/lib/ai/mode";
+import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ function jsonResponse(body: Record<string, unknown>, init?: ResponseInit) {
 export function serializeProviderErrorsForClient(providerErrors: Array<{ provider: string; message: string }>) {
   return providerErrors.map((providerError) => ({
     provider: providerError.provider,
-    message: sanitizeProviderErrorMessage(providerError.message),
+    message: sanitizeAiDiagnosticMessage(providerError.message),
   }));
 }
 
@@ -54,13 +55,6 @@ function getErrorMessage(error: unknown) {
   return { message: "Nao foi possivel analisar a planta agora." };
 }
 
-export function sanitizeProviderErrorMessage(message: string) {
-  return message
-    .replace(/https?:\/\/\S+/gi, "[url]")
-    .replace(/\b(?:Bearer|Authorization|apikey|api_key|x-api-key)\b\s*[:=]?\s*[^\s,;]+/gi, "[redacted]")
-    .replace(/[A-Za-z0-9_-]{28,}/g, "[redacted]");
-}
-
 function logPlanExtractFailure(error: unknown) {
   const mode = readAiProductMode(process.env);
 
@@ -69,7 +63,7 @@ function logPlanExtractFailure(error: unknown) {
       mode,
       providers: error.providerErrors.map((providerError) => ({
         provider: providerError.provider,
-        message: sanitizeProviderErrorMessage(providerError.message),
+        message: sanitizeAiDiagnosticMessage(providerError.message),
       })),
     });
     return;
@@ -79,14 +73,14 @@ function logPlanExtractFailure(error: unknown) {
     console.warn("ai_plan_extract_failed", {
       mode,
       code: error.code,
-      message: sanitizeProviderErrorMessage(error.message),
+      message: sanitizeAiDiagnosticMessage(error.message),
     });
     return;
   }
 
   console.error("ai_plan_extract_unexpected", {
     mode,
-    error: sanitizeProviderErrorMessage(error instanceof Error ? error.message : String(error)),
+    error: sanitizeAiDiagnosticMessage(error instanceof Error ? error.message : String(error)),
   });
 }
 

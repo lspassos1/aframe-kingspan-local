@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeProviderErrorMessage, serializeProviderErrorsForClient } from "@/app/api/ai/plan-extract/route";
+import { serializeProviderErrorsForClient } from "@/app/api/ai/plan-extract/route";
+import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 describe("plan extract route diagnostics", () => {
   it("redacts provider URLs and token-like values from safe diagnostics", () => {
-    const sanitized = sanitizeProviderErrorMessage(
+    const sanitized = sanitizeAiDiagnosticMessage(
       "Provider failed at https://example.test/path with Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 and x-api-key=short-key"
     );
 

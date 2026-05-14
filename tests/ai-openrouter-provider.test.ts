@@ -240,6 +240,44 @@ describe("OpenRouter plan review provider", () => {
     });
   });
 
+  it("sanitizes retryable OpenRouter review errors before returning success payloads", async () => {
+    const result = await extractPlanWithProviderChain(
+      {
+        mimeType: "image/png",
+        fileBase64: "abc",
+      },
+      {
+        env: {
+          AI_MODE: "free-cloud",
+          AI_PLAN_PRIMARY_PROVIDER: "gemini",
+          AI_PLAN_REVIEW_PROVIDER: "openrouter",
+          GEMINI_API_KEY: "gemini-key",
+          OPENROUTER_API_KEY: "openrouter-key",
+          OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.0-flash-exp:free",
+        },
+        async callProvider(provider) {
+          return {
+            result: primaryResult,
+            provider: provider.id,
+            model: provider.model,
+          };
+        },
+        async callReviewProvider() {
+          throw new Error("OpenRouter failed at https://openrouter.ai/api/v1 with Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456");
+        },
+      }
+    );
+
+    expect(result.review).toMatchObject({
+      status: "unavailable",
+      provider: "openrouter",
+      error: {
+        message: "OpenRouter failed at [url] with [redacted] [redacted]",
+        retryable: true,
+      },
+    });
+  });
+
   it("marks missing OpenRouter credentials as deterministic review unavailability", async () => {
     let reviewCalls = 0;
     const result = await extractPlanWithProviderChain(
