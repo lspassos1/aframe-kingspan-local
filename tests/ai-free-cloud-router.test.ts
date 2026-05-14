@@ -63,6 +63,25 @@ describe("free-cloud AI router", () => {
     });
   });
 
+  it("accepts the OpenRouter free models router in free-cloud mode", () => {
+    expect(
+      resolveAiTaskProvider("plan-review", {
+        env: {
+          AI_MODE: "free-cloud",
+          AI_PLAN_REVIEW_PROVIDER: "openrouter",
+          OPENROUTER_API_KEY: "openrouter-key",
+          OPENROUTER_PLAN_REVIEW_MODEL: "openrouter/free",
+        },
+      })
+    ).toMatchObject({
+      id: "openrouter",
+      task: "plan-review",
+      supportsVision: true,
+      supportsPdf: false,
+      supportsJsonSchema: true,
+    });
+  });
+
   it("blocks paid OpenRouter models in free-cloud mode", () => {
     expect(() =>
       resolveAiTaskProvider("plan-review", {

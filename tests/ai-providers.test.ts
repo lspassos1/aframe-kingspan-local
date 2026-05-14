@@ -113,7 +113,7 @@ describe("AI plan extraction providers", () => {
     const providers = getConfiguredAiPlanExtractProviders({
       AI_MODE: "free-cloud",
       OPENROUTER_API_KEY: "openrouter-key",
-      OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.5-flash:free",
+      OPENROUTER_PLAN_REVIEW_MODEL: "openrouter/free",
     });
 
     expect(providers.map((provider) => provider.id)).toEqual(["openrouter"]);

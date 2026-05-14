@@ -36,7 +36,7 @@ OpenAI não deve ser removido. A chave `OPENAI_API_KEY` continua server-side e s
 | Fallback textual opcional | Cerebras ou SambaNova Free | `AI_TEXT_FALLBACK_PROVIDER=cerebras` ou `sambanova` |
 | Modo Pro explícito | OpenAI | somente com `AI_MODE=paid` |
 
-OpenRouter deve usar apenas modelos gratuitos no modo `free-cloud`. Neste contrato inicial, OpenRouter é tratado como segunda leitura visual sem suporte PDF genérico; suporte PDF dependerá do modelo/rota em PR futuro. No modo `free-cloud`, `OPENROUTER_PLAN_REVIEW_MODEL` é obrigatório para OpenRouter e o router só aceita IDs de modelo com sufixo `:free`. Se não houver modelo gratuito compatível com a tarefa, a extração primária com Gemini continua e a segunda leitura fica marcada como indisponível/pendente.
+OpenRouter deve usar apenas modelos gratuitos no modo `free-cloud`. Neste contrato inicial, OpenRouter é tratado como segunda leitura visual sem suporte PDF genérico; suporte PDF dependerá do modelo/rota em PR futuro. No modo `free-cloud`, `OPENROUTER_PLAN_REVIEW_MODEL` é obrigatório para OpenRouter e o router aceita IDs de modelo com sufixo `:free` ou o roteador gratuito explícito `openrouter/free`. Se não houver modelo gratuito compatível com a tarefa, a extração primária com Gemini continua e a segunda leitura fica marcada como indisponível/pendente.
 
 Modelos configuráveis por provider:
 
@@ -62,7 +62,7 @@ GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_FREE_TIER_NOTICE=true
 OPENROUTER_API_KEY=
-OPENROUTER_PLAN_REVIEW_MODEL=google/gemini-2.0-flash-exp:free
+OPENROUTER_PLAN_REVIEW_MODEL=openrouter/free
 GROQ_API_KEY=
 GROQ_TEXT_MODEL=llama-3.1-8b-instant
 CEREBRAS_API_KEY=
