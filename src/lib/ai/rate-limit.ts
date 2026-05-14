@@ -174,8 +174,8 @@ export function isAiRateLimitSetupReason(reason: string | undefined) {
 }
 
 export async function releaseAiDailyLimitDecision(decision: AiRateLimitDecision, store: AiRateLimitStore | null = createRedisAiRateLimitStore()) {
-  if (!decision.allowed || !store || decision.consumedKeys?.length === 0) return;
-  await Promise.allSettled((decision.consumedKeys ?? []).map((key) => store.decrement(key)));
+  if (!decision.allowed || !store || !decision.consumedKeys?.length) return;
+  await Promise.allSettled(decision.consumedKeys.map((key) => store.decrement(key)));
 }
 
 export async function checkAndConsumeAiDailyLimit(

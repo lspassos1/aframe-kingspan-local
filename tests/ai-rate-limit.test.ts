@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   checkAndConsumeAiDailyLimit,
   createAiRateLimitHeaders,
@@ -71,6 +71,28 @@ describe("AI daily rate limit", () => {
 
     const second = await checkAndConsumeAiDailyLimit(input, { env: { ...baseEnv, AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "1" }, store });
     expect(second).toMatchObject({ allowed: true, remaining: 0 });
+  });
+
+  it("does not attempt to release quota when no consumed keys are tracked", async () => {
+    const decrement = vi.fn();
+
+    await releaseAiDailyLimitDecision(
+      {
+        allowed: true,
+        scope: "user",
+        limit: 3,
+        remaining: 2,
+        resetAt: "2026-05-05T00:00:00.000Z",
+        storage: "memory",
+      },
+      {
+        kind: "memory",
+        increment: vi.fn(),
+        decrement,
+      }
+    );
+
+    expect(decrement).not.toHaveBeenCalled();
   });
 
   it("blocks the sixth IP request for anonymous usage when enabled", async () => {

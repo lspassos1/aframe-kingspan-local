@@ -193,6 +193,6 @@ export async function POST(request: NextRequest) {
     await releaseAiDailyLimitDecision(rateLimitDecision);
     const payload = getErrorMessage(error);
     const status = error instanceof AiPlanExtractError ? error.status : 502;
-    return jsonResponse(payload, { status, headers: rateLimitHeaders });
+    return jsonResponse(payload, { status });
   }
 }
