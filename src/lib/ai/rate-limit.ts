@@ -127,6 +127,10 @@ export function createRedisAiRateLimitStore(env: AiRateLimitEnv = process.env, f
   };
 }
 
+function createDefaultAiRateLimitStore(env: AiRateLimitEnv = process.env, fetcher: typeof fetch = fetch) {
+  return createRedisAiRateLimitStore(env, fetcher) ?? (env.NODE_ENV === "production" ? null : createMemoryAiRateLimitStore());
+}
+
 function getDateKey(now: Date) {
   return now.toISOString().slice(0, 10);
 }
@@ -173,7 +177,7 @@ export function isAiRateLimitSetupReason(reason: string | undefined) {
   return reason === "rate-limit-salt-required" || reason === "rate-limit-storage-unavailable" || reason === "rate-limit-store-error";
 }
 
-export async function releaseAiDailyLimitDecision(decision: AiRateLimitDecision, store: AiRateLimitStore | null = createRedisAiRateLimitStore()) {
+export async function releaseAiDailyLimitDecision(decision: AiRateLimitDecision, store: AiRateLimitStore | null = createDefaultAiRateLimitStore()) {
   if (!decision.allowed || !store || !decision.consumedKeys?.length) return;
   await Promise.allSettled(decision.consumedKeys.map((key) => store.decrement(key)));
 }
@@ -200,8 +204,8 @@ export async function checkAndConsumeAiDailyLimit(
     ip: getNumberEnv(env, "AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP", 5),
   };
 
-  const redisStore = options.store === undefined ? createRedisAiRateLimitStore(env, options.fetcher) : null;
-  const store = options.store ?? redisStore ?? (env.NODE_ENV === "production" ? null : createMemoryAiRateLimitStore());
+  const defaultStore = options.store === undefined ? createDefaultAiRateLimitStore(env, options.fetcher) : null;
+  const store = options.store ?? defaultStore;
 
   if (env.NODE_ENV === "production" && salt === "change-me-in-production") {
     return buildHeadersDecision({

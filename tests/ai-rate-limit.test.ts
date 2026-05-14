@@ -95,6 +95,24 @@ describe("AI daily rate limit", () => {
     expect(decrement).not.toHaveBeenCalled();
   });
 
+  it("releases shared memory quota when no persistent store is configured locally", async () => {
+    const input = {
+      feature: "plan-extract" as const,
+      userId: "user-local-refund",
+      ip: "203.0.113.45",
+      now: new Date("2026-05-04T12:00:00.000Z"),
+    };
+    const env = { ...baseEnv, AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "1" };
+
+    const first = await checkAndConsumeAiDailyLimit(input, { env });
+    expect(first).toMatchObject({ allowed: true, remaining: 0 });
+
+    await releaseAiDailyLimitDecision(first);
+
+    const second = await checkAndConsumeAiDailyLimit(input, { env });
+    expect(second).toMatchObject({ allowed: true, remaining: 0 });
+  });
+
   it("blocks the sixth IP request for anonymous usage when enabled", async () => {
     const store = createMemoryAiRateLimitStore(new Map());
     const env = { ...baseEnv, AI_ALLOW_ANONYMOUS_PLAN_EXTRACT: "true" };
