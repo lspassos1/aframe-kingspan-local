@@ -96,6 +96,12 @@ describe("AI daily rate limit", () => {
   });
 
   it("releases shared memory quota when no persistent store is configured locally", async () => {
+    const redisEnvKeys = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_URL", "KV_REST_API_TOKEN"] as const;
+    const previousRedisEnv = Object.fromEntries(redisEnvKeys.map((key) => [key, process.env[key]]));
+    redisEnvKeys.forEach((key) => {
+      delete process.env[key];
+    });
+
     const input = {
       feature: "plan-extract" as const,
       userId: "user-local-refund",
@@ -104,13 +110,24 @@ describe("AI daily rate limit", () => {
     };
     const env = { ...baseEnv, AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "1" };
 
-    const first = await checkAndConsumeAiDailyLimit(input, { env });
-    expect(first).toMatchObject({ allowed: true, remaining: 0 });
+    try {
+      const first = await checkAndConsumeAiDailyLimit(input, { env });
+      expect(first).toMatchObject({ allowed: true, remaining: 0 });
 
-    await releaseAiDailyLimitDecision(first);
+      await releaseAiDailyLimitDecision(first);
 
-    const second = await checkAndConsumeAiDailyLimit(input, { env });
-    expect(second).toMatchObject({ allowed: true, remaining: 0 });
+      const second = await checkAndConsumeAiDailyLimit(input, { env });
+      expect(second).toMatchObject({ allowed: true, remaining: 0 });
+    } finally {
+      redisEnvKeys.forEach((key) => {
+        const value = previousRedisEnv[key];
+        if (value === undefined) {
+          delete process.env[key];
+          return;
+        }
+        process.env[key] = value;
+      });
+    }
   });
 
   it("blocks the sixth IP request for anonymous usage when enabled", async () => {
