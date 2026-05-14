@@ -4,6 +4,7 @@ import { parsePlanExtractResult, type PlanExtractResult } from "@/lib/ai/plan-ex
 import { AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError, getAiTaskProviderId, resolveAiTaskProvider, type AiCloudProviderId } from "@/lib/ai/free-cloud-router";
 import { readAiProductMode } from "@/lib/ai/mode";
+import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 export type AiPlanExtractProviderId = "gemini" | "openai" | "openrouter" | "groq";
 
@@ -103,7 +104,18 @@ function toPlanExtractProviderId(providerId: AiCloudProviderId): AiPlanExtractPr
 export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.env) {
   if (isFreeCloudMode(env)) {
     const providerId = toPlanExtractProviderId(getAiTaskProviderId("plan-primary", env));
-    return providerId ? [providerId] : [];
+    const providerOrder = providerId ? [providerId] : [];
+
+    try {
+      const reviewProvider = getAiPlanReviewProviderConfig(env);
+      if (reviewProvider && !providerOrder.includes(reviewProvider.id)) {
+        providerOrder.push(reviewProvider.id);
+      }
+    } catch {
+      // Invalid review-provider configuration must not block the primary free-cloud provider.
+    }
+
+    return providerOrder;
   }
 
   return officialProviderOrder;
@@ -367,7 +379,7 @@ function isRetryableReviewError(error: unknown) {
 
 function serializeReviewError(error: unknown, retryable: boolean) {
   return {
-    message: error instanceof Error ? error.message : "Erro desconhecido.",
+    message: sanitizeAiDiagnosticMessage(error instanceof Error ? error.message : "Erro desconhecido."),
     code: error instanceof AiRouterError ? error.code : error instanceof AiProviderUnavailableError ? error.code : undefined,
     retryable,
   };
@@ -395,6 +407,21 @@ async function attachPlanReview(
   }
 
   if (!reviewProvider) return primary;
+  if (reviewProvider.id === primary.provider) {
+    return {
+      ...primary,
+      review: {
+        status: "skipped",
+        provider: reviewProvider.id,
+        model: reviewProvider.model,
+        error: {
+          message: "Segunda leitura ignorada porque o mesmo provider gratuito ja foi usado na analise principal.",
+          code: "ai-review-provider-already-used",
+          retryable: false,
+        },
+      },
+    };
+  }
   if (!reviewProvider.configured) {
     return {
       ...primary,

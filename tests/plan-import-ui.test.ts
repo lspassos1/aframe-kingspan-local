@@ -72,6 +72,7 @@ describe("plan import UI state", () => {
     expect(getPlanImportStateCopy("idle", freeCloudStatus).badge).toBe("Modo gratuito");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).title).toContain("Análise rápida");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).description).toContain("Revisão detalhada");
+    expect(getPlanImportStateCopy("error", freeCloudStatus).description).toBe("Continue pelo preenchimento manual ou tente outro arquivo quando a análise estiver disponível.");
     expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).title).toBe("Envio por IA indisponível hoje");
     expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).description).toBe("Continue manualmente ou tente novamente amanhã.");
   });

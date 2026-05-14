@@ -13,11 +13,19 @@ import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtrac
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError } from "@/lib/ai/free-cloud-router";
 import { readAiProductMode } from "@/lib/ai/mode";
+import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 export const runtime = "nodejs";
 
 function jsonResponse(body: Record<string, unknown>, init?: ResponseInit) {
   return NextResponse.json(body, init);
+}
+
+export function serializeProviderErrorsForClient(providerErrors: Array<{ provider: string; message: string }>) {
+  return providerErrors.map((providerError) => ({
+    provider: providerError.provider,
+    message: sanitizeAiDiagnosticMessage(providerError.message),
+  }));
 }
 
 function getErrorMessage(error: unknown) {
@@ -38,13 +46,42 @@ function getErrorMessage(error: unknown) {
     return {
       message:
         mode === "free-cloud" ? "Nao foi possivel extrair a planta com o modo gratuito neste momento." : "Nao foi possivel extrair a planta com o Modo Pro neste momento.",
-      providers: error.providerErrors,
+      providers: serializeProviderErrorsForClient(error.providerErrors),
     };
   }
   if (error instanceof AiPlanExtractError) {
     return { message: error.message, code: error.code };
   }
   return { message: "Nao foi possivel analisar a planta agora." };
+}
+
+function logPlanExtractFailure(error: unknown) {
+  const mode = readAiProductMode(process.env);
+
+  if (error instanceof AiProviderChainError) {
+    console.warn("ai_plan_extract_provider_chain_failed", {
+      mode,
+      providers: error.providerErrors.map((providerError) => ({
+        provider: providerError.provider,
+        message: sanitizeAiDiagnosticMessage(providerError.message),
+      })),
+    });
+    return;
+  }
+
+  if (error instanceof AiProviderUnavailableError || error instanceof AiRouterError || error instanceof AiPlanExtractError) {
+    console.warn("ai_plan_extract_failed", {
+      mode,
+      code: error.code,
+      message: sanitizeAiDiagnosticMessage(error.message),
+    });
+    return;
+  }
+
+  console.error("ai_plan_extract_unexpected", {
+    mode,
+    error: sanitizeAiDiagnosticMessage(error instanceof Error ? error.message : String(error)),
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -152,6 +189,7 @@ export async function POST(request: NextRequest) {
       { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS" } }
     );
   } catch (error) {
+    logPlanExtractFailure(error);
     const payload = getErrorMessage(error);
     const status = error instanceof AiPlanExtractError ? error.status : 502;
     return jsonResponse(payload, { status, headers: rateLimitHeaders });
