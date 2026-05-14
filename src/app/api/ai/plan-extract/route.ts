@@ -20,6 +20,13 @@ function jsonResponse(body: Record<string, unknown>, init?: ResponseInit) {
   return NextResponse.json(body, init);
 }
 
+export function serializeProviderErrorsForClient(providerErrors: Array<{ provider: string; message: string }>) {
+  return providerErrors.map((providerError) => ({
+    provider: providerError.provider,
+    message: sanitizeProviderErrorMessage(providerError.message),
+  }));
+}
+
 function getErrorMessage(error: unknown) {
   const mode = readAiProductMode(process.env);
   if (error instanceof AiProviderUnavailableError) {
@@ -38,7 +45,7 @@ function getErrorMessage(error: unknown) {
     return {
       message:
         mode === "free-cloud" ? "Nao foi possivel extrair a planta com o modo gratuito neste momento." : "Nao foi possivel extrair a planta com o Modo Pro neste momento.",
-      providers: error.providerErrors,
+      providers: serializeProviderErrorsForClient(error.providerErrors),
     };
   }
   if (error instanceof AiPlanExtractError) {
@@ -47,7 +54,7 @@ function getErrorMessage(error: unknown) {
   return { message: "Nao foi possivel analisar a planta agora." };
 }
 
-function sanitizeProviderErrorMessage(message: string) {
+export function sanitizeProviderErrorMessage(message: string) {
   return message
     .replace(/https?:\/\/\S+/gi, "[url]")
     .replace(/\b(?:Bearer|Authorization|apikey|api_key|x-api-key)\b\s*[:=]?\s*[^\s,;]+/gi, "[redacted]")
@@ -74,7 +81,13 @@ function logPlanExtractFailure(error: unknown) {
       code: error.code,
       message: sanitizeProviderErrorMessage(error.message),
     });
+    return;
   }
+
+  console.error("ai_plan_extract_unexpected", {
+    mode,
+    error: sanitizeProviderErrorMessage(error instanceof Error ? error.message : String(error)),
+  });
 }
 
 export async function POST(request: NextRequest) {
