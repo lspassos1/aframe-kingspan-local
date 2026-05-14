@@ -7,6 +7,7 @@ import {
   getClientIpFromHeaders,
   isAiDailyLimitReason,
   isAiRateLimitSetupReason,
+  releaseAiDailyLimitDecision,
 } from "@/lib/ai/rate-limit";
 
 const baseEnv = {
@@ -52,6 +53,24 @@ describe("AI daily rate limit", () => {
       scope: "user",
       reason: "user-daily-limit-exceeded",
     });
+  });
+
+  it("can release consumed quota after an extraction provider failure", async () => {
+    const store = createMemoryAiRateLimitStore(new Map());
+    const input = {
+      feature: "plan-extract" as const,
+      userId: "user-refund",
+      ip: "203.0.113.44",
+      now: new Date("2026-05-04T12:00:00.000Z"),
+    };
+
+    const first = await checkAndConsumeAiDailyLimit(input, { env: { ...baseEnv, AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "1" }, store });
+    expect(first).toMatchObject({ allowed: true, remaining: 0 });
+
+    await releaseAiDailyLimitDecision(first, store);
+
+    const second = await checkAndConsumeAiDailyLimit(input, { env: { ...baseEnv, AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "1" }, store });
+    expect(second).toMatchObject({ allowed: true, remaining: 0 });
   });
 
   it("blocks the sixth IP request for anonymous usage when enabled", async () => {

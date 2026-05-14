@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
-import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders, isAiDailyLimitReason, isAiRateLimitSetupReason } from "@/lib/ai/rate-limit";
+import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders, isAiDailyLimitReason, isAiRateLimitSetupReason, releaseAiDailyLimitDecision } from "@/lib/ai/rate-limit";
 import {
   createMemoryPlanExtractCacheStore,
   createPlanExtractCacheKey,
@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logPlanExtractFailure(error);
+    await releaseAiDailyLimitDecision(rateLimitDecision);
     const payload = getErrorMessage(error);
     const status = error instanceof AiPlanExtractError ? error.status : 502;
     return jsonResponse(payload, { status, headers: rateLimitHeaders });

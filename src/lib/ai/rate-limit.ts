@@ -11,6 +11,7 @@ export type AiRateLimitDecision = {
   resetAt: string;
   storage: AiRateLimitStorageKind;
   reason?: string;
+  consumedKeys?: string[];
 };
 
 export type AiRateLimitInput = {
@@ -172,6 +173,11 @@ export function isAiRateLimitSetupReason(reason: string | undefined) {
   return reason === "rate-limit-salt-required" || reason === "rate-limit-storage-unavailable" || reason === "rate-limit-store-error";
 }
 
+export async function releaseAiDailyLimitDecision(decision: AiRateLimitDecision, store: AiRateLimitStore | null = createRedisAiRateLimitStore()) {
+  if (!decision.allowed || !store || decision.consumedKeys?.length === 0) return;
+  await Promise.allSettled((decision.consumedKeys ?? []).map((key) => store.decrement(key)));
+}
+
 export async function checkAndConsumeAiDailyLimit(
   input: AiRateLimitInput,
   options: {
@@ -315,5 +321,6 @@ export async function checkAndConsumeAiDailyLimit(
     remaining: tightestScope?.remaining ?? limits.global,
     resetAt,
     storage: activeStore.kind,
+    consumedKeys: consumed.map((scope) => scope.key),
   });
 }
