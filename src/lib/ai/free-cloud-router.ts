@@ -158,7 +158,11 @@ function assertFreeCloudModel(provider: AiProviderDescriptor, env: AiRouterEnv, 
     throw new AiRouterError(`Modelo gratuito de ${provider.id} nao esta configurado no servidor.`, "ai-provider-model-not-configured");
   }
 
-  if (!model.toLowerCase().endsWith(":free")) {
+  const normalizedModel = model.toLowerCase();
+  // "openrouter/free" is OpenRouter's free meta-router. Capability guarantees
+  // for vision/json output come from OpenRouter's routing contract, not from a pinned model id.
+  const isFreeOpenRouterModel = normalizedModel === "openrouter/free" || normalizedModel.endsWith(":free");
+  if (!isFreeOpenRouterModel) {
     throw new AiRouterError(`Modelo pago ${model} bloqueado no modo free-cloud para ${provider.id}.`, "ai-paid-model-blocked");
   }
 }
