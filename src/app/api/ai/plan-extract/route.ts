@@ -47,6 +47,36 @@ function getErrorMessage(error: unknown) {
   return { message: "Nao foi possivel analisar a planta agora." };
 }
 
+function sanitizeProviderErrorMessage(message: string) {
+  return message
+    .replace(/https?:\/\/\S+/gi, "[url]")
+    .replace(/\b(?:Bearer|Authorization|apikey|api_key|x-api-key)\b\s*[:=]?\s*[^\s,;]+/gi, "[redacted]")
+    .replace(/[A-Za-z0-9_-]{28,}/g, "[redacted]");
+}
+
+function logPlanExtractFailure(error: unknown) {
+  const mode = readAiProductMode(process.env);
+
+  if (error instanceof AiProviderChainError) {
+    console.warn("ai_plan_extract_provider_chain_failed", {
+      mode,
+      providers: error.providerErrors.map((providerError) => ({
+        provider: providerError.provider,
+        message: sanitizeProviderErrorMessage(providerError.message),
+      })),
+    });
+    return;
+  }
+
+  if (error instanceof AiProviderUnavailableError || error instanceof AiRouterError || error instanceof AiPlanExtractError) {
+    console.warn("ai_plan_extract_failed", {
+      mode,
+      code: error.code,
+      message: sanitizeProviderErrorMessage(error.message),
+    });
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isAiPlanExtractEnabled()) {
     return jsonResponse({ message: "Extracao de planta por IA ainda nao esta habilitada neste ambiente." }, { status: 403 });
@@ -152,6 +182,7 @@ export async function POST(request: NextRequest) {
       { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS" } }
     );
   } catch (error) {
+    logPlanExtractFailure(error);
     const payload = getErrorMessage(error);
     const status = error instanceof AiPlanExtractError ? error.status : 502;
     return jsonResponse(payload, { status, headers: rateLimitHeaders });

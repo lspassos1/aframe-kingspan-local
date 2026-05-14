@@ -106,7 +106,7 @@ export function getPlanImportStateCopy(state: PlanImportState, providerStatus: P
     error: {
       badge: "Continuar manualmente",
       title: "Análise indisponível",
-      description: "Continue pelo preenchimento manual ou tente outro arquivo quando o limite externo liberar.",
+      description: "Continue pelo preenchimento manual ou tente outro arquivo quando a análise estiver disponível.",
     },
     "limit-exceeded": {
       badge: "Limite gratuito",

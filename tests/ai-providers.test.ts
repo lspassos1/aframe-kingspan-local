@@ -109,13 +109,15 @@ describe("AI plan extraction providers", () => {
     expect(providers).toHaveLength(0);
   });
 
-  it("does not configure OpenRouter even when OpenRouter env vars are present", () => {
+  it("allows OpenRouter Free as an image-only fallback provider in free-cloud mode", () => {
     const providers = getConfiguredAiPlanExtractProviders({
+      AI_MODE: "free-cloud",
       OPENROUTER_API_KEY: "openrouter-key",
       OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.5-flash:free",
     });
 
-    expect(providers).toHaveLength(0);
+    expect(providers.map((provider) => provider.id)).toEqual(["openrouter"]);
+    expect(providers[0]?.supports).toEqual(["image/png", "image/jpeg", "image/webp"]);
   });
 
   it("throws an unavailable error when OpenAI is not configured", async () => {
@@ -179,6 +181,108 @@ describe("AI plan extraction providers", () => {
         }
       )
     ).resolves.toMatchObject({ provider: "gemini" });
+
+    expect(calledProviders).toEqual(["gemini"]);
+  });
+
+  it("falls back to OpenRouter Free for image extraction when Gemini fails", async () => {
+    const calledProviders: string[] = [];
+
+    await expect(
+      extractPlanWithProviderChain(
+        {
+          mimeType: "image/png",
+          fileBase64: "abc",
+        },
+        {
+          env: {
+            AI_MODE: "free-cloud",
+            AI_PLAN_PRIMARY_PROVIDER: "gemini",
+            AI_PLAN_REVIEW_PROVIDER: "openrouter",
+            GEMINI_API_KEY: "gemini-key",
+            GEMINI_MODEL: "gemini-2.5-flash",
+            OPENROUTER_API_KEY: "openrouter-key",
+            OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.5-flash:free",
+            OPENAI_API_KEY: "openai-key",
+            AI_OPENAI_MODEL: "gpt-4o-mini",
+          },
+          async callProvider(provider) {
+            calledProviders.push(provider.id);
+            if (provider.id === "gemini") throw new Error("Provider gemini respondeu 429.");
+            return {
+              result: parsePlanExtractResult(validPlanExtractJson),
+              provider: provider.id,
+              model: provider.model,
+            };
+          },
+        }
+      )
+    ).resolves.toMatchObject({
+      provider: "openrouter",
+      review: {
+        status: "skipped",
+      },
+    });
+
+    expect(calledProviders).toEqual(["gemini", "openrouter"]);
+  });
+
+  it("does not use OpenRouter fallback for PDF extraction in free-cloud mode", async () => {
+    const calledProviders: string[] = [];
+
+    await expect(
+      extractPlanWithProviderChain(
+        {
+          mimeType: "application/pdf",
+          fileBase64: "abc",
+        },
+        {
+          env: {
+            AI_MODE: "free-cloud",
+            AI_PLAN_PRIMARY_PROVIDER: "gemini",
+            AI_PLAN_REVIEW_PROVIDER: "openrouter",
+            GEMINI_API_KEY: "gemini-key",
+            GEMINI_MODEL: "gemini-2.5-flash",
+            OPENROUTER_API_KEY: "openrouter-key",
+            OPENROUTER_PLAN_REVIEW_MODEL: "google/gemini-2.5-flash:free",
+          },
+          async callProvider(provider) {
+            calledProviders.push(provider.id);
+            throw new Error(`${provider.id} failed`);
+          },
+        }
+      )
+    ).rejects.toBeInstanceOf(AiProviderChainError);
+
+    expect(calledProviders).toEqual(["gemini"]);
+  });
+
+  it("does not use paid OpenRouter models as free-cloud fallback providers", async () => {
+    const calledProviders: string[] = [];
+
+    await expect(
+      extractPlanWithProviderChain(
+        {
+          mimeType: "image/png",
+          fileBase64: "abc",
+        },
+        {
+          env: {
+            AI_MODE: "free-cloud",
+            AI_PLAN_PRIMARY_PROVIDER: "gemini",
+            AI_PLAN_REVIEW_PROVIDER: "openrouter",
+            GEMINI_API_KEY: "gemini-key",
+            GEMINI_MODEL: "gemini-2.5-flash",
+            OPENROUTER_API_KEY: "openrouter-key",
+            OPENROUTER_PLAN_REVIEW_MODEL: "openai/gpt-4o-mini",
+          },
+          async callProvider(provider) {
+            calledProviders.push(provider.id);
+            throw new Error(`${provider.id} failed`);
+          },
+        }
+      )
+    ).rejects.toBeInstanceOf(AiProviderChainError);
 
     expect(calledProviders).toEqual(["gemini"]);
   });

@@ -103,7 +103,18 @@ function toPlanExtractProviderId(providerId: AiCloudProviderId): AiPlanExtractPr
 export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.env) {
   if (isFreeCloudMode(env)) {
     const providerId = toPlanExtractProviderId(getAiTaskProviderId("plan-primary", env));
-    return providerId ? [providerId] : [];
+    const providerOrder = providerId ? [providerId] : [];
+
+    try {
+      const reviewProvider = getAiPlanReviewProviderConfig(env);
+      if (reviewProvider && !providerOrder.includes(reviewProvider.id)) {
+        providerOrder.push(reviewProvider.id);
+      }
+    } catch {
+      // Invalid review-provider configuration must not block the primary free-cloud provider.
+    }
+
+    return providerOrder;
   }
 
   return officialProviderOrder;
@@ -395,6 +406,21 @@ async function attachPlanReview(
   }
 
   if (!reviewProvider) return primary;
+  if (reviewProvider.id === primary.provider) {
+    return {
+      ...primary,
+      review: {
+        status: "skipped",
+        provider: reviewProvider.id,
+        model: reviewProvider.model,
+        error: {
+          message: "Segunda leitura ignorada porque o mesmo provider gratuito ja foi usado na analise principal.",
+          code: "ai-review-provider-already-used",
+          retryable: false,
+        },
+      },
+    };
+  }
   if (!reviewProvider.configured) {
     return {
       ...primary,
