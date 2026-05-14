@@ -1,5 +1,6 @@
+import { DOMParser } from "@xmldom/xmldom";
 import JSZip from "jszip";
-import * as XLSX from "xlsx";
+import writeXlsxFile from "write-excel-file/node";
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import {
@@ -27,6 +28,8 @@ const source: SinapiSource = {
 };
 
 const csvHeader = "codigo,descricao,unidade,preco_total,material,mao_obra,equipamento,hh,data_base,uf,regime,etapa,tags,metodo";
+
+globalThis.DOMParser ??= DOMParser as typeof globalThis.DOMParser;
 
 describe("SINAPI controlled price database", () => {
   it("imports CSV rows as read-only SINAPI compositions and service compositions", async () => {
@@ -68,22 +71,34 @@ describe("SINAPI controlled price database", () => {
     });
   });
 
+  it("imports semicolon-delimited SINAPI CSV rows", async () => {
+    const result = await importSinapiPriceBase({
+      fileName: "sinapi-ba.csv",
+      data: [
+        "codigo;descricao;unidade;preco_total;material;mao_obra;equipamento;hh;data_base;uf;regime;etapa;tags;metodo",
+        "SINAPI-124;Alvenaria com CSV brasileiro;m2;95;60;30;5;0.5;2026-05;BA;desonerado;alvenaria;parede;alvenaria",
+      ].join("\n"),
+      source,
+      defaultConstructionMethod: "conventional-masonry",
+      expectedState: "BA",
+    });
+
+    expect(result.issues).toEqual([]);
+    expect(result.importedRows).toBe(1);
+    expect(result.compositions[0]).toMatchObject({
+      code: "SINAPI-124",
+      directUnitCostBRL: 95,
+      materialCostBRL: 60,
+    });
+  });
+
   it("imports XLSX rows with official metadata", async () => {
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet([
-      {
-        codigo: "SINAPI-200",
-        descricao: "Concreto usinado",
-        unidade: "m3",
-        preco_total: 520,
-        material: 420,
-        mao_obra: 80,
-        equipamento: 20,
-        hh: 1.2,
-      },
-    ]);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "SINAPI");
-    const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+    const data = toArrayBuffer(
+      await writeXlsxFile([
+        ["codigo", "descricao", "unidade", "preco_total", "material", "mao_obra", "equipamento", "hh"],
+        ["SINAPI-200", "Concreto usinado", "m3", 520, 420, 80, 20, 1.2],
+      ]).toBuffer()
+    );
 
     const result = await importSinapiPriceBase({
       fileName: "sinapi-ba.xlsx",
@@ -312,3 +327,7 @@ describe("SINAPI controlled price database", () => {
     });
   });
 });
+
+function toArrayBuffer(buffer: Buffer): ArrayBuffer {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+}

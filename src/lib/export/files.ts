@@ -6,17 +6,15 @@ import { createBudgetSourceExport, createBudgetSourceWorkbookRows } from "@/lib/
 import { generateScenarioTechnicalSummary } from "@/lib/construction-methods/scenario-calculations";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
 import { formatCurrency, slugify } from "@/lib/format";
+import { createXlsxBlobPartFromSheets, isSpreadsheetLibraryReady, prepareSpreadsheetLibrary, rowsToCsv, type SpreadsheetRow } from "@/lib/spreadsheet/tabular";
 
-type XlsxModule = typeof import("xlsx");
 type JsPdfConstructor = typeof import("jspdf")["default"];
 
-let xlsxModule: XlsxModule | null = null;
-let xlsxModulePromise: Promise<XlsxModule> | null = null;
 let jsPdfConstructor: JsPdfConstructor | null = null;
 let jsPdfPromise: Promise<JsPdfConstructor> | null = null;
 
 export function isSpreadsheetExportLibraryReady() {
-  return Boolean(xlsxModule);
+  return isSpreadsheetLibraryReady();
 }
 
 export function isPdfExportLibraryReady() {
@@ -24,7 +22,7 @@ export function isPdfExportLibraryReady() {
 }
 
 export async function prepareSpreadsheetExportLibrary() {
-  await loadXlsx();
+  await prepareSpreadsheetLibrary();
 }
 
 export async function preparePdfExportLibrary() {
@@ -33,6 +31,14 @@ export async function preparePdfExportLibrary() {
 
 export function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mime });
+  downloadBlob(filename, blob);
+}
+
+function downloadBinaryFile(filename: string, content: BlobPart) {
+  downloadBlob(filename, new Blob([content], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+}
+
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -46,7 +52,6 @@ export function exportProjectJson(project: Project) {
 }
 
 export async function exportMaterialsCsv(projectName: string, materials: MaterialLine[], methodName: string) {
-  const XLSX = xlsxModule ?? (await loadXlsx());
   const rows = materials.map((line) => ({
     metodo: methodName,
     codigo: line.code,
@@ -62,16 +67,11 @@ export async function exportMaterialsCsv(projectName: string, materials: Materia
     confirmar: line.requiresConfirmation ? "sim" : "nao",
     observacoes: line.notes,
   }));
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  const csv = XLSX.utils.sheet_to_csv(worksheet);
-  downloadTextFile(`${slugify(projectName)}-materiais.csv`, csv, "text/csv;charset=utf-8");
+  downloadTextFile(`${slugify(projectName)}-materiais.csv`, rowsToCsv(rows), "text/csv;charset=utf-8");
 }
 
 export async function exportMaterialsXlsx(projectName: string, materials: MaterialLine[], methodName: string) {
-  const XLSX = xlsxModule ?? (await loadXlsx());
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(
-    materials.map((line) => ({
+  const rows = materials.map((line) => ({
       Metodo: methodName,
       Codigo: line.code,
       Descricao: line.description,
@@ -85,10 +85,9 @@ export async function exportMaterialsXlsx(projectName: string, materials: Materi
       "Total liquido": line.netTotalBRL,
       "Confirmar fornecedor": line.requiresConfirmation ? "sim" : "nao",
       Observacoes: line.notes,
-    }))
-  );
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Materiais");
-  XLSX.writeFile(workbook, `${slugify(projectName)}-materiais.xlsx`);
+    }));
+  const blobPart = await createXlsxBlobPartFromSheets([{ name: "Materiais", rows }]);
+  downloadBinaryFile(`${slugify(projectName)}-materiais.xlsx`, blobPart);
 }
 
 export function exportRfqText(projectName: string, requests: QuotationRequest[]) {
@@ -102,17 +101,17 @@ export function exportBudgetSourceJson(project: Project, scenario: Scenario) {
 }
 
 export async function exportBudgetSourceXlsx(project: Project, scenario: Scenario) {
-  const XLSX = xlsxModule ?? (await loadXlsx());
   const report = createBudgetSourceExport(project, scenario);
   const rows = createBudgetSourceWorkbookRows(report);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.summary), "Resumo");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.sources), "Fontes");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.compositions), "Composicoes");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.serviceLines), "Servicos");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.laborHours), "HH");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.pendingItems), "Pendencias");
-  XLSX.writeFile(workbook, `${slugify(project.name)}-orcamento-fontes.xlsx`);
+  const blobPart = await createXlsxBlobPartFromSheets([
+    { name: "Resumo", rows: rows.summary as SpreadsheetRow[] },
+    { name: "Fontes", rows: rows.sources as SpreadsheetRow[] },
+    { name: "Composicoes", rows: rows.compositions as SpreadsheetRow[] },
+    { name: "Servicos", rows: rows.serviceLines as SpreadsheetRow[] },
+    { name: "HH", rows: rows.laborHours as SpreadsheetRow[] },
+    { name: "Pendencias", rows: rows.pendingItems as SpreadsheetRow[] },
+  ]);
+  downloadBinaryFile(`${slugify(project.name)}-orcamento-fontes.xlsx`, blobPart);
 }
 
 export async function exportBudgetSourcePdf(project: Project, scenario: Scenario) {
@@ -287,20 +286,6 @@ export async function exportTechnicalPdf(project: Project, scenario: Scenario) {
     doc.addImage(png, "PNG", 10, 26, 190, 126);
   }
   doc.save(`${slugify(project.name)}-projeto-tecnico.pdf`);
-}
-
-async function loadXlsx(): Promise<XlsxModule> {
-  if (xlsxModule) return xlsxModule;
-  xlsxModulePromise ??= import("xlsx")
-    .then((module) => {
-      xlsxModule = module;
-      return module;
-    })
-    .catch((error) => {
-      xlsxModulePromise = null;
-      throw error;
-    });
-  return xlsxModulePromise;
 }
 
 async function loadJsPdf(): Promise<JsPdfConstructor> {

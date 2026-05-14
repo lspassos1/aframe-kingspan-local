@@ -1,4 +1,5 @@
-import * as XLSX from "xlsx";
+import { DOMParser } from "@xmldom/xmldom";
+import writeXlsxFile from "write-excel-file/node";
 import { describe, expect, it } from "vitest";
 import { defaultProject } from "@/data/defaultProject";
 import {
@@ -24,6 +25,8 @@ const source = createImportedPriceSource({
   referenceDate: "2026-05-04",
   reliability: "high",
 });
+
+globalThis.DOMParser ??= DOMParser as typeof globalThis.DOMParser;
 
 describe("price base importer", () => {
   it("imports a mapped CSV row as sourced service composition", async () => {
@@ -104,6 +107,29 @@ describe("price base importer", () => {
     });
   });
 
+  it("parses semicolon-delimited CSV rows from Brazilian exports", async () => {
+    const rows = await parsePriceBaseCsv(
+      [
+        "codigo;descricao;unidade;preco_total;material;mao_obra;equipamento",
+        "SINAPI-997;Servico com separador brasileiro;m2;1.234;1.000;200;34",
+      ].join("\n")
+    );
+
+    const result = importPriceBaseRows({
+      rows,
+      mapping: defaultPriceBaseColumnMapping,
+      source,
+      defaultConstructionMethod: "conventional-masonry",
+    });
+
+    expect(result.importedRows).toBe(1);
+    expect(result.serviceCompositions[0]).toMatchObject({
+      sourceCode: "SINAPI-997",
+      directUnitCostBRL: 1234,
+      materialCostBRL: 1000,
+    });
+  });
+
   it("keeps dot-decimal labor hours separate from dot-thousand money parsing", async () => {
     const rows = await parsePriceBaseCsv(
       [
@@ -161,24 +187,12 @@ describe("price base importer", () => {
   });
 
   it("parses XLSX rows with explicit column mapping", async () => {
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet([
-      {
-        Cod: "EPS-1",
-        Desc: "Painel EPS monolitico",
-        Un: "m²",
-        Total: 120,
-        Material: 85,
-        Labor: 35,
-        HH: 0.3,
-        UF: "BA",
-        Cidade: "Cruz das Almas",
-        Metodo: "eps",
-        Etapa: "paineis",
-      },
-    ]);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Base");
-    const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+    const data = toArrayBuffer(
+      await writeXlsxFile([
+        ["Cod", "Desc", "Un", "Total", "Material", "Labor", "HH", "UF", "Cidade", "Metodo", "Etapa"],
+        ["EPS-1", "Painel EPS monolitico", "m²", 120, 85, 35, 0.3, "BA", "Cruz das Almas", "eps", "paineis"],
+      ]).toBuffer()
+    );
     const rows = await parsePriceBaseXlsx(data);
 
     const result = importPriceBaseRows({
@@ -206,6 +220,45 @@ describe("price base importer", () => {
       constructionMethod: "monolithic-eps",
       unit: "m2",
       directUnitCostBRL: 120,
+    });
+  });
+
+  it("uses the first populated worksheet when an XLSX starts with a cover sheet", async () => {
+    const data = toArrayBuffer(
+      await writeXlsxFile([
+        {
+          sheet: "Capa",
+          data: [["Relatorio gerado pelo fornecedor"]],
+        },
+        {
+          sheet: "Base",
+          data: [
+            ["Cod", "Desc", "Un", "Total", "Material", "Labor"],
+            ["MULTI-1", "Servico na segunda aba", "m2", 75, 50, 25],
+          ],
+        },
+      ]).toBuffer()
+    );
+    const rows = await parsePriceBaseXlsx(data);
+
+    const result = importPriceBaseRows({
+      rows,
+      mapping: {
+        sourceCode: "Cod",
+        description: "Desc",
+        unit: "Un",
+        totalUnitPrice: "Total",
+        materialCostBRL: "Material",
+        laborCostBRL: "Labor",
+      },
+      source,
+      defaultConstructionMethod: "conventional-masonry",
+    });
+
+    expect(result.importedRows).toBe(1);
+    expect(result.serviceCompositions[0]).toMatchObject({
+      sourceCode: "MULTI-1",
+      directUnitCostBRL: 75,
     });
   });
 
@@ -241,3 +294,7 @@ describe("price base importer", () => {
     });
   });
 });
+
+function toArrayBuffer(buffer: Buffer): ArrayBuffer {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+}

@@ -141,13 +141,13 @@ export function PriceBaseImportCard({
       if ((requestSourceType === "sinapi" || extension === "zip") && file.size > sinapiImportLimits.maxUploadBytes) {
         throw new Error(`Arquivo excede o limite de ${Math.round(sinapiImportLimits.maxUploadBytes / 1024 / 1024)} MB para importacao SINAPI.`);
       }
-      const fileData = extension === "xlsx" || extension === "xls" || extension === "zip" ? await file.arrayBuffer() : await file.text();
+      const fileData = extension === "xlsx" || extension === "zip" ? await file.arrayBuffer() : await file.text();
       let parsedRows: PriceBaseRawRow[];
       if (requestSourceType === "sinapi" || extension === "zip") {
         parsedRows = await parseSinapiRowsFromFile(selectedFileName, fileData);
       } else if (extension === "json") {
         parsedRows = parsePriceBaseJson(fileData as string);
-      } else if (extension === "xlsx" || extension === "xls") {
+      } else if (extension === "xlsx") {
         parsedRows = await parsePriceBaseXlsx(fileData as ArrayBuffer);
       } else {
         parsedRows = await parsePriceBaseCsv(fileData as string);
@@ -252,7 +252,7 @@ export function PriceBaseImportCard({
         <form onSubmit={handleImport} className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="price-base-file">Arquivo CSV, XLSX, JSON ou ZIP</Label>
-            <Input id="price-base-file" type="file" accept=".csv,.xlsx,.xls,.json,.zip" onChange={handleFileChange} />
+            <Input id="price-base-file" type="file" accept=".csv,.xlsx,.json,.zip" onChange={handleFileChange} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="price-base-title">Nome da base</Label>
