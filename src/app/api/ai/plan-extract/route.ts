@@ -12,7 +12,7 @@ import {
 import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtractFile } from "@/lib/ai/plan-extract-request";
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError } from "@/lib/ai/free-cloud-router";
-import { readAiProductMode, type AiModeEnv, type AiProductMode } from "@/lib/ai/mode";
+import { createAiModeScopedEnv, readAiProductMode, type AiModeEnv, type AiProductMode } from "@/lib/ai/mode";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 export const runtime = "nodejs";
@@ -33,7 +33,7 @@ export function readRequestedPlanExtractMode(formData: FormData | null): AiProdu
 }
 
 function createModeEnv(mode: AiProductMode): AiModeEnv {
-  return { ...process.env, AI_MODE: mode };
+  return createAiModeScopedEnv(process.env, mode);
 }
 
 export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?: string; env?: AiModeEnv } = {}) {
