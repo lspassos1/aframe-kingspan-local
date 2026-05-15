@@ -1,4 +1,13 @@
+import type { PlanImportProviderUiStatus, PlanImportState } from "@/lib/ai/plan-import-ui";
+
 export type StartAssistantMode = "choose" | "ai" | "manual" | "example";
+
+export type StartAiStatusTone = "success" | "warning" | "pending" | "info";
+
+export type StartAiStatusPill = {
+  label: string;
+  tone: StartAiStatusTone;
+};
 
 export type StartAssistantOption = {
   id: Exclude<StartAssistantMode, "choose">;
@@ -82,4 +91,82 @@ export function createStartAssistantViewModel({
     showAiDisabledNotice: mode === "ai" && !planExtractEnabled,
     shouldRunExample: mode === "example",
   };
+}
+
+export function createStartAiStatusPills({
+  planExtractEnabled,
+  state,
+  aiProviderStatus,
+}: {
+  planExtractEnabled: boolean;
+  state: PlanImportState;
+  aiProviderStatus: PlanImportProviderUiStatus;
+}): StartAiStatusPill[] {
+  if (!planExtractEnabled) {
+    return [
+      { label: "Upload aguardando configuração", tone: "warning" },
+      { label: "Continuar manualmente disponível", tone: "info" },
+    ];
+  }
+
+  if (state === "error") {
+    return [
+      { label: "Análise não concluída", tone: "warning" },
+      { label: "Continuar manualmente disponível", tone: "info" },
+      { label: "Tente outro arquivo quando possível", tone: "pending" },
+    ];
+  }
+
+  if (state === "temporarily-unavailable") {
+    return [
+      { label: "Upload assistido temporariamente indisponível", tone: "warning" },
+      { label: "Continuar manualmente disponível", tone: "info" },
+    ];
+  }
+
+  if (state === "limit-exceeded") {
+    return [
+      { label: "Limite diário atingido", tone: "warning" },
+      { label: "Continuar manualmente disponível", tone: "info" },
+      { label: "Tente novamente amanhã", tone: "pending" },
+    ];
+  }
+
+  if (state === "cache-hit") {
+    return [
+      { label: "Resultado recuperado do cache", tone: "success" },
+      { label: "Revisão humana obrigatória", tone: "pending" },
+      { label: "Continuar manualmente disponível", tone: "info" },
+    ];
+  }
+
+  if (state === "review-ready") {
+    return [
+      { label: "Análise pronta para revisão", tone: "success" },
+      { label: "Revisão humana obrigatória", tone: "pending" },
+      { label: "Continuar manualmente disponível", tone: "info" },
+    ];
+  }
+
+  if (state === "applied") {
+    return [
+      { label: "Campos aplicados", tone: "success" },
+      { label: "Revisar medidas antes de seguir", tone: "pending" },
+      { label: "Continuar manualmente disponível", tone: "info" },
+    ];
+  }
+
+  if (state === "uploading" || state === "analyzing") {
+    return [
+      { label: state === "uploading" ? "Upload em andamento" : "Análise em andamento", tone: "pending" },
+      { label: "Nada aplicado sem revisão", tone: "info" },
+    ];
+  }
+
+  return [
+    { label: "Upload habilitado", tone: "success" },
+    { label: "Cache por hash ativo quando houver resultado", tone: "pending" },
+    ...(aiProviderStatus.mode === "free-cloud" ? [{ label: "Análise gratuita depende de limites externos", tone: "warning" as const }] : []),
+    { label: "Continuar manualmente disponível", tone: "info" },
+  ];
 }
