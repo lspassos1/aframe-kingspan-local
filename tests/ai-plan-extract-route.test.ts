@@ -5,6 +5,7 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(async () => ({ userId: "user_test" })),
 }));
 
+import { auth } from "@clerk/nextjs/server";
 import { getPlanExtractErrorPayload, POST, readRequestedPlanExtractMode, serializeProviderErrorsForClient } from "@/app/api/ai/plan-extract/route";
 import { AiProviderChainError } from "@/lib/ai/errors";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
@@ -13,6 +14,7 @@ describe("plan extract route diagnostics", () => {
   beforeEach(() => {
     vi.stubEnv("AI_PLAN_EXTRACT_ENABLED", "true");
     vi.stubEnv("AI_RATE_LIMIT_SALT", "test-salt");
+    vi.mocked(auth).mockResolvedValue({ userId: "user_test" } as never);
     vi.spyOn(console, "info").mockImplementation(() => undefined);
   });
 
@@ -95,5 +97,35 @@ describe("plan extract route diagnostics", () => {
     expect(payload.message).toBe("Envie um arquivo de planta baixa.");
     expect(payload.diagnosticId).toMatch(/^diag_[a-zA-Z0-9_-]+$/);
     expect(response.headers.get("X-AI-Diagnostic-Id")).toBe(payload.diagnosticId);
+  });
+
+  it("returns a diagnostic id before the feature-disabled guard", async () => {
+    vi.stubEnv("AI_PLAN_EXTRACT_ENABLED", "false");
+    const disabledResponse = await POST(
+      new NextRequest("http://localhost/api/ai/plan-extract", {
+        method: "POST",
+        body: new FormData(),
+      })
+    );
+    const disabledPayload = (await disabledResponse.json()) as { diagnosticId?: string };
+
+    expect(disabledResponse.status).toBe(403);
+    expect(disabledPayload.diagnosticId).toMatch(/^diag_[a-zA-Z0-9_-]+$/);
+    expect(disabledResponse.headers.get("X-AI-Diagnostic-Id")).toBe(disabledPayload.diagnosticId);
+  });
+
+  it("returns a diagnostic id before the auth-required guard", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+    const authResponse = await POST(
+      new NextRequest("http://localhost/api/ai/plan-extract", {
+        method: "POST",
+        body: new FormData(),
+      })
+    );
+    const authPayload = (await authResponse.json()) as { diagnosticId?: string };
+
+    expect(authResponse.status).toBe(401);
+    expect(authPayload.diagnosticId).toMatch(/^diag_[a-zA-Z0-9_-]+$/);
+    expect(authResponse.headers.get("X-AI-Diagnostic-Id")).toBe(authPayload.diagnosticId);
   });
 });

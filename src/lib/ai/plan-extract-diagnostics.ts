@@ -198,11 +198,22 @@ export function createRedisPlanExtractDiagnosticStore(env: PlanExtractDiagnostic
           body: JSON.stringify(commands),
         });
         if (!response.ok) throw new Error(`Diagnostic store failed with ${response.status}.`);
+        const payload = await response.json().catch(() => null);
+        if (!Array.isArray(payload) || payload.length === 0) throw new Error("Diagnostic store returned an invalid pipeline response.");
+        if (hasRedisPipelineError(payload)) throw new Error("Diagnostic store command failed.");
       } finally {
         clearTimeout(timeout);
       }
     },
   };
+}
+
+function hasRedisPipelineError(payload: unknown[]) {
+  return payload.some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const error = (item as { error?: unknown }).error;
+    return typeof error === "string" ? error.trim().length > 0 : Boolean(error);
+  });
 }
 
 export async function recordPlanExtractDiagnosticAttempt(
@@ -216,9 +227,10 @@ export async function recordPlanExtractDiagnosticAttempt(
 ) {
   const env = options.env ?? input.env ?? process.env;
   const logger = options.logger ?? console;
+  let record: PlanExtractDiagnosticRecord | undefined;
 
   try {
-    const record = createPlanExtractDiagnosticRecord({ ...input, env });
+    record = createPlanExtractDiagnosticRecord({ ...input, env });
     const store = options.store === undefined ? createRedisPlanExtractDiagnosticStore(env, options.fetcher) : options.store;
     const fallbackStore = createConsolePlanExtractDiagnosticStore(logger);
 
@@ -232,7 +244,7 @@ export async function recordPlanExtractDiagnosticAttempt(
   }
 
   try {
-    const fallbackRecord = createPlanExtractDiagnosticRecord({ ...input, env });
+    const fallbackRecord = record ?? createPlanExtractDiagnosticRecord({ ...input, env });
     await createConsolePlanExtractDiagnosticStore(logger).save(fallbackRecord);
     return fallbackRecord;
   } catch {
