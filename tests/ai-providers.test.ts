@@ -317,4 +317,38 @@ describe("AI plan extraction providers", () => {
 
     expect(calledProviders).toEqual(["openai"]);
   });
+
+  it("keeps PDF extraction on OpenAI when paid mode is explicit", async () => {
+    const calledProviders: string[] = [];
+
+    await expect(
+      extractPlanWithProviderChain(
+        {
+          mimeType: "application/pdf",
+          fileBase64: "abc",
+        },
+        {
+          env: {
+            AI_MODE: "paid",
+            OPENAI_API_KEY: "openai-key",
+            AI_OPENAI_MODEL: "gpt-4o-mini",
+            GEMINI_API_KEY: "gemini-key",
+            GEMINI_MODEL: "gemini-2.5-flash",
+            OPENROUTER_API_KEY: "openrouter-key",
+            OPENROUTER_PLAN_REVIEW_MODEL: "openrouter/free",
+          },
+          async callProvider(provider) {
+            calledProviders.push(provider.id);
+            return {
+              result: parsePlanExtractResult(validPlanExtractJson),
+              provider: provider.id,
+              model: provider.model,
+            };
+          },
+        }
+      )
+    ).resolves.toMatchObject({ provider: "openai" });
+
+    expect(calledProviders).toEqual(["openai"]);
+  });
 });

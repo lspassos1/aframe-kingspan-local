@@ -50,6 +50,7 @@ describe("plan import UI state", () => {
     expect(getPlanImportStateFromResponse({ ok: true, status: 200, cached: true })).toBe("cache-hit");
     expect(getPlanImportStateFromResponse({ ok: true, status: 200 })).toBe("review-ready");
     expect(getPlanImportStateFromResponse({ ok: false, status: 429, reason: "user-daily-limit-exceeded" })).toBe("limit-exceeded");
+    expect(getPlanImportStateFromResponse({ ok: false, status: 502, reason: "free-pdf-provider-unavailable" })).toBe("error");
     expect(getPlanImportStateFromResponse({ ok: false, status: 415 })).toBe("error");
   });
 
@@ -85,6 +86,16 @@ describe("plan import UI state", () => {
     const limitMessage = getPlanImportPayloadMessage(null, "limit-exceeded");
     expect(limitMessage).toBe("Continue manualmente ou tente novamente amanhã.");
     expect(limitMessage).not.toContain("Envio por IA indisponível hoje");
+
+    expect(
+      getPlanImportPayloadMessage(
+        {
+          message: "Não consegui ler este PDF agora. Exporte a primeira página como imagem ou continue manualmente.",
+          reason: "free-pdf-provider-unavailable",
+        },
+        "error"
+      )
+    ).toBe("Não consegui ler este PDF agora. Exporte a primeira página como imagem ou continue manualmente.");
   });
 
   it("blocks upload activation while the daily limit fallback is active", () => {
