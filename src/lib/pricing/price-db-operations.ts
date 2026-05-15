@@ -1,4 +1,4 @@
-export type ExternalPriceDbStatus = "missing-config" | "missing-sync" | "sync-running" | "sync-failed" | "stale-data" | "ready";
+export type ExternalPriceDbStatus = "missing-config" | "missing-sync" | "read-failed" | "sync-running" | "sync-failed" | "stale-data" | "ready";
 export type ExternalPriceDbOperationalTone = "ok" | "warning" | "muted";
 
 export interface ExternalPriceDbSourceSnapshot {
@@ -16,10 +16,17 @@ export interface ExternalPriceDbSyncRunSnapshot {
   errorMessage?: string;
 }
 
+export interface ExternalPriceDbReadProbeSnapshot {
+  status?: "not-run" | "ok" | "failed" | string;
+  checkedAt?: string;
+  errorMessage?: string;
+}
+
 export interface ExternalPriceDbOperationalInput {
   configured: boolean;
   latestSource?: ExternalPriceDbSourceSnapshot;
   latestSyncRun?: ExternalPriceDbSyncRunSnapshot;
+  readProbe?: ExternalPriceDbReadProbeSnapshot;
   now?: Date | string;
   staleAfterDays?: number;
 }
@@ -92,6 +99,24 @@ export function createExternalPriceDbOperationalStatus(input: ExternalPriceDbOpe
     };
   }
 
+  if (isFailedReadProbe(input.readProbe)) {
+    const safeError = sanitizeOperationalError(input.readProbe?.errorMessage);
+    const readFailedReferenceMonth = normalizeReferenceMonth(input.latestSource?.referenceMonth);
+    return {
+      configured: true,
+      status: "read-failed",
+      centralLabel: "configurada",
+      syncLabel: "busca indisponível",
+      detail: "Busca central indisponível; use importação local ou fonte manual revisável até a leitura pública responder.",
+      syncDetail: safeError ? `Falha de leitura segura: ${safeError}` : "Falha de leitura sem detalhe público seguro.",
+      technicalDetail: "RPC de preços/leitura pública falhou sem expor URL, token ou payload bruto.",
+      tone: "warning",
+      stale: readFailedReferenceMonth ? isReferenceMonthStale(readFailedReferenceMonth, input.now, input.staleAfterDays ?? defaultStaleAfterDays) : false,
+      lastReferenceMonth: readFailedReferenceMonth,
+      safeError,
+    };
+  }
+
   const referenceMonth = normalizeReferenceMonth(input.latestSource?.referenceMonth);
   if (!isActiveSource(input.latestSource) || !referenceMonth) {
     return {
@@ -100,7 +125,10 @@ export function createExternalPriceDbOperationalStatus(input: ExternalPriceDbOpe
       centralLabel: "configurada",
       syncLabel: "sem registro",
       detail: "Base central configurada, mas sem fonte ativa informada; use candidatos apenas após validação operacional.",
-      syncDetail: "Sem registro público seguro de sync. Fluxo local/manual continua disponível.",
+      syncDetail:
+        input.readProbe?.status === "ok"
+          ? "RPC de preços respondendo; sem fonte ativa pública informada. Fluxo local/manual continua disponível."
+          : "Sem registro público seguro de sync. Fluxo local/manual continua disponível.",
       technicalDetail: "O app não lê price_sync_runs com credencial pública; exponha apenas snapshots operacionais seguros.",
       tone: "warning",
       stale: false,
@@ -130,8 +158,11 @@ export function createExternalPriceDbOperationalStatus(input: ExternalPriceDbOpe
     centralLabel: "configurada",
     syncLabel: referenceMonth ? `atualizada ${referenceMonth}` : "configurada",
     detail: "Busca central pode ser apresentada como candidata; preços ainda exigem aprovação.",
-    syncDetail: referenceMonth ? `Última referência segura: ${referenceMonth}.` : "Configuração pronta; referência ainda não informada.",
-    technicalDetail: "Leitura pública configurada; chave de serviço não é usada no app.",
+    syncDetail: referenceMonth ? `Última fonte ativa: ${referenceMonth}.` : "Configuração pronta; referência ainda não informada.",
+    technicalDetail:
+      input.readProbe?.status === "ok"
+        ? "RPC de preços respondendo; leitura pública configurada; chave de serviço não é usada no app."
+        : "Leitura pública configurada; chave de serviço não é usada no app.",
     tone: "ok",
     stale: false,
     lastReferenceMonth: referenceMonth,
@@ -165,6 +196,10 @@ function isFailedRun(run: ExternalPriceDbSyncRunSnapshot | undefined) {
 
 function isRunningRun(run: ExternalPriceDbSyncRunSnapshot | undefined) {
   return run?.status === "started" || run?.status === "running";
+}
+
+function isFailedReadProbe(probe: ExternalPriceDbReadProbeSnapshot | undefined) {
+  return probe?.status === "failed";
 }
 
 function isActiveSource(source: ExternalPriceDbSourceSnapshot | undefined) {

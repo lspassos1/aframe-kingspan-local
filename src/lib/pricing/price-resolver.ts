@@ -8,6 +8,7 @@ import {
 import type { CompositionMatchLocation } from "@/lib/budget-assistant/composition-matching";
 import type { ServiceBudgetCompositionLink } from "@/lib/budget-assistant/service-budget";
 import type { PriceCandidate, PriceCandidateSearchInput, PriceResolutionCandidate, PriceResolverResult } from "./price-candidate-types";
+import { sanitizeOperationalError } from "./price-db-operations";
 import { createDisabledRemotePriceDbAdapter, type RemotePriceDbAdapter } from "./remote-price-db";
 
 export interface PriceResolverInput {
@@ -200,7 +201,10 @@ function hasManualCompositionMarker(composition: ServiceComposition) {
 }
 
 function getRemoteSearchErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return `Remote price database search failed: ${error.message}`;
+  if (error instanceof Error && error.message.trim()) {
+    const safeMessage = sanitizeOperationalError(error.message);
+    return safeMessage ? `Remote price database search failed: ${safeMessage}` : "Remote price database search failed.";
+  }
   return "Remote price database search failed.";
 }
 

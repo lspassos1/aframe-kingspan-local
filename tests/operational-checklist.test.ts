@@ -188,6 +188,60 @@ describe("operational checklist", () => {
     expect(JSON.stringify(checklist)).not.toContain("example.supabase.co");
   });
 
+  it("reports central DB read failures as a safe unavailable search state", () => {
+    const readFailedStatus = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      readProbe: {
+        status: "failed",
+        errorMessage: "RPC 500 at https://example.supabase.co/rest/v1 with api_key=short123",
+      },
+    });
+    const checklist = createOperationalChecklist(
+      {
+        ...disabledEnvironment,
+        centralPriceDbConfigured: true,
+        centralPriceDbLabel: readFailedStatus.centralLabel,
+        lastSemiannualSyncLabel: readFailedStatus.syncLabel,
+        centralPriceDbOperational: readFailedStatus,
+      },
+      defaultProject
+    );
+    const serialized = JSON.stringify(checklist);
+
+    expect(getStatus(checklist, "central-db")).toBe("configurada");
+    expect(getStatus(checklist, "semiannual-sync")).toBe("busca indisponível");
+    expect(checklist.find((item) => item.id === "central-db")?.detail).toContain("Busca central indisponível");
+    expect(serialized).not.toContain("example.supabase.co");
+    expect(serialized).not.toContain("short123");
+  });
+
+  it("surfaces responding central DB smoke results without implying auto approval", () => {
+    const readyStatus = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      readProbe: { status: "ok", checkedAt: "2026-05-13T00:00:00Z" },
+      now: "2026-05-13T00:00:00Z",
+    });
+    const checklist = createOperationalChecklist(
+      {
+        ...disabledEnvironment,
+        centralPriceDbConfigured: true,
+        centralPriceDbLabel: readyStatus.centralLabel,
+        lastSemiannualSyncLabel: readyStatus.syncLabel,
+        centralPriceDbOperational: readyStatus,
+      },
+      defaultProject
+    );
+
+    expect(getStatus(checklist, "central-db")).toBe("configurada");
+    expect(getStatus(checklist, "semiannual-sync")).toBe("atualizada 2026-05");
+    expect(checklist.find((item) => item.id === "central-db")?.detail).toContain("preços ainda exigem aprovação");
+    expect(checklist.find((item) => item.id === "semiannual-sync")?.detail).toContain("Última fonte ativa: 2026-05");
+  });
+
   it("keeps a safe UF status when a legacy project has no scenarios", () => {
     const projectWithoutScenarios: Project = {
       ...defaultProject,

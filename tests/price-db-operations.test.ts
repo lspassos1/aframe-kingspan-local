@@ -56,6 +56,7 @@ describe("external price DB operational status", () => {
       configured: true,
       latestSource: { referenceMonth: "2026-05", status: "active" },
       latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      readProbe: { status: "ok", checkedAt: "2026-05-13T00:00:00Z" },
       now: "2026-05-13T00:00:00Z",
     });
 
@@ -67,6 +68,66 @@ describe("external price DB operational status", () => {
       stale: false,
     });
     expect(status.detail).toContain("preços ainda exigem aprovação");
+    expect(status.syncDetail).toContain("Última fonte ativa");
+    expect(status.technicalDetail).toContain("RPC de preços respondendo");
+  });
+
+  it("reports central read/RPC failures as safe unavailable search status", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      readProbe: {
+        status: "failed",
+        errorMessage: "RPC 403 at https://example.supabase.co/rest/v1/rpc/search_price_candidates with x-api-key: short123",
+      },
+      now: "2026-05-13T00:00:00Z",
+    });
+
+    expect(status).toMatchObject({
+      status: "read-failed",
+      centralLabel: "configurada",
+      syncLabel: "busca indisponível",
+      tone: "warning",
+      stale: false,
+      lastReferenceMonth: "2026-05",
+    });
+    expect(status.detail).toContain("Busca central indisponível");
+    expect(status.syncDetail).toContain("Falha de leitura segura");
+    expect(status.technicalDetail).toContain("RPC de preços");
+    expect(JSON.stringify(status)).not.toContain("example.supabase.co");
+    expect(JSON.stringify(status)).not.toContain("short123");
+  });
+
+  it("preserves stale source freshness when central reads are unavailable", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-01-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-01-02T00:00:00Z" },
+      readProbe: { status: "failed", errorMessage: "RPC 500" },
+      now: "2026-08-01T00:00:00Z",
+    });
+
+    expect(status).toMatchObject({
+      status: "read-failed",
+      stale: true,
+      lastReferenceMonth: "2026-01",
+    });
+  });
+
+  it("reports a responding RPC separately from missing active source snapshots", () => {
+    const status = createExternalPriceDbOperationalStatus({
+      configured: true,
+      readProbe: { status: "ok", checkedAt: "2026-05-13T00:00:00Z" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+    });
+
+    expect(status).toMatchObject({
+      status: "missing-sync",
+      syncLabel: "sem registro",
+      tone: "warning",
+    });
+    expect(status.syncDetail).toContain("RPC de preços respondendo");
   });
 
   it("keeps semiannual references fresh until the next cadence window", () => {
