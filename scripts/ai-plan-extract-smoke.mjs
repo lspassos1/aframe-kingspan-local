@@ -80,6 +80,7 @@ function parseArgs(argv) {
     }
   }
 
+  if (args.help) return args;
   if (args.fixture && args.file) throw new SmokeExit("Use either --fixture or --file, not both.", 3, "invalid-input");
   if (!args.fixture && !args.file) throw new SmokeExit("Provide --file or --fixture.", 3, "missing-file");
   if (args.fixture) args.file = fixturePaths[args.fixture];

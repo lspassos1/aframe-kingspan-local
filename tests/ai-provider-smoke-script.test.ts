@@ -62,7 +62,7 @@ async function runSmokeAsync(args: string[], env: Record<string, string | undefi
   return {
     stdout: result.stdout,
     stderr: result.stderr,
-    json: JSON.parse(result.stdout),
+    json: result.stdout ? JSON.parse(result.stdout) : null,
   };
 }
 
@@ -109,6 +109,19 @@ describe("AI provider smoke script", () => {
     });
     expect(result.stdout).not.toContain("base64");
     expect(result.stdout).not.toContain("sk-");
+  });
+
+  it("prints help without requiring a file or fixture", () => {
+    const result = spawnSync(process.execPath, [scriptPath, "--help"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: childProcessTimeoutMs,
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Usage:");
+    expect(result.stdout).toContain("AI_LIVE_PROVIDER_SMOKE=true");
+    expect(result.stdout).not.toContain("missing-file");
   });
 
   it("fails clearly when local provider configuration is absent", () => {

@@ -51,11 +51,12 @@ jobs:
           AI_LIVE_PROVIDER_SMOKE: "true"
           AI_SMOKE_AUTH_BEARER: ${{ secrets.AI_SMOKE_AUTH_BEARER }}
           AI_SMOKE_AUTH_COOKIE: ${{ secrets.AI_SMOKE_AUTH_COOKIE }}
+          INPUT_ENDPOINT: ${{ inputs.endpoint }}
         run: |
           node scripts/ai-plan-extract-smoke.mjs \
             --mode "${{ inputs.mode }}" \
             --fixture "${{ inputs.fixture }}" \
-            --endpoint "${{ inputs.endpoint }}" \
+            --endpoint "$INPUT_ENDPOINT" \
             --output ai-provider-smoke-report.json \
             --json
 
