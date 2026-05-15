@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { PlanImportProviderUiStatus } from "@/lib/ai/plan-import-ui";
-import { createStartAssistantViewModel, normalizeStartAssistantModeParam } from "@/lib/onboarding/start-guided-assistant";
+import { createStartAiStatusPills, createStartAssistantViewModel, normalizeStartAssistantModeParam } from "@/lib/onboarding/start-guided-assistant";
 
 const planImportCardProps = vi.hoisted(() => ({
   latest: undefined as { onManualFallback?: () => void; aiProviderStatus?: unknown } | undefined,
@@ -97,6 +97,51 @@ describe("createStartAssistantViewModel", () => {
     expect(createStartAssistantViewModel({ mode: "example", planExtractEnabled: true })).toMatchObject({
       shouldRunExample: true,
     });
+  });
+
+  it("separates normal upload availability from the latest runtime failure status", () => {
+    expect(
+      createStartAiStatusPills({
+        planExtractEnabled: true,
+        state: "idle",
+        aiProviderStatus: freeCloudStatus,
+      }).map((item) => item.label)
+    ).toEqual(["Upload habilitado", "Cache por hash ativo quando houver resultado", "Análise gratuita depende de limites externos", "Continuar manualmente disponível"]);
+
+    expect(
+      createStartAiStatusPills({
+        planExtractEnabled: true,
+        state: "error",
+        aiProviderStatus: freeCloudStatus,
+      }).map((item) => item.label)
+    ).toEqual(["Análise não concluída", "Continuar manualmente disponível", "Tente outro arquivo quando possível"]);
+  });
+
+  it("uses distinct product status for limit, temporary outage and successful review states", () => {
+    expect(createStartAiStatusPills({ planExtractEnabled: true, state: "limit-exceeded", aiProviderStatus: freeCloudStatus }).map((item) => item.label)).toEqual([
+      "Limite diário atingido",
+      "Continuar manualmente disponível",
+      "Tente novamente amanhã",
+    ]);
+    expect(createStartAiStatusPills({ planExtractEnabled: true, state: "temporarily-unavailable", aiProviderStatus: freeCloudStatus }).map((item) => item.label)).toEqual([
+      "Upload assistido temporariamente indisponível",
+      "Continuar manualmente disponível",
+    ]);
+    expect(createStartAiStatusPills({ planExtractEnabled: true, state: "review-ready", aiProviderStatus: freeCloudStatus }).map((item) => item.label)).toEqual([
+      "Análise pronta para revisão",
+      "Revisão humana obrigatória",
+      "Continuar manualmente disponível",
+    ]);
+    expect(createStartAiStatusPills({ planExtractEnabled: true, state: "cache-hit", aiProviderStatus: freeCloudStatus }).map((item) => item.label)).toEqual([
+      "Resultado recuperado do cache",
+      "Revisão humana obrigatória",
+      "Continuar manualmente disponível",
+    ]);
+    expect(createStartAiStatusPills({ planExtractEnabled: true, state: "applied", aiProviderStatus: freeCloudStatus }).map((item) => item.label)).toEqual([
+      "Campos aplicados",
+      "Revisar medidas antes de seguir",
+      "Continuar manualmente disponível",
+    ]);
   });
 });
 

@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, CircleHelp, Clock3, FileCheck2, FileUp, FolderOpen, Keyboard, RotateCcw, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, FileUp, FolderOpen, Keyboard, ShieldCheck } from "lucide-react";
 import { PlanImportCard } from "@/components/ai/PlanImportCard";
 import { StartProjectForm } from "@/components/onboarding/StartProjectForm";
 import { ActionCard, InlineHelp, PageFrame, PageHeader, SectionHeader, StepProgress, StatusPill, StickySummary } from "@/components/shared/design-system";
 import { Button } from "@/components/ui/button";
 import { defaultProject } from "@/data/defaultProject";
-import { defaultPlanImportProviderUiStatus, type PlanImportProviderUiStatus } from "@/lib/ai/plan-import-ui";
-import { createStartAssistantViewModel, type StartAssistantMode } from "@/lib/onboarding/start-guided-assistant";
+import { defaultPlanImportProviderUiStatus, type PlanImportProviderUiStatus, type PlanImportState } from "@/lib/ai/plan-import-ui";
+import { createStartAiStatusPills, createStartAssistantViewModel, type StartAssistantMode } from "@/lib/onboarding/start-guided-assistant";
 import type { StartRedirectReason } from "@/lib/routes/shell";
 import { cloneProject } from "@/lib/store/project-normalization";
 import { useProjectStore } from "@/lib/store/project-store";
@@ -70,9 +70,14 @@ export function StartGuidedAssistant({
   const setProject = useProjectStore((state) => state.setProject);
   const setOnboardingCompleted = useProjectStore((state) => state.setOnboardingCompleted);
   const [mode, setMode] = useState<StartAssistantMode>(initialMode);
+  const [planImportState, setPlanImportState] = useState<PlanImportState>("idle");
   const openedInitialExampleRef = useRef(false);
   const viewModel = useMemo(() => createStartAssistantViewModel({ mode, planExtractEnabled, aiMode: aiProviderStatus.mode }), [aiProviderStatus.mode, mode, planExtractEnabled]);
   const aiOperationalFacts = useMemo(() => getAiOperationalFacts(aiProviderStatus), [aiProviderStatus]);
+  const aiStatusPills = useMemo(
+    () => createStartAiStatusPills({ planExtractEnabled, state: planImportState, aiProviderStatus }),
+    [aiProviderStatus, planExtractEnabled, planImportState]
+  );
   const aiReadyLabel = aiProviderStatus.modeLabel;
   const aiConfiguredLabel = aiProviderStatus.modeLabel;
 
@@ -102,6 +107,7 @@ export function StartGuidedAssistant({
       openExampleProject();
       return;
     }
+    setPlanImportState("idle");
     setMode(nextMode);
   }
 
@@ -232,7 +238,7 @@ export function StartGuidedAssistant({
               description="Arraste ou selecione um arquivo. O app mostra cache, limite, análise e revisão antes de aplicar qualquer dado."
               action={<StatusPill tone="pending">{aiProviderStatus.mode === "free-cloud" ? "Modo gratuito + revisão" : "Revisão obrigatória"}</StatusPill>}
             />
-            <PlanImportCard planExtractEnabled={planExtractEnabled} aiProviderStatus={aiProviderStatus} onManualFallback={openManualCompletion} />
+            <PlanImportCard planExtractEnabled={planExtractEnabled} aiProviderStatus={aiProviderStatus} onManualFallback={openManualCompletion} onStateChange={setPlanImportState} />
           </div>
 
           <StickySummary
@@ -250,14 +256,11 @@ export function StartGuidedAssistant({
               ))}
             </div>
             <div className="mt-3 grid gap-2">
-              <StatusPill tone={planExtractEnabled ? "success" : "warning"} icon={planExtractEnabled ? FileCheck2 : CircleHelp}>
-                {planExtractEnabled ? "Upload habilitado" : "Upload aguardando configuração"}
-              </StatusPill>
-              <StatusPill tone="pending" icon={Clock3}>Cache por hash ativo quando houver resultado</StatusPill>
-              {aiProviderStatus.mode === "free-cloud" ? (
-                <StatusPill tone="warning" icon={ShieldCheck}>Análise gratuita depende de limites externos</StatusPill>
-              ) : null}
-              <StatusPill tone="info" icon={RotateCcw}>Continuar manualmente disponível</StatusPill>
+              {aiStatusPills.map((item) => (
+                <StatusPill key={item.label} tone={item.tone}>
+                  {item.label}
+                </StatusPill>
+              ))}
             </div>
             <InlineHelp tone="warning" className="mt-3">
               Nenhum campo extraído altera o estudo sem revisão humana. Método incerto fica como sugestão.

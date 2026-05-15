@@ -55,6 +55,7 @@ type PlanImportCardProps = {
   planExtractEnabled?: boolean;
   aiProviderStatus?: PlanImportProviderUiStatus;
   onManualFallback?: () => void;
+  onStateChange?: (state: PlanImportState) => void;
   initialState?: PlanImportState;
 };
 
@@ -131,7 +132,83 @@ function getReviewStatusLabel(review?: PlanExtractReviewPayload, providerStatus:
   return undefined;
 }
 
-export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = defaultPlanImportProviderUiStatus, onManualFallback, initialState = "idle" }: PlanImportCardProps) {
+function getPlanImportProductStatusLines({
+  planExtractEnabled,
+  state,
+  aiProviderStatus,
+  reviewStatusLabel,
+  providerMeta,
+}: {
+  planExtractEnabled: boolean;
+  state: PlanImportState;
+  aiProviderStatus: PlanImportProviderUiStatus;
+  reviewStatusLabel?: string;
+  providerMeta: { provider?: string; remaining?: string; limit?: string; cached?: boolean };
+}) {
+  if (!planExtractEnabled) {
+    return [
+      aiProviderStatus.mode === "free-cloud" ? "Modo gratuito aguardando configuração no servidor." : "Modo Pro aguardando configuração no servidor.",
+      "Continuar manualmente disponível.",
+    ];
+  }
+
+  if (state === "error") {
+    return ["Análise não concluída.", "Continuar manualmente disponível.", "Tente outro arquivo quando a análise estiver disponível."];
+  }
+
+  if (state === "temporarily-unavailable") {
+    return ["Upload assistido temporariamente indisponível.", "Continuar manualmente disponível.", "Configuração sendo verificada com segurança."];
+  }
+
+  if (state === "limit-exceeded") {
+    return ["Limite diário atingido.", "Continuar manualmente disponível.", "Tente novamente amanhã."];
+  }
+
+  if (state === "cache-hit") {
+    return ["Resultado recuperado do cache.", "Revisão humana obrigatória.", "Limite diário não foi consumido."];
+  }
+
+  if (state === "review-ready") {
+    return ["Análise pronta para revisão.", reviewStatusLabel ?? "Revisão humana obrigatória.", "Nada será aplicado sem confirmação."];
+  }
+
+  if (state === "applied") {
+    return ["Campos aplicados.", "Revise medidas antes de seguir.", "Você pode voltar ao preenchimento manual a qualquer momento."];
+  }
+
+  if (state === "uploading") {
+    return ["Upload em andamento.", "Aguarde a análise antes de trocar de arquivo.", "Nada será aplicado sem revisão."];
+  }
+
+  if (state === "analyzing") {
+    return ["Análise em andamento.", "Campos preliminares serão enviados para revisão.", "Nada será aplicado automaticamente."];
+  }
+
+  const lines = [
+    aiProviderStatus.mode === "free-cloud"
+      ? `Modo gratuito: ${aiProviderStatus.primaryProviderLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando configuração no servidor"}.`
+      : `${aiProviderStatus.modeLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando configuração no servidor"}.`,
+  ];
+
+  if (aiProviderStatus.mode === "free-cloud" && aiProviderStatus.reviewProviderLabel) {
+    lines.push(`Revisão: ${aiProviderStatus.reviewProviderLabel}${aiProviderStatus.reviewConfigured ? "" : " aguardando configuração no servidor"}.`);
+  }
+  if (providerMeta.provider) lines.push(`Resposta: ${formatPlanImportProviderName(providerMeta.provider)}.`);
+  if (reviewStatusLabel) lines.push(reviewStatusLabel);
+  if (providerMeta.cached) lines.push("Cache reaproveitado; limite diário não foi consumido.");
+  if (providerMeta.remaining && providerMeta.limit) lines.push(`Limite restante hoje: ${providerMeta.remaining}/${providerMeta.limit}.`);
+  if (aiProviderStatus.mode === "free-cloud") lines.push("Sem cobrança automática; continue manualmente se a análise não estiver disponível.");
+
+  return lines;
+}
+
+export function PlanImportCard({
+  planExtractEnabled = true,
+  aiProviderStatus = defaultPlanImportProviderUiStatus,
+  onManualFallback,
+  onStateChange,
+  initialState = "idle",
+}: PlanImportCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const project = useProjectStore((state) => state.project);
   const setProject = useProjectStore((state) => state.setProject);
@@ -165,6 +242,12 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
     aiProviderStatus.mode === "free-cloud"
       ? `${aiProviderStatus.primaryProviderLabel} sugere campos preliminares; o sistema não aplica nada sem revisão humana.`
       : "Modo Pro sugere campos preliminares; o sistema não aplica nada sem revisão humana.";
+  const productStatusLines = getPlanImportProductStatusLines({ planExtractEnabled, state, aiProviderStatus, reviewStatusLabel, providerMeta });
+
+  function updateState(nextState: PlanImportState) {
+    setState(nextState);
+    onStateChange?.(nextState);
+  }
 
   function openManualFallback() {
     if (onManualFallback) {
@@ -179,7 +262,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
   async function uploadFile(file: File) {
     if (!canUpload) return;
 
-    setState("uploading");
+    updateState("uploading");
     setMessage("");
     setResult(null);
     setModifiedValues({});
@@ -195,7 +278,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
         body: formData,
       });
       await waitForNextPaint();
-      setState("analyzing");
+      updateState("analyzing");
       const response = await responsePromise;
       const payload = (await response.json().catch(() => null)) as PlanExtractApiPayload | null;
       const nextState = getPlanImportStateFromResponse({
@@ -207,14 +290,14 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
       });
 
       if (!response.ok) {
-        setState(nextState);
+        updateState(nextState);
         setMessage(getPlanImportPayloadMessage(payload, nextState));
         return;
       }
 
       const parsed = planExtractResultSchema.safeParse(payload?.result);
       if (!parsed.success) {
-        setState("error");
+        updateState("error");
         setMessage("A resposta da extração veio em formato inválido.");
         return;
       }
@@ -231,10 +314,10 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
         remaining: response.headers.get("X-RateLimit-Remaining") ?? undefined,
         limit: response.headers.get("X-RateLimit-Limit") ?? undefined,
       });
-      setState(nextState);
+      updateState(nextState);
       setMessage(getPlanImportPayloadMessage(payload, nextState));
     } catch {
-      setState("error");
+      updateState("error");
       setMessage("Falha de rede ao enviar a planta. Tente novamente ou preencha manualmente.");
     } finally {
       setIsDragging(false);
@@ -279,7 +362,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
     const updatedProject = applyPlanExtractToProject(current, current.selectedScenarioId, reviewedResult, nextSelectedFields);
     setProject(updatedProject);
     setModifiedValues({});
-    setState("applied");
+    updateState("applied");
     setMessage("Campos aplicados. Revise os dados antes de continuar.");
     openManualFallback();
   }
@@ -291,7 +374,7 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
     setQuestionAnswers({});
     setProviderMeta({});
     setMessage("");
-    setState("idle");
+    updateState("idle");
   }
 
   function returnToManual() {
@@ -392,32 +475,10 @@ export function PlanImportCard({ planExtractEnabled = true, aiProviderStatus = d
             ) : null}
           </div>
 
-          <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-            <p>
-              {aiProviderStatus.mode === "free-cloud"
-                ? `Modo gratuito: ${aiProviderStatus.primaryProviderLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando configuração no servidor"}.`
-                : `${aiProviderStatus.modeLabel}${aiProviderStatus.primaryConfigured ? "" : " aguardando configuração no servidor"}.`}
-            </p>
-            {aiProviderStatus.mode === "free-cloud" && aiProviderStatus.reviewProviderLabel ? (
-              <p>
-                Revisão: {aiProviderStatus.reviewProviderLabel}
-                {aiProviderStatus.reviewConfigured ? "" : " aguardando configuração no servidor"}.
-              </p>
-            ) : null}
-            {providerMeta.provider ? (
-              <p>Resposta: {formatPlanImportProviderName(providerMeta.provider)}.</p>
-            ) : null}
-            {reviewStatusLabel ? <p>{reviewStatusLabel}</p> : null}
-            {providerMeta.cached ? <p>Cache reaproveitado; limite diário não foi consumido.</p> : null}
-            {providerMeta.remaining && providerMeta.limit ? <p>Limite restante hoje: {providerMeta.remaining}/{providerMeta.limit}.</p> : null}
-            {aiProviderStatus.mode === "free-cloud" ? <p>Sem cobrança automática; continue manualmente se a análise não estiver disponível.</p> : null}
-            {!planExtractEnabled ? (
-              <p>
-                {aiProviderStatus.mode === "free-cloud"
-                  ? "Configure o modo gratuito no servidor ou continue manualmente."
-                  : "Configure o Modo Pro no servidor ou continue manualmente."}
-              </p>
-            ) : null}
+          <div className="mt-4 space-y-2 text-xs text-muted-foreground" aria-label="Status do upload assistido">
+            {productStatusLines.map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
           </div>
           {canShowManualRecovery ? (
             <div className="mt-4 flex flex-wrap gap-2">

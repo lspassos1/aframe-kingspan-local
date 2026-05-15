@@ -181,7 +181,8 @@ describe("PlanImportCard", () => {
 
     expect(html).toContain("Upload assistido indisponível");
     expect(html).toContain("Configure o Modo Pro no servidor.");
-    expect(html).toContain("Configure o Modo Pro no servidor ou continue manualmente.");
+    expect(html).toContain("Modo Pro aguardando configuração no servidor.");
+    expect(html).toContain("Continuar manualmente disponível.");
     expect(html).toContain("Continuar manualmente");
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
@@ -210,6 +211,30 @@ describe("PlanImportCard", () => {
     expect(html).not.toContain("fallback pago");
   });
 
+  it("shows runtime failure as the current product status instead of healthy availability", () => {
+    const html = renderToStaticMarkup(
+      createElement(PlanImportCard, {
+        planExtractEnabled: true,
+        aiProviderStatus: freeCloudStatus,
+        initialState: "error",
+      })
+    );
+
+    expect(html).toContain('data-state="error"');
+    expect(html).toContain("Análise indisponível");
+    expect(html).toContain("Análise não concluída.");
+    expect(html).toContain("Continuar manualmente disponível.");
+    expect(html).toContain("Tente outro arquivo quando a análise estiver disponível.");
+    expect(html).toContain("Continuar manualmente");
+    expect(html).not.toContain("Modo gratuito: Análise rápida.");
+    expect(html).not.toContain("Cache reaproveitado");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
+    expect(html).not.toContain(sensitiveOpenAiKeyName);
+    expect(html).not.toContain("router");
+    expect(html).not.toContain("fallback pago");
+  });
+
   it("does not duplicate the daily limit fallback sentence across the limit UI", () => {
     const html = renderToStaticMarkup(
       createElement(PlanImportCard, {
@@ -228,7 +253,8 @@ describe("PlanImportCard", () => {
     const html = renderToStaticMarkup(createElement(PlanImportCard, { planExtractEnabled: false, aiProviderStatus: freeCloudStatus }));
 
     expect(html).toContain("Configure o modo gratuito no servidor.");
-    expect(html).toContain("Configure o modo gratuito no servidor ou continue manualmente.");
+    expect(html).toContain("Modo gratuito aguardando configuração no servidor.");
+    expect(html).toContain("Continuar manualmente disponível.");
     expect(html).toContain("Continuar manualmente");
     expect(html).not.toContain(sensitiveOpenAiKeyName);
   });
