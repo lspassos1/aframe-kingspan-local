@@ -3,6 +3,7 @@ import { mergePlanExtractionResults, type PlanExtractComparisonSummary } from "@
 import { parsePlanExtractResult, type PlanExtractResult } from "@/lib/ai/plan-extract-schema";
 import { AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError, getAiTaskProviderId, resolveAiTaskProvider, type AiCloudProviderId } from "@/lib/ai/free-cloud-router";
+import { isPlanExtractImageMimeType } from "@/lib/ai/plan-image-mime";
 import { readAiProductMode } from "@/lib/ai/mode";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
@@ -34,6 +35,18 @@ export type AiPlanExtractProviderResult = {
   model: string;
   tokens?: number;
   review?: AiPlanReviewResult;
+  diagnostics?: {
+    providerAttempts: AiPlanExtractProviderAttempt[];
+  };
+};
+
+export type AiPlanExtractProviderAttempt = {
+  provider: AiPlanExtractProviderId;
+  attempt: number;
+  outcome: "success" | "failed";
+  durationMs: number;
+  status?: number;
+  retryReason?: "timeout" | "transient-error";
 };
 
 export type AiPlanReviewResult = {
@@ -333,9 +346,7 @@ export async function callGeminiPlanExtractProvider(
       body: JSON.stringify(createGeminiPlanExtractRequest(input)),
     });
 
-    if (!response.ok) {
-      throw new Error(`Provider gemini respondeu ${response.status}.`);
-    }
+    if (!response.ok) throw new AiProviderHttpError(`Provider gemini respondeu ${response.status}.`, response.status);
 
     const payload = (await response.json()) as {
       usageMetadata?: { totalTokenCount?: number };
@@ -376,6 +387,41 @@ function isRetryableReviewError(error: unknown) {
   if (error instanceof AiProviderHttpError) return error.status === 408 || error.status === 409 || error.status === 425 || error.status === 429 || error.status >= 500;
   if (error instanceof AiRouterError || error instanceof AiProviderUnavailableError) return false;
   return true;
+}
+
+function getProviderHttpStatus(error: unknown) {
+  if (error instanceof AiProviderHttpError) return error.status;
+  const message = error instanceof Error ? error.message : String(error);
+  const match = message.match(/\b([1-5]\d{2})\b/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function isProviderAbortOrTimeout(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return error.name === "AbortError" || /\b(abort|timeout|timed out|tempo esgotado)\b/i.test(error.message);
+}
+
+function getFreeImageProviderRetryReason(provider: AiPlanExtractProviderConfig, input: AiPlanExtractInput, error: unknown, env: AiPlanExtractEnv) {
+  if (!isFreeCloudMode(env)) return undefined;
+  if (!isPlanExtractImageMimeType(input.mimeType)) return undefined;
+  if (provider.id !== "gemini") return undefined;
+  if (error instanceof AiRouterError || error instanceof AiProviderUnavailableError) return undefined;
+  const status = getProviderHttpStatus(error);
+  if (isProviderAbortOrTimeout(error) || status === 408 || status === 504) return "timeout";
+  if (status !== undefined && status >= 500) return "transient-error";
+  return undefined;
+}
+
+function mergeProviderAttempts(
+  result: AiPlanExtractProviderResult,
+  providerAttempts: AiPlanExtractProviderAttempt[]
+): AiPlanExtractProviderResult {
+  return {
+    ...result,
+    diagnostics: {
+      providerAttempts,
+    },
+  };
 }
 
 function serializeReviewError(error: unknown, retryable: boolean) {
@@ -492,16 +538,43 @@ export async function extractPlanWithProviderChain(
   if (providers.length === 0) throw new AiProviderUnavailableError();
 
   const errors: Array<{ provider: string; message: string }> = [];
+  const providerAttempts: AiPlanExtractProviderAttempt[] = [];
   const callProvider = options.callProvider ?? callPlanExtractProvider;
   const callReviewProvider = options.callReviewProvider ?? callProvider;
   for (const provider of providers) {
-    try {
-      const primary = await callProvider(provider, input);
-      return await attachPlanReview(primary, input, env, callReviewProvider);
-    } catch (error) {
-      errors.push({ provider: provider.id, message: error instanceof Error ? error.message : "Erro desconhecido." });
+    let attempt = 1;
+    while (attempt <= 2) {
+      const startedAt = Date.now();
+      try {
+        const primary = await callProvider(provider, input);
+        providerAttempts.push({
+          provider: provider.id,
+          attempt,
+          outcome: "success",
+          durationMs: Date.now() - startedAt,
+        });
+        const extraction = await attachPlanReview(primary, input, env, callReviewProvider);
+        return mergeProviderAttempts(extraction, providerAttempts);
+      } catch (error) {
+        const retryReason = attempt === 1 ? getFreeImageProviderRetryReason(provider, input, error, env) : undefined;
+        providerAttempts.push({
+          provider: provider.id,
+          attempt,
+          outcome: "failed",
+          durationMs: Date.now() - startedAt,
+          status: getProviderHttpStatus(error),
+          retryReason,
+        });
+        if (retryReason) {
+          attempt += 1;
+          continue;
+        }
+
+        errors.push({ provider: provider.id, message: error instanceof Error ? error.message : "Erro desconhecido." });
+        break;
+      }
     }
   }
 
-  throw new AiProviderChainError(errors);
+  throw new AiProviderChainError(errors, providerAttempts);
 }

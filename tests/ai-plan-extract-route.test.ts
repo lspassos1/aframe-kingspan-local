@@ -70,6 +70,72 @@ describe("plan extract route diagnostics", () => {
     expect(JSON.stringify(payload)).not.toContain("secret-token");
   });
 
+  it("returns safe free image failure reasons without exposing provider internals", () => {
+    const rateLimitedPayload = getPlanExtractErrorPayload(
+      new AiProviderChainError(
+        [
+          {
+            provider: "gemini",
+            message: "Provider gemini respondeu 503 at https://example.test with x-api-key=secret-token",
+          },
+          {
+            provider: "openrouter",
+            message: "Provider openrouter respondeu 429.",
+          },
+        ],
+        [
+          {
+            provider: "gemini",
+            attempt: 1,
+            outcome: "failed",
+            durationMs: 20,
+            status: 503,
+            retryReason: "transient-error",
+          },
+          {
+            provider: "openrouter",
+            attempt: 1,
+            outcome: "failed",
+            durationMs: 20,
+            status: 429,
+          },
+        ]
+      ),
+      { mimeType: "image/png", env: { AI_MODE: "free-cloud" } }
+    );
+    const timeoutPayload = getPlanExtractErrorPayload(
+      new AiProviderChainError(
+        [
+          {
+            provider: "gemini",
+            message: "Provider gemini abort timeout.",
+          },
+        ],
+        [
+          {
+            provider: "gemini",
+            attempt: 1,
+            outcome: "failed",
+            durationMs: 20,
+            retryReason: "timeout",
+          },
+        ]
+      ),
+      { mimeType: "image/jpeg", env: { AI_MODE: "free-cloud" } }
+    );
+
+    expect(rateLimitedPayload).toMatchObject({
+      reason: "free-image-provider-rate-limited",
+      message: "A análise gratuita está temporariamente indisponível. Continue manualmente ou tente novamente mais tarde.",
+    });
+    expect(timeoutPayload).toMatchObject({
+      reason: "free-image-provider-timeout",
+      message: "A análise gratuita demorou demais. Continue manualmente ou tente uma imagem menor.",
+    });
+    expect(JSON.stringify(rateLimitedPayload)).not.toContain("example.test");
+    expect(JSON.stringify(rateLimitedPayload)).not.toContain("secret-token");
+  });
+
   it("reads only the explicit supported plan extraction modes from form data", () => {
     const freeForm = new FormData();
     freeForm.set("aiMode", "free-cloud");

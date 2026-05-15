@@ -17,7 +17,10 @@ export class AiProviderUnavailableError extends AiPlanExtractError {
 }
 
 export class AiProviderChainError extends AiPlanExtractError {
-  constructor(readonly providerErrors: Array<{ provider: string; message: string }>) {
+  constructor(
+    readonly providerErrors: Array<{ provider: string; message: string }>,
+    readonly providerAttempts: Array<{ provider: string; attempt: number; outcome: "success" | "failed"; durationMs: number; status?: number; retryReason?: string }> = []
+  ) {
     super("Todos os providers configurados falharam ao extrair a planta.", "ai-provider-chain-failed", 502);
     this.name = "AiProviderChainError";
   }

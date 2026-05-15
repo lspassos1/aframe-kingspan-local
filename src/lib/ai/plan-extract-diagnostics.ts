@@ -14,6 +14,26 @@ export type PlanExtractDiagnosticProviderError = {
   status?: number;
 };
 
+export type PlanExtractProviderAttemptDiagnostic = {
+  provider: string;
+  attempt: number;
+  outcome: "success" | "failed";
+  durationMs?: number;
+  status?: number;
+  retryReason?: string;
+};
+
+export type PlanExtractImageProcessingDiagnostic = {
+  status: "processed" | "unchanged" | "skipped" | "failed";
+  reason: "within-limits" | "large-image" | "heavy-png" | "large-image-heavy-png" | "processed-not-smaller" | "metadata-unavailable" | "non-image" | "preprocess-error";
+  originalSizeBucket: string;
+  processedSizeBucket: string;
+  originalDimensions?: { width: number; height: number };
+  processedDimensions?: { width: number; height: number };
+  originalFormat: string;
+  processedFormat: string;
+};
+
 export type PlanExtractDiagnosticAttemptInput = {
   diagnosticId: string;
   mode: AiProductMode;
@@ -27,6 +47,8 @@ export type PlanExtractDiagnosticAttemptInput = {
   providerErrors?: PlanExtractDiagnosticProviderError[];
   durationMs?: number;
   providerDurations?: Array<{ provider: string; durationMs: number }>;
+  providerAttempts?: PlanExtractProviderAttemptDiagnostic[];
+  imageProcessing?: PlanExtractImageProcessingDiagnostic;
   quota: PlanExtractDiagnosticQuotaStatus;
   message?: string;
   env?: PlanExtractDiagnosticEnv;
@@ -49,6 +71,8 @@ export type PlanExtractDiagnosticRecord = {
   externalStatuses: number[];
   durationMs?: number;
   providerDurations: Array<{ provider: string; durationMs: number }>;
+  providerAttempts: PlanExtractProviderAttemptDiagnostic[];
+  imageProcessing?: PlanExtractImageProcessingDiagnostic;
   quota: PlanExtractDiagnosticQuotaStatus;
   message: string;
 };
@@ -80,6 +104,10 @@ function sanitizeDiagnosticText(value: string | undefined) {
 function extractHttpStatus(message: string) {
   const match = message.match(/\b([1-5]\d{2})\b/);
   return match ? Number(match[1]) : undefined;
+}
+
+function normalizePositiveInteger(value: number | undefined) {
+  return Number.isFinite(value) ? Math.max(0, Math.round(value as number)) : undefined;
 }
 
 export function createPlanExtractDiagnosticId() {
@@ -126,11 +154,36 @@ export function createPlanExtractDiagnosticRecord(input: PlanExtractDiagnosticAt
     providersTried: Array.from(new Set((input.providersTried ?? providerErrors.map((error) => error.provider)).map(normalizeDiagnosticToken).filter(Boolean))),
     providerErrors,
     externalStatuses,
-    durationMs: Number.isFinite(input.durationMs) ? Math.max(0, Math.round(input.durationMs ?? 0)) : undefined,
+    durationMs: normalizePositiveInteger(input.durationMs),
     providerDurations: (input.providerDurations ?? []).map((duration) => ({
       provider: normalizeDiagnosticToken(duration.provider),
       durationMs: Math.max(0, Math.round(duration.durationMs)),
     })),
+    providerAttempts: (input.providerAttempts ?? []).map((attempt) => {
+      const durationMs = normalizePositiveInteger(attempt.durationMs);
+      const status = normalizePositiveInteger(attempt.status);
+      const retryReason = normalizeDiagnosticToken(attempt.retryReason ?? "");
+      return {
+        provider: normalizeDiagnosticToken(attempt.provider),
+        attempt: Math.max(1, Math.round(attempt.attempt)),
+        outcome: attempt.outcome === "success" ? "success" : "failed",
+        ...(durationMs === undefined ? {} : { durationMs }),
+        ...(status === undefined ? {} : { status }),
+        ...(retryReason ? { retryReason } : {}),
+      };
+    }),
+    imageProcessing: input.imageProcessing
+      ? {
+          status: input.imageProcessing.status,
+          reason: input.imageProcessing.reason,
+          originalSizeBucket: input.imageProcessing.originalSizeBucket,
+          processedSizeBucket: input.imageProcessing.processedSizeBucket,
+          originalDimensions: input.imageProcessing.originalDimensions,
+          processedDimensions: input.imageProcessing.processedDimensions,
+          originalFormat: normalizeDiagnosticToken(input.imageProcessing.originalFormat) || "unknown",
+          processedFormat: normalizeDiagnosticToken(input.imageProcessing.processedFormat) || "unknown",
+        }
+      : undefined,
     quota: input.quota,
     message: sanitizeDiagnosticText(input.message),
   };

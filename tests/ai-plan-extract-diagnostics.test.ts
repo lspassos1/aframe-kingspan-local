@@ -117,6 +117,73 @@ describe("plan extraction diagnostics", () => {
     });
   });
 
+  it("records safe image preprocessing and provider retry metadata", () => {
+    const record = createPlanExtractDiagnosticRecord({
+      ...baseAttempt,
+      reason: "free-image-provider-timeout",
+      imageProcessing: {
+        status: "processed",
+        reason: "large-image",
+        originalSizeBucket: "5-10MB",
+        processedSizeBucket: "1-5MB",
+        originalDimensions: { width: 4200, height: 3200 },
+        processedDimensions: { width: 2048, height: 1560 },
+        originalFormat: "png",
+        processedFormat: "jpeg",
+      },
+      providerAttempts: [
+        {
+          provider: "gemini",
+          attempt: 1,
+          outcome: "failed",
+          durationMs: 45000,
+          status: 504,
+          retryReason: "timeout",
+        },
+        {
+          provider: "gemini",
+          attempt: 2,
+          outcome: "failed",
+          durationMs: 1200,
+          status: 503,
+        },
+      ],
+    });
+    const serialized = JSON.stringify(record);
+
+    expect(record).toMatchObject({
+      reason: "free-image-provider-timeout",
+      imageProcessing: {
+        status: "processed",
+        reason: "large-image",
+        originalDimensions: { width: 4200, height: 3200 },
+        processedDimensions: { width: 2048, height: 1560 },
+        originalFormat: "png",
+        processedFormat: "jpeg",
+      },
+      providerAttempts: [
+        {
+          provider: "gemini",
+          attempt: 1,
+          outcome: "failed",
+          durationMs: 45000,
+          status: 504,
+          retryReason: "timeout",
+        },
+        {
+          provider: "gemini",
+          attempt: 2,
+          outcome: "failed",
+          durationMs: 1200,
+          status: 503,
+        },
+      ],
+    });
+    expect(serialized).not.toContain("base64");
+    expect(serialized).not.toContain("apikey");
+    expect(serialized).not.toContain("Bearer");
+  });
+
   it("writes sanitized diagnostics to Redis-compatible storage with TTL metadata", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(Array.from({ length: 7 }, () => ({ result: "OK" }))), { status: 200 }));
     const store = createRedisPlanExtractDiagnosticStore(
