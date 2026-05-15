@@ -23,6 +23,7 @@ describe("operational environment status", () => {
       aiModelConfigured: true,
       aiRateLimitSaltConfigured: false,
       aiRateLimitStorageConfigured: false,
+      aiDiagnosticsStorageConfigured: false,
       providerLabel: "Modo gratuito",
       dailyLimitLabel: "4/usuário · 6/IP · 80/global",
       centralPriceDbConfigured: false,
@@ -98,6 +99,7 @@ describe("operational environment status", () => {
 
     expect(status.aiRateLimitSaltConfigured).toBe(true);
     expect(status.aiRateLimitStorageConfigured).toBe(true);
+    expect(status.aiDiagnosticsStorageConfigured).toBe(true);
     expect(JSON.stringify(status)).not.toContain("super-secret");
     expect(JSON.stringify(status)).not.toContain("upstash.io");
   });
@@ -111,6 +113,7 @@ describe("operational environment status", () => {
 
     expect(status.aiRateLimitSaltConfigured).toBe(true);
     expect(status.aiRateLimitStorageConfigured).toBe(true);
+    expect(status.aiDiagnosticsStorageConfigured).toBe(true);
     expect(JSON.stringify(status)).not.toContain("super-secret");
     expect(JSON.stringify(status)).not.toContain("upstash.io");
   });

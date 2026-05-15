@@ -1,6 +1,7 @@
 import "server-only";
 
 import { resolveAiMode } from "@/lib/ai/mode";
+import { hasPlanExtractDiagnosticStorage } from "@/lib/ai/plan-extract-diagnostics";
 import type { OperationalEnvironmentStatus } from "@/lib/operations/operational-checklist";
 import { createExternalPriceDbOperationalStatus } from "@/lib/pricing/price-db-operations";
 
@@ -34,6 +35,7 @@ export function createOperationalEnvironmentStatus(env: Record<string, string | 
     aiModelConfigured: aiMode.primaryModelConfigured,
     aiRateLimitSaltConfigured: hasEnv(env, "AI_RATE_LIMIT_SALT"),
     aiRateLimitStorageConfigured: hasPersistentRateLimitStorage(env),
+    aiDiagnosticsStorageConfigured: hasPlanExtractDiagnosticStorage(env),
     providerLabel: aiMode.publicModeLabel,
     dailyLimitLabel: `${perUserLimit}/usuário · ${perIpLimit}/IP · ${globalLimit}/global`,
     centralPriceDbConfigured,

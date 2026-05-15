@@ -13,12 +13,25 @@ import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtrac
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError } from "@/lib/ai/free-cloud-router";
 import { createAiModeScopedEnv, readAiProductMode, type AiModeEnv, type AiProductMode } from "@/lib/ai/mode";
+import {
+  createPlanExtractDiagnosticId,
+  recordPlanExtractDiagnosticAttempt,
+  type PlanExtractDiagnosticCacheStatus,
+  type PlanExtractDiagnosticQuotaStatus,
+  type PlanExtractDiagnosticStatus,
+} from "@/lib/ai/plan-extract-diagnostics";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 export const runtime = "nodejs";
 
 function jsonResponse(body: Record<string, unknown>, init?: ResponseInit) {
   return NextResponse.json(body, init);
+}
+
+function jsonDiagnosticResponse(body: Record<string, unknown>, diagnosticId: string, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  headers.set("X-AI-Diagnostic-Id", diagnosticId);
+  return jsonResponse({ ...body, diagnosticId }, { ...init, headers });
 }
 
 export function serializeProviderErrorsForClient(providerErrors: Array<{ provider: string; message: string }>) {
@@ -34,6 +47,10 @@ export function readRequestedPlanExtractMode(formData: FormData | null): AiProdu
 
 function createModeEnv(mode: AiProductMode): AiModeEnv {
   return createAiModeScopedEnv(process.env, mode);
+}
+
+function compactProviders<T extends string>(providers: Array<T | undefined>) {
+  return providers.filter((provider): provider is T => Boolean(provider));
 }
 
 export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?: string; env?: AiModeEnv } = {}) {
@@ -103,6 +120,27 @@ function logPlanExtractFailure(error: unknown, context: { mimeType?: string; env
   });
 }
 
+function getDiagnosticStatusForError(error: unknown): PlanExtractDiagnosticStatus {
+  if (error instanceof AiProviderChainError) return "provider_chain_failed";
+  if (error instanceof AiProviderUnavailableError || error instanceof AiRouterError) return "setup_unavailable";
+  if (error instanceof AiPlanExtractError && error.status < 500) return "invalid_file";
+  return "provider_chain_failed";
+}
+
+function getDiagnosticReasonForError(error: unknown) {
+  if (error instanceof AiProviderChainError) return error.code;
+  if (error instanceof AiProviderUnavailableError || error instanceof AiRouterError || error instanceof AiPlanExtractError) return error.code;
+  return "unexpected-error";
+}
+
+function getDiagnosticProviderErrors(error: unknown) {
+  if (!(error instanceof AiProviderChainError)) return [];
+  return error.providerErrors.map((providerError) => ({
+    provider: providerError.provider,
+    message: sanitizeAiDiagnosticMessage(providerError.message),
+  }));
+}
+
 export async function POST(request: NextRequest) {
   if (!isAiPlanExtractEnabled()) {
     return jsonResponse({ message: "Extracao de planta por IA ainda nao esta habilitada neste ambiente." }, { status: 403 });
@@ -117,14 +155,71 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData().catch(() => null);
   const requestedMode = readRequestedPlanExtractMode(formData);
   const aiEnv = createModeEnv(requestedMode);
+  const diagnosticId = createPlanExtractDiagnosticId();
+  const startedAt = Date.now();
   const file = formData?.get("file");
+
+  async function recordDiagnostic({
+    status,
+    cache,
+    quota,
+    reason,
+    mimeType,
+    fileSizeBytes,
+    message,
+    providersTried,
+    providerErrors,
+  }: {
+    status: PlanExtractDiagnosticStatus;
+    cache: PlanExtractDiagnosticCacheStatus;
+    quota: PlanExtractDiagnosticQuotaStatus;
+    reason?: string;
+    mimeType?: string;
+    fileSizeBytes?: number;
+    message?: string;
+    providersTried?: string[];
+    providerErrors?: Array<{ provider: string; message: string }>;
+  }) {
+    await recordPlanExtractDiagnosticAttempt({
+      diagnosticId,
+      mode: requestedMode,
+      status,
+      userId: session.userId,
+      mimeType,
+      fileSizeBytes,
+      cache,
+      reason,
+      providersTried,
+      providerErrors,
+      durationMs: Date.now() - startedAt,
+      quota,
+      message,
+      env: aiEnv,
+    });
+  }
+
+  function queueDiagnostic(input: Parameters<typeof recordDiagnostic>[0]) {
+    void recordDiagnostic(input).catch(() => undefined);
+  }
+
   if (!(file instanceof File)) {
-    return jsonResponse({ message: "Envie um arquivo de planta baixa." }, { status: 400 });
+    const message = "Envie um arquivo de planta baixa.";
+    queueDiagnostic({ status: "invalid_file", cache: "SKIP", quota: "not-consumed", reason: "missing-file", message });
+    return jsonDiagnosticResponse({ message }, diagnosticId, { status: 400 });
   }
 
   const validation = validatePlanExtractFile(file);
   if (!validation.valid) {
-    return jsonResponse({ message: validation.message, maxBytes: validation.maxBytes }, { status: validation.status });
+    queueDiagnostic({
+      status: "invalid_file",
+      cache: "SKIP",
+      quota: "not-consumed",
+      reason: `file-validation-${validation.status}`,
+      mimeType: file.type,
+      fileSizeBytes: file.size,
+      message: validation.message,
+    });
+    return jsonDiagnosticResponse({ message: validation.message, maxBytes: validation.maxBytes }, diagnosticId, { status: validation.status });
   }
 
   let fileBytes: Buffer;
@@ -132,14 +227,33 @@ export async function POST(request: NextRequest) {
     fileBytes = Buffer.from(await file.arrayBuffer());
   } catch {
     const payload = getPlanExtractErrorPayload(new AiPlanExtractError("Nao foi possivel ler o arquivo enviado.", "ai-plan-file-read-failed", 400), { env: aiEnv });
-    return jsonResponse(payload, { status: 400 });
+    queueDiagnostic({
+      status: "invalid_file",
+      cache: "SKIP",
+      quota: "not-consumed",
+      reason: "ai-plan-file-read-failed",
+      mimeType: validation.mimeType,
+      fileSizeBytes: file.size,
+      message: typeof payload.message === "string" ? payload.message : undefined,
+    });
+    return jsonDiagnosticResponse(payload, diagnosticId, { status: 400 });
   }
 
   const cacheStore = createMemoryPlanExtractCacheStore();
   const cacheKey = createPlanExtractCacheKey({ fileBytes, mimeType: validation.mimeType, env: aiEnv });
   const cachedExtraction = await cacheStore.get(cacheKey.key).catch(() => null);
   if (cachedExtraction) {
-    return jsonResponse(
+    queueDiagnostic({
+      status: "success",
+      cache: "HIT",
+      quota: "not-consumed",
+      reason: "cache-hit",
+      mimeType: validation.mimeType,
+      fileSizeBytes: fileBytes.byteLength,
+      providersTried: compactProviders([cachedExtraction.provider, cachedExtraction.review?.provider]),
+      message: "Resultado recuperado do cache.",
+    });
+    return jsonDiagnosticResponse(
       {
         mode: requestedMode,
         result: cachedExtraction.result,
@@ -149,6 +263,7 @@ export async function POST(request: NextRequest) {
         review: cachedExtraction.review,
         cached: true,
       },
+      diagnosticId,
       { headers: { "X-AI-Cache": "HIT", "X-AI-Mode": requestedMode } }
     );
   }
@@ -163,28 +278,70 @@ export async function POST(request: NextRequest) {
   const rateLimitHeaders = createAiRateLimitHeaders(rateLimitDecision);
   if (!rateLimitDecision.allowed) {
     if (rateLimitDecision.reason === "anonymous-not-allowed") {
-      return jsonResponse({ message: "Entre na conta para usar a importacao por IA.", reason: rateLimitDecision.reason }, { status: 401, headers: rateLimitHeaders });
+      const message = "Entre na conta para usar a importacao por IA.";
+      queueDiagnostic({
+        status: "rate_limit",
+        cache: "MISS",
+        quota: "not-consumed",
+        reason: rateLimitDecision.reason,
+        mimeType: validation.mimeType,
+        fileSizeBytes: fileBytes.byteLength,
+        message,
+      });
+      return jsonDiagnosticResponse({ message, reason: rateLimitDecision.reason }, diagnosticId, { status: 401, headers: rateLimitHeaders });
     }
 
     if (isAiDailyLimitReason(rateLimitDecision.reason)) {
-      return jsonResponse({ message: "Limite diario de IA atingido. Voce ainda pode preencher manualmente.", reason: rateLimitDecision.reason }, { status: 429, headers: rateLimitHeaders });
+      const message = "Limite diario de IA atingido. Voce ainda pode preencher manualmente.";
+      queueDiagnostic({
+        status: "rate_limit",
+        cache: "MISS",
+        quota: "not-consumed",
+        reason: rateLimitDecision.reason,
+        mimeType: validation.mimeType,
+        fileSizeBytes: fileBytes.byteLength,
+        message,
+      });
+      return jsonDiagnosticResponse({ message, reason: rateLimitDecision.reason }, diagnosticId, { status: 429, headers: rateLimitHeaders });
     }
 
     if (isAiRateLimitSetupReason(rateLimitDecision.reason)) {
-      return jsonResponse(
+      const message = "Upload assistido temporariamente indisponivel. Continue manualmente enquanto a configuracao e verificada.";
+      queueDiagnostic({
+        status: "setup_unavailable",
+        cache: "MISS",
+        quota: "not-consumed",
+        reason: rateLimitDecision.reason,
+        mimeType: validation.mimeType,
+        fileSizeBytes: fileBytes.byteLength,
+        message,
+      });
+      return jsonDiagnosticResponse(
         {
-          message: "Upload assistido temporariamente indisponivel. Continue manualmente enquanto a configuracao e verificada.",
+          message,
           reason: rateLimitDecision.reason,
         },
+        diagnosticId,
         { status: 503, headers: rateLimitHeaders }
       );
     }
 
-    return jsonResponse(
+    const message = "Upload assistido temporariamente indisponivel. Continue manualmente enquanto a configuracao e verificada.";
+    queueDiagnostic({
+      status: "setup_unavailable",
+      cache: "MISS",
+      quota: "not-consumed",
+      reason: "rate-limit-unavailable",
+      mimeType: validation.mimeType,
+      fileSizeBytes: fileBytes.byteLength,
+      message,
+    });
+    return jsonDiagnosticResponse(
       {
-        message: "Upload assistido temporariamente indisponivel. Continue manualmente enquanto a configuracao e verificada.",
+        message,
         reason: "rate-limit-unavailable",
       },
+      diagnosticId,
       { status: 503, headers: rateLimitHeaders }
     );
   }
@@ -201,7 +358,18 @@ export async function POST(request: NextRequest) {
       await cacheStore.set(cacheKey.key, extraction, getPlanExtractCacheTtlSeconds()).catch(() => undefined);
     }
 
-    return jsonResponse(
+    queueDiagnostic({
+      status: "success",
+      cache: "MISS",
+      quota: "consumed",
+      reason: "extraction-success",
+      mimeType: validation.mimeType,
+      fileSizeBytes: fileBytes.byteLength,
+      providersTried: compactProviders([extraction.provider, extraction.review?.provider]),
+      message: "Extração concluída. Revise os campos antes de aplicar.",
+    });
+
+    return jsonDiagnosticResponse(
       {
         mode: requestedMode,
         result: extraction.result,
@@ -210,6 +378,7 @@ export async function POST(request: NextRequest) {
         tokens: extraction.tokens,
         review: extraction.review,
       },
+      diagnosticId,
       { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS", "X-AI-Mode": requestedMode } }
     );
   } catch (error) {
@@ -217,6 +386,18 @@ export async function POST(request: NextRequest) {
     await releaseAiDailyLimitDecision(rateLimitDecision);
     const payload = getPlanExtractErrorPayload(error, { mimeType: validation.mimeType, env: aiEnv });
     const status = error instanceof AiPlanExtractError ? error.status : 502;
-    return jsonResponse({ ...payload, mode: requestedMode }, { status, headers: { "X-AI-Mode": requestedMode } });
+    const diagnosticProviderErrors = getDiagnosticProviderErrors(error);
+    queueDiagnostic({
+      status: getDiagnosticStatusForError(error),
+      cache: "MISS",
+      quota: "released",
+      reason: typeof payload.reason === "string" ? payload.reason : getDiagnosticReasonForError(error),
+      mimeType: validation.mimeType,
+      fileSizeBytes: fileBytes.byteLength,
+      providersTried: diagnosticProviderErrors.map((providerError) => providerError.provider),
+      providerErrors: diagnosticProviderErrors,
+      message: typeof payload.message === "string" ? payload.message : undefined,
+    });
+    return jsonDiagnosticResponse({ ...payload, mode: requestedMode }, diagnosticId, { status, headers: { "X-AI-Mode": requestedMode } });
   }
 }
