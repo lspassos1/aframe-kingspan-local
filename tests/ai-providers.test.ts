@@ -245,6 +245,101 @@ describe("AI plan extraction providers", () => {
     expect(calledProviders).toEqual(["gemini", "openrouter"]);
   });
 
+  it("retries Gemini once for transient free image provider failures", async () => {
+    const calledProviders: string[] = [];
+
+    const result = await extractPlanWithProviderChain(
+      {
+        mimeType: "image/png",
+        fileBase64: "abc",
+      },
+      {
+        env: {
+          AI_MODE: "free-cloud",
+          AI_PLAN_PRIMARY_PROVIDER: "gemini",
+          GEMINI_API_KEY: "gemini-key",
+          GEMINI_MODEL: "gemini-2.5-flash",
+        },
+        async callProvider(provider) {
+          calledProviders.push(provider.id);
+          if (calledProviders.length === 1) throw new Error("Provider gemini respondeu 503.");
+          return {
+            result: parsePlanExtractResult(validPlanExtractJson),
+            provider: provider.id,
+            model: provider.model,
+          };
+        },
+      }
+    );
+
+    expect(result).toMatchObject({
+      provider: "gemini",
+      diagnostics: {
+        providerAttempts: [
+          {
+            provider: "gemini",
+            attempt: 1,
+            outcome: "failed",
+            status: 503,
+            retryReason: "transient-error",
+          },
+          {
+            provider: "gemini",
+            attempt: 2,
+            outcome: "success",
+          },
+        ],
+      },
+    });
+    expect(calledProviders).toEqual(["gemini", "gemini"]);
+  });
+
+  it("does not retry OpenRouter 429 responses in the free image fallback", async () => {
+    const calledProviders: string[] = [];
+
+    await expect(
+      extractPlanWithProviderChain(
+        {
+          mimeType: "image/png",
+          fileBase64: "abc",
+        },
+        {
+          env: {
+            AI_MODE: "free-cloud",
+            AI_PLAN_PRIMARY_PROVIDER: "gemini",
+            AI_PLAN_REVIEW_PROVIDER: "openrouter",
+            GEMINI_API_KEY: "gemini-key",
+            GEMINI_MODEL: "gemini-2.5-flash",
+            OPENROUTER_API_KEY: "openrouter-key",
+            OPENROUTER_PLAN_REVIEW_MODEL: "openrouter/free",
+          },
+          async callProvider(provider) {
+            calledProviders.push(provider.id);
+            if (provider.id === "openrouter") throw new Error("Provider openrouter respondeu 429.");
+            throw new Error("Provider gemini respondeu 400.");
+          },
+        }
+      )
+    ).rejects.toMatchObject({
+      providerAttempts: [
+        {
+          provider: "gemini",
+          attempt: 1,
+          outcome: "failed",
+          status: 400,
+        },
+        {
+          provider: "openrouter",
+          attempt: 1,
+          outcome: "failed",
+          status: 429,
+        },
+      ],
+    });
+
+    expect(calledProviders).toEqual(["gemini", "openrouter"]);
+  });
+
   it("does not use OpenRouter fallback for PDF extraction in free-cloud mode", async () => {
     const calledProviders: string[] = [];
 

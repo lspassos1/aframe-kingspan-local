@@ -1,6 +1,8 @@
 import { Buffer } from "node:buffer";
 import { auth } from "@clerk/nextjs/server";
 import { after, NextRequest, NextResponse } from "next/server";
+import { isPlanExtractImageMimeType, shouldPreprocessPlanExtractImage } from "@/lib/ai/plan-image-mime";
+import { preprocessPlanExtractImage } from "@/lib/ai/plan-image-preprocess";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
 import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders, isAiDailyLimitReason, isAiRateLimitSetupReason, releaseAiDailyLimitDecision } from "@/lib/ai/rate-limit";
 import {
@@ -17,6 +19,8 @@ import {
   createPlanExtractDiagnosticId,
   recordPlanExtractDiagnosticAttempt,
   type PlanExtractDiagnosticCacheStatus,
+  type PlanExtractImageProcessingDiagnostic,
+  type PlanExtractProviderAttemptDiagnostic,
   type PlanExtractDiagnosticQuotaStatus,
   type PlanExtractDiagnosticStatus,
 } from "@/lib/ai/plan-extract-diagnostics";
@@ -53,6 +57,17 @@ function compactProviders<T extends string>(providers: Array<T | undefined>) {
   return providers.filter((provider): provider is T => Boolean(provider));
 }
 
+function classifyFreeImageProviderFailure(error: AiProviderChainError) {
+  const attempts = error.providerAttempts ?? [];
+  const messages = error.providerErrors.map((providerError) => providerError.message).join(" ");
+  const statuses = attempts.map((attempt) => attempt.status).filter((status): status is number => Number.isFinite(status));
+  if (statuses.includes(429) || /\b429\b/.test(messages)) return "free-image-provider-rate-limited";
+  if (attempts.some((attempt) => attempt.retryReason === "timeout") || statuses.some((status) => status === 408 || status === 504) || /\b(abort|timeout|timed out)\b/i.test(messages)) {
+    return "free-image-provider-timeout";
+  }
+  return "free-image-provider-unavailable";
+}
+
 export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?: string; env?: AiModeEnv } = {}) {
   const mode = readAiProductMode(context.env ?? process.env);
   if (error instanceof AiProviderUnavailableError) {
@@ -72,6 +87,20 @@ export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?:
       return {
         message: "Não consegui ler este PDF agora. Exporte a primeira página como imagem ou continue manualmente.",
         reason: "free-pdf-provider-unavailable",
+        providers: serializeProviderErrorsForClient(error.providerErrors),
+      };
+    }
+
+    if (mode === "free-cloud" && isPlanExtractImageMimeType(context.mimeType)) {
+      const reason = classifyFreeImageProviderFailure(error);
+      return {
+        message:
+          reason === "free-image-provider-timeout"
+            ? "A análise gratuita demorou demais. Continue manualmente ou tente uma imagem menor."
+            : reason === "free-image-provider-rate-limited"
+              ? "A análise gratuita está temporariamente indisponível. Continue manualmente ou tente novamente mais tarde."
+              : "Nao foi possivel extrair a planta com o modo gratuito neste momento.",
+        reason,
         providers: serializeProviderErrorsForClient(error.providerErrors),
       };
     }
@@ -142,6 +171,22 @@ function getDiagnosticProviderErrors(error: unknown) {
   }));
 }
 
+function getDiagnosticProviderAttempts(value: { diagnostics?: { providerAttempts?: PlanExtractProviderAttemptDiagnostic[] }; providerAttempts?: PlanExtractProviderAttemptDiagnostic[] } | unknown) {
+  if (value instanceof AiProviderChainError) return value.providerAttempts ?? [];
+  if (value && typeof value === "object" && "diagnostics" in value) {
+    const diagnostics = (value as { diagnostics?: { providerAttempts?: PlanExtractProviderAttemptDiagnostic[] } }).diagnostics;
+    return diagnostics?.providerAttempts ?? [];
+  }
+  return [];
+}
+
+function getProviderDurations(providerAttempts: PlanExtractProviderAttemptDiagnostic[]) {
+  return providerAttempts.map((attempt) => ({
+    provider: `${attempt.provider}-${attempt.attempt}`,
+    durationMs: attempt.durationMs ?? 0,
+  }));
+}
+
 export async function POST(request: NextRequest) {
   const diagnosticId = createPlanExtractDiagnosticId();
   const startedAt = Date.now();
@@ -159,6 +204,9 @@ export async function POST(request: NextRequest) {
     message?: string;
     providersTried?: string[];
     providerErrors?: Array<{ provider: string; message: string }>;
+    providerAttempts?: PlanExtractProviderAttemptDiagnostic[];
+    providerDurations?: Array<{ provider: string; durationMs: number }>;
+    imageProcessing?: PlanExtractImageProcessingDiagnostic;
   };
 
   async function recordDiagnostic({
@@ -171,6 +219,9 @@ export async function POST(request: NextRequest) {
     message,
     providersTried,
     providerErrors,
+    providerAttempts,
+    providerDurations,
+    imageProcessing,
   }: DiagnosticInput, context: { mode: AiProductMode; userId: string | null; env: ReturnType<typeof createModeEnv> }) {
     await recordPlanExtractDiagnosticAttempt({
       diagnosticId,
@@ -183,6 +234,9 @@ export async function POST(request: NextRequest) {
       reason,
       providersTried,
       providerErrors,
+      providerAttempts,
+      providerDurations,
+      imageProcessing,
       durationMs: Date.now() - startedAt,
       quota,
       message,
@@ -363,14 +417,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let imageProcessing: PlanExtractImageProcessingDiagnostic | undefined;
+  const shouldPreprocessImage = shouldPreprocessPlanExtractImage({ mode: requestedMode, mimeType: validation.mimeType });
   try {
-    const fileBase64 = fileBytes.toString("base64");
+    const preprocessed = shouldPreprocessImage ? await preprocessPlanExtractImage({ bytes: fileBytes, mimeType: validation.mimeType }) : null;
+    imageProcessing = preprocessed?.diagnostic;
+    const providerFileBytes = preprocessed?.bytes ?? fileBytes;
+    const providerMimeType = preprocessed?.mimeType ?? validation.mimeType;
+    const fileBase64 = providerFileBytes.toString("base64");
     const extraction = await extractPlanWithProviderChain({
-      mimeType: validation.mimeType,
+      mimeType: providerMimeType,
       fileBase64,
       fileName: sanitizePlanExtractFileName(file.name),
       timeoutMs: 45_000,
     }, { env: aiEnv });
+    const providerAttempts = getDiagnosticProviderAttempts(extraction);
     if (shouldCachePlanExtractResult(extraction)) {
       await cacheStore.set(cacheKey.key, extraction, getPlanExtractCacheTtlSeconds()).catch(() => undefined);
     }
@@ -383,6 +444,9 @@ export async function POST(request: NextRequest) {
       mimeType: validation.mimeType,
       fileSizeBytes: fileBytes.byteLength,
       providersTried: compactProviders([extraction.provider, extraction.review?.provider]),
+      providerAttempts,
+      providerDurations: getProviderDurations(providerAttempts),
+      imageProcessing,
       message: "Extração concluída. Revise os campos antes de aplicar.",
     });
 
@@ -404,6 +468,7 @@ export async function POST(request: NextRequest) {
     const payload = getPlanExtractErrorPayload(error, { mimeType: validation.mimeType, env: aiEnv });
     const status = error instanceof AiPlanExtractError ? error.status : 502;
     const diagnosticProviderErrors = getDiagnosticProviderErrors(error);
+    const providerAttempts = getDiagnosticProviderAttempts(error);
     queueDiagnostic({
       status: getDiagnosticStatusForError(error),
       cache: "MISS",
@@ -413,6 +478,18 @@ export async function POST(request: NextRequest) {
       fileSizeBytes: fileBytes.byteLength,
       providersTried: diagnosticProviderErrors.map((providerError) => providerError.provider),
       providerErrors: diagnosticProviderErrors,
+      providerAttempts,
+      providerDurations: getProviderDurations(providerAttempts),
+      imageProcessing: imageProcessing ?? (shouldPreprocessImage
+        ? {
+            status: "failed",
+            reason: "preprocess-error",
+            originalSizeBucket: "unknown",
+            processedSizeBucket: "unknown",
+            originalFormat: validation.mimeType.replace("image/", ""),
+            processedFormat: validation.mimeType.replace("image/", ""),
+          }
+        : undefined),
       message: typeof payload.message === "string" ? payload.message : undefined,
     });
     return jsonDiagnosticResponse({ ...payload, mode: requestedMode }, diagnosticId, { status, headers: { "X-AI-Mode": requestedMode } });
