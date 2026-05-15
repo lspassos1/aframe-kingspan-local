@@ -28,7 +28,7 @@ export function serializeProviderErrorsForClient(providerErrors: Array<{ provide
   }));
 }
 
-function getErrorMessage(error: unknown) {
+export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?: string } = {}) {
   const mode = readAiProductMode(process.env);
   if (error instanceof AiProviderUnavailableError) {
     return {
@@ -43,6 +43,14 @@ function getErrorMessage(error: unknown) {
     return { message: error.message, code: error.code };
   }
   if (error instanceof AiProviderChainError) {
+    if (mode === "free-cloud" && context.mimeType === "application/pdf") {
+      return {
+        message: "Não consegui ler este PDF agora. Exporte a primeira página como imagem ou continue manualmente.",
+        reason: "free-pdf-provider-unavailable",
+        providers: serializeProviderErrorsForClient(error.providerErrors),
+      };
+    }
+
     return {
       message:
         mode === "free-cloud" ? "Nao foi possivel extrair a planta com o modo gratuito neste momento." : "Nao foi possivel extrair a planta com o Modo Pro neste momento.",
@@ -55,12 +63,13 @@ function getErrorMessage(error: unknown) {
   return { message: "Nao foi possivel analisar a planta agora." };
 }
 
-function logPlanExtractFailure(error: unknown) {
+function logPlanExtractFailure(error: unknown, context: { mimeType?: string } = {}) {
   const mode = readAiProductMode(process.env);
 
   if (error instanceof AiProviderChainError) {
     console.warn("ai_plan_extract_provider_chain_failed", {
       mode,
+      mimeType: context.mimeType,
       providers: error.providerErrors.map((providerError) => ({
         provider: providerError.provider,
         message: sanitizeAiDiagnosticMessage(providerError.message),
@@ -72,6 +81,7 @@ function logPlanExtractFailure(error: unknown) {
   if (error instanceof AiProviderUnavailableError || error instanceof AiRouterError || error instanceof AiPlanExtractError) {
     console.warn("ai_plan_extract_failed", {
       mode,
+      mimeType: context.mimeType,
       code: error.code,
       message: sanitizeAiDiagnosticMessage(error.message),
     });
@@ -80,6 +90,7 @@ function logPlanExtractFailure(error: unknown) {
 
   console.error("ai_plan_extract_unexpected", {
     mode,
+    mimeType: context.mimeType,
     error: sanitizeAiDiagnosticMessage(error instanceof Error ? error.message : String(error)),
   });
 }
@@ -110,7 +121,7 @@ export async function POST(request: NextRequest) {
   try {
     fileBytes = Buffer.from(await file.arrayBuffer());
   } catch {
-    const payload = getErrorMessage(new AiPlanExtractError("Nao foi possivel ler o arquivo enviado.", "ai-plan-file-read-failed", 400));
+    const payload = getPlanExtractErrorPayload(new AiPlanExtractError("Nao foi possivel ler o arquivo enviado.", "ai-plan-file-read-failed", 400));
     return jsonResponse(payload, { status: 400 });
   }
 
@@ -189,9 +200,9 @@ export async function POST(request: NextRequest) {
       { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS" } }
     );
   } catch (error) {
-    logPlanExtractFailure(error);
+    logPlanExtractFailure(error, { mimeType: validation.mimeType });
     await releaseAiDailyLimitDecision(rateLimitDecision);
-    const payload = getErrorMessage(error);
+    const payload = getPlanExtractErrorPayload(error, { mimeType: validation.mimeType });
     const status = error instanceof AiPlanExtractError ? error.status : 502;
     return jsonResponse(payload, { status });
   }
