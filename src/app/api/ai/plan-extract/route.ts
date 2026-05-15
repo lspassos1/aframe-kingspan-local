@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { auth } from "@clerk/nextjs/server";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
 import { createAiRateLimitHeaders, checkAndConsumeAiDailyLimit, getClientIpFromHeaders, isAiDailyLimitReason, isAiRateLimitSetupReason, releaseAiDailyLimitDecision } from "@/lib/ai/rate-limit";
 import {
@@ -124,6 +124,7 @@ function getDiagnosticStatusForError(error: unknown): PlanExtractDiagnosticStatu
   if (error instanceof AiProviderChainError) return "provider_chain_failed";
   if (error instanceof AiProviderUnavailableError || error instanceof AiRouterError) return "setup_unavailable";
   if (error instanceof AiPlanExtractError && error.status < 500) return "invalid_file";
+  if (error instanceof AiPlanExtractError) return "setup_unavailable";
   return "provider_chain_failed";
 }
 
@@ -142,22 +143,23 @@ function getDiagnosticProviderErrors(error: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isAiPlanExtractEnabled()) {
-    return jsonResponse({ message: "Extracao de planta por IA ainda nao esta habilitada neste ambiente." }, { status: 403 });
-  }
-
-  const session = await auth();
-  const allowAnonymous = process.env.AI_ALLOW_ANONYMOUS_PLAN_EXTRACT === "true";
-  if (!session.userId && !allowAnonymous) {
-    return jsonResponse({ message: "Entre na conta para usar a importacao por IA." }, { status: 401 });
-  }
-
-  const formData = await request.formData().catch(() => null);
-  const requestedMode = readRequestedPlanExtractMode(formData);
-  const aiEnv = createModeEnv(requestedMode);
   const diagnosticId = createPlanExtractDiagnosticId();
   const startedAt = Date.now();
-  const file = formData?.get("file");
+  let requestedMode: AiProductMode = "free-cloud";
+  let aiEnv = createModeEnv(requestedMode);
+  let sessionUserId: string | null = null;
+
+  type DiagnosticInput = {
+    status: PlanExtractDiagnosticStatus;
+    cache: PlanExtractDiagnosticCacheStatus;
+    quota: PlanExtractDiagnosticQuotaStatus;
+    reason?: string;
+    mimeType?: string;
+    fileSizeBytes?: number;
+    message?: string;
+    providersTried?: string[];
+    providerErrors?: Array<{ provider: string; message: string }>;
+  };
 
   async function recordDiagnostic({
     status,
@@ -169,22 +171,12 @@ export async function POST(request: NextRequest) {
     message,
     providersTried,
     providerErrors,
-  }: {
-    status: PlanExtractDiagnosticStatus;
-    cache: PlanExtractDiagnosticCacheStatus;
-    quota: PlanExtractDiagnosticQuotaStatus;
-    reason?: string;
-    mimeType?: string;
-    fileSizeBytes?: number;
-    message?: string;
-    providersTried?: string[];
-    providerErrors?: Array<{ provider: string; message: string }>;
-  }) {
+  }: DiagnosticInput, context: { mode: AiProductMode; userId: string | null; env: ReturnType<typeof createModeEnv> }) {
     await recordPlanExtractDiagnosticAttempt({
       diagnosticId,
-      mode: requestedMode,
+      mode: context.mode,
       status,
-      userId: session.userId,
+      userId: context.userId,
       mimeType,
       fileSizeBytes,
       cache,
@@ -194,13 +186,38 @@ export async function POST(request: NextRequest) {
       durationMs: Date.now() - startedAt,
       quota,
       message,
-      env: aiEnv,
+      env: context.env,
     });
   }
 
-  function queueDiagnostic(input: Parameters<typeof recordDiagnostic>[0]) {
-    void recordDiagnostic(input).catch(() => undefined);
+  function queueDiagnostic(input: DiagnosticInput) {
+    const context = { mode: requestedMode, userId: sessionUserId, env: aiEnv };
+    try {
+      after(() => recordDiagnostic(input, context).catch(() => undefined));
+    } catch {
+      void recordDiagnostic(input, context).catch(() => undefined);
+    }
   }
+
+  if (!isAiPlanExtractEnabled()) {
+    const message = "Extracao de planta por IA ainda nao esta habilitada neste ambiente.";
+    queueDiagnostic({ status: "setup_unavailable", cache: "SKIP", quota: "not-consumed", reason: "plan-extract-disabled", message });
+    return jsonDiagnosticResponse({ message }, diagnosticId, { status: 403 });
+  }
+
+  const session = await auth();
+  sessionUserId = session.userId;
+  const allowAnonymous = process.env.AI_ALLOW_ANONYMOUS_PLAN_EXTRACT === "true";
+  if (!session.userId && !allowAnonymous) {
+    const message = "Entre na conta para usar a importacao por IA.";
+    queueDiagnostic({ status: "setup_unavailable", cache: "SKIP", quota: "not-consumed", reason: "auth-required", message });
+    return jsonDiagnosticResponse({ message }, diagnosticId, { status: 401 });
+  }
+
+  const formData = await request.formData().catch(() => null);
+  requestedMode = readRequestedPlanExtractMode(formData);
+  aiEnv = createModeEnv(requestedMode);
+  const file = formData?.get("file");
 
   if (!(file instanceof File)) {
     const message = "Envie um arquivo de planta baixa.";

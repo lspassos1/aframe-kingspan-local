@@ -118,7 +118,7 @@ describe("plan extraction diagnostics", () => {
   });
 
   it("writes sanitized diagnostics to Redis-compatible storage with TTL metadata", async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(Array.from({ length: 7 }, () => ({ result: "OK" }))), { status: 200 }));
     const store = createRedisPlanExtractDiagnosticStore(
       {
         UPSTASH_REDIS_REST_URL: "https://redis.example.test",
@@ -165,6 +165,99 @@ describe("plan extraction diagnostics", () => {
     );
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain("abcdefghijklmnopqrstuvwxyz123456");
     expect(logger.info).toHaveBeenCalledWith("ai_plan_extract_attempt", expect.objectContaining({ diagnosticId: "diag_test_123" }));
+  });
+
+  it("falls back when Redis pipeline returns per-command errors with HTTP 200", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify([{ result: "OK" }, { error: "WRONGTYPE Operation against a key" }]), { status: 200 }));
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+
+    await expect(
+      recordPlanExtractDiagnosticAttempt(baseAttempt, {
+        env: {
+          UPSTASH_REDIS_REST_URL: "https://redis.example.test",
+          UPSTASH_REDIS_REST_TOKEN: "redis-secret-token",
+        },
+        fetcher: fetcher as unknown as typeof fetch,
+        logger,
+      })
+    ).resolves.toMatchObject({
+      diagnosticId: "diag_test_123",
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "ai_plan_extract_diagnostic_store_failed",
+      expect.objectContaining({
+        diagnosticId: "diag_test_123",
+        message: "Diagnostic store command failed.",
+      })
+    );
+    expect(logger.info).toHaveBeenCalledWith("ai_plan_extract_attempt", expect.objectContaining({ diagnosticId: "diag_test_123" }));
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain("redis-secret-token");
+  });
+
+  it("falls back when Redis pipeline returns an invalid HTTP 200 body", async () => {
+    const fetcher = vi.fn(async () => new Response("not-json", { status: 200 }));
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+
+    await expect(
+      recordPlanExtractDiagnosticAttempt(baseAttempt, {
+        env: {
+          UPSTASH_REDIS_REST_URL: "https://redis.example.test",
+          UPSTASH_REDIS_REST_TOKEN: "redis-secret-token",
+        },
+        fetcher: fetcher as unknown as typeof fetch,
+        logger,
+      })
+    ).resolves.toMatchObject({
+      diagnosticId: "diag_test_123",
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "ai_plan_extract_diagnostic_store_failed",
+      expect.objectContaining({
+        diagnosticId: "diag_test_123",
+        message: "Diagnostic store returned an invalid pipeline response.",
+      })
+    );
+    expect(logger.info).toHaveBeenCalledWith("ai_plan_extract_attempt", expect.objectContaining({ diagnosticId: "diag_test_123" }));
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain("redis-secret-token");
+  });
+
+  it("falls back when Redis pipeline returns an empty response list", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+
+    await expect(
+      recordPlanExtractDiagnosticAttempt(baseAttempt, {
+        env: {
+          UPSTASH_REDIS_REST_URL: "https://redis.example.test",
+          UPSTASH_REDIS_REST_TOKEN: "redis-secret-token",
+        },
+        fetcher: fetcher as unknown as typeof fetch,
+        logger,
+      })
+    ).resolves.toMatchObject({
+      diagnosticId: "diag_test_123",
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "ai_plan_extract_diagnostic_store_failed",
+      expect.objectContaining({
+        diagnosticId: "diag_test_123",
+        message: "Diagnostic store returned an invalid pipeline response.",
+      })
+    );
+    expect(logger.info).toHaveBeenCalledWith("ai_plan_extract_attempt", expect.objectContaining({ diagnosticId: "diag_test_123" }));
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain("redis-secret-token");
   });
 
   it("does not throw when diagnostic record construction fails", async () => {
