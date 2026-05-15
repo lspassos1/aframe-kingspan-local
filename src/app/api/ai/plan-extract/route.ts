@@ -63,12 +63,13 @@ export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?:
   return { message: "Nao foi possivel analisar a planta agora." };
 }
 
-function logPlanExtractFailure(error: unknown) {
+function logPlanExtractFailure(error: unknown, context: { mimeType?: string } = {}) {
   const mode = readAiProductMode(process.env);
 
   if (error instanceof AiProviderChainError) {
     console.warn("ai_plan_extract_provider_chain_failed", {
       mode,
+      mimeType: context.mimeType,
       providers: error.providerErrors.map((providerError) => ({
         provider: providerError.provider,
         message: sanitizeAiDiagnosticMessage(providerError.message),
@@ -80,6 +81,7 @@ function logPlanExtractFailure(error: unknown) {
   if (error instanceof AiProviderUnavailableError || error instanceof AiRouterError || error instanceof AiPlanExtractError) {
     console.warn("ai_plan_extract_failed", {
       mode,
+      mimeType: context.mimeType,
       code: error.code,
       message: sanitizeAiDiagnosticMessage(error.message),
     });
@@ -88,6 +90,7 @@ function logPlanExtractFailure(error: unknown) {
 
   console.error("ai_plan_extract_unexpected", {
     mode,
+    mimeType: context.mimeType,
     error: sanitizeAiDiagnosticMessage(error instanceof Error ? error.message : String(error)),
   });
 }
@@ -197,7 +200,7 @@ export async function POST(request: NextRequest) {
       { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS" } }
     );
   } catch (error) {
-    logPlanExtractFailure(error);
+    logPlanExtractFailure(error, { mimeType: validation.mimeType });
     await releaseAiDailyLimitDecision(rateLimitDecision);
     const payload = getPlanExtractErrorPayload(error, { mimeType: validation.mimeType });
     const status = error instanceof AiPlanExtractError ? error.status : 502;
