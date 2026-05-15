@@ -135,6 +135,33 @@ describe("plan import UI state", () => {
     });
     expect(JSON.stringify(status)).not.toContain("configured-");
   });
+
+  it("requires Pro key and model before exposing an explicit Pro upload status", () => {
+    expect(
+      getSafePlanImportProviderUiStatus({
+        AI_MODE: "paid",
+        OPENAI_API_KEY: "configured-openai",
+      })
+    ).toMatchObject({
+      mode: "paid",
+      primaryConfigured: false,
+    });
+
+    const status = getSafePlanImportProviderUiStatus({
+      AI_MODE: "paid",
+      OPENAI_API_KEY: "configured-openai",
+      AI_OPENAI_MODEL: "gpt-4o-mini",
+    });
+
+    expect(status).toMatchObject({
+      mode: "paid",
+      modeLabel: "Modo Pro",
+      primaryProviderLabel: "Revisão detalhada",
+      primaryConfigured: true,
+    });
+    expect(JSON.stringify(status)).not.toContain("configured-openai");
+    expect(JSON.stringify(status)).not.toContain("gpt-4o-mini");
+  });
 });
 
 describe("PlanImportCard", () => {
@@ -186,6 +213,36 @@ describe("PlanImportCard", () => {
     expect(html).toContain("Continuar manualmente");
     expect(html).toContain('aria-disabled="true"');
     expect(html).not.toContain("Clique para selecionar ou solte o arquivo aqui");
+  });
+
+  it("renders explicit Pro upload copy without exposing provider or env names", () => {
+    const html = renderToStaticMarkup(
+      createElement(PlanImportCard, {
+        planExtractEnabled: true,
+        aiProviderStatus: {
+          mode: "paid",
+          modeLabel: "Modo Pro",
+          primaryProviderLabel: "Revisão detalhada",
+          reviewProviderLabel: "Validação Pro",
+          paidFallbackEnabled: false,
+          primaryConfigured: true,
+          reviewConfigured: false,
+        },
+        requestedMode: "paid",
+        uploadTitle: "Enviar com Modo Pro",
+        uploadDescription: "Modo Pro usa análise detalhada. Pode gerar custo de API; nada será aplicado sem revisão.",
+      })
+    );
+
+    expect(html).toContain("Enviar com Modo Pro");
+    expect(html).toContain("Modo Pro usa análise detalhada");
+    expect(html).toContain("Pode gerar custo de API");
+    expect(html).toContain("Nada será aplicado sem revisão");
+    expect(html).not.toContain(sensitiveOpenAiKeyName);
+    expect(html).not.toContain("OpenAI");
+    expect(html).not.toContain("gpt-");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
   });
 
   it("renders daily limit fallback without active upload instructions or technical terms", () => {

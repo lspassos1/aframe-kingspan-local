@@ -59,6 +59,23 @@ describe("AI plan extraction providers", () => {
     });
 
     expect(providers.map((provider) => provider.id)).toEqual(["openai"]);
+    expect(providers[0]?.configured).toBe(false);
+  });
+
+  it("requires an explicit OpenAI model before paid extraction is configured", () => {
+    expect(
+      getConfiguredAiPlanExtractProviders({
+        AI_MODE: "paid",
+        OPENAI_API_KEY: "openai-key",
+      })
+    ).toHaveLength(0);
+    expect(
+      getConfiguredAiPlanExtractProviders({
+        AI_MODE: "paid",
+        OPENAI_API_KEY: "openai-key",
+        AI_OPENAI_MODEL: "gpt-4o-mini",
+      }).map((provider) => provider.id)
+    ).toEqual(["openai"]);
   });
 
   it("uses OpenAI as the paid/default extraction order without provider-order envs", () => {
@@ -143,6 +160,7 @@ describe("AI plan extraction providers", () => {
           env: {
             AI_MODE: "paid",
             OPENAI_API_KEY: "openai-key",
+            AI_OPENAI_MODEL: "gpt-4o-mini",
             OPENROUTER_API_KEY: "openrouter-key",
           },
           async callProvider(provider) {

@@ -5,7 +5,7 @@ import type { PlanImportProviderUiStatus } from "@/lib/ai/plan-import-ui";
 import { createStartAiStatusPills, createStartAssistantViewModel, normalizeStartAssistantModeParam } from "@/lib/onboarding/start-guided-assistant";
 
 const planImportCardProps = vi.hoisted(() => ({
-  latest: undefined as { onManualFallback?: () => void; aiProviderStatus?: unknown } | undefined,
+  calls: [] as Array<{ onManualFallback?: () => void; aiProviderStatus?: unknown; requestedMode?: unknown; uploadTitle?: unknown; uploadDescription?: unknown }>,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -21,9 +21,9 @@ vi.mock("@/lib/store/project-store", () => ({
 }));
 
 vi.mock("@/components/ai/PlanImportCard", () => ({
-  PlanImportCard: (props: { onManualFallback?: () => void; aiProviderStatus?: unknown }) => {
-    planImportCardProps.latest = props;
-    return createElement("div", { "data-testid": "plan-import" }, "Enviar planta baixa");
+  PlanImportCard: (props: { onManualFallback?: () => void; aiProviderStatus?: unknown; requestedMode?: unknown; uploadTitle?: unknown; uploadDescription?: unknown }) => {
+    planImportCardProps.calls.push(props);
+    return createElement("div", { "data-testid": "plan-import" }, String(props.uploadTitle ?? "Enviar planta baixa"));
   },
 }));
 
@@ -43,6 +43,16 @@ const freeCloudStatus: PlanImportProviderUiStatus = {
   paidFallbackEnabled: false,
   primaryConfigured: true,
   reviewConfigured: true,
+};
+
+const proStatus: PlanImportProviderUiStatus = {
+  mode: "paid",
+  modeLabel: "Modo Pro",
+  primaryProviderLabel: "Revisão detalhada",
+  reviewProviderLabel: "Validação Pro",
+  paidFallbackEnabled: false,
+  primaryConfigured: true,
+  reviewConfigured: false,
 };
 
 describe("createStartAssistantViewModel", () => {
@@ -176,12 +186,12 @@ describe("StartGuidedAssistant", () => {
   });
 
   it("renders upload with operational status and a manual fallback in AI mode", () => {
-    planImportCardProps.latest = undefined;
+    planImportCardProps.calls = [];
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true, initialMode: "ai" }));
 
     expect(html).toContain('data-testid="plan-import"');
     expect(html).not.toContain('data-testid="manual-form"');
-    expect(typeof planImportCardProps.latest?.onManualFallback).toBe("function");
+    expect(typeof planImportCardProps.calls[0]?.onManualFallback).toBe("function");
     expect(html).toContain("Status da IA");
     expect(html).toContain("Modo Pro");
     expect(html).toContain("Limite diário");
@@ -191,7 +201,7 @@ describe("StartGuidedAssistant", () => {
   });
 
   it("renders free-cloud status without exposing provider keys", () => {
-    planImportCardProps.latest = undefined;
+    planImportCardProps.calls = [];
     const html = renderToStaticMarkup(createElement(StartGuidedAssistant, { planExtractEnabled: true, initialMode: "ai", aiProviderStatus: freeCloudStatus }));
 
     expect(html).toContain("Modo gratuito");
@@ -199,12 +209,53 @@ describe("StartGuidedAssistant", () => {
     expect(html).toContain("Análise rápida");
     expect(html).toContain("Revisão detalhada quando disponível");
     expect(html).toContain("Análise gratuita depende de limites externos");
-    expect(planImportCardProps.latest?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Análise rápida" });
+    expect(planImportCardProps.calls[0]?.aiProviderStatus).toMatchObject({ mode: "free-cloud", primaryProviderLabel: "Análise rápida" });
+    expect(planImportCardProps.calls[0]?.requestedMode).toBe("free-cloud");
     expect(html).not.toContain("OPENAI_API_KEY");
     expect(html).not.toContain("Gemini");
     expect(html).not.toContain("OpenRouter");
     expect(html).not.toContain("Free cloud");
     expect(html).not.toContain("fallback pago");
+  });
+
+  it("shows explicit side-by-side Free and Pro uploads only when Pro is configured", () => {
+    planImportCardProps.calls = [];
+    const html = renderToStaticMarkup(
+      createElement(StartGuidedAssistant, {
+        planExtractEnabled: true,
+        initialMode: "ai",
+        aiProviderStatus: freeCloudStatus,
+        proProviderStatus: proStatus,
+      })
+    );
+
+    expect(html).toContain("Escolha Free ou Pro");
+    expect(html).toContain("Free padrão + Pro explícito");
+    expect(html).toContain("Enviar com IA gratuita");
+    expect(html).toContain("Enviar com Modo Pro");
+    expect(html).toContain("Modo Pro");
+    expect(html).toContain("Revisão detalhada");
+    expect(html).not.toContain("OPENAI_API_KEY");
+    expect(html).not.toContain("OpenAI");
+    expect(html).not.toContain("Gemini");
+    expect(html).not.toContain("OpenRouter");
+
+    expect(planImportCardProps.calls).toHaveLength(2);
+    expect(planImportCardProps.calls.map((props) => props.requestedMode)).toEqual(["free-cloud", "paid"]);
+    expect(planImportCardProps.calls[1]?.uploadDescription).toContain("Pode gerar custo de API");
+
+    planImportCardProps.calls = [];
+    renderToStaticMarkup(
+      createElement(StartGuidedAssistant, {
+        planExtractEnabled: true,
+        initialMode: "ai",
+        aiProviderStatus: freeCloudStatus,
+        proProviderStatus: { ...proStatus, primaryConfigured: false },
+      })
+    );
+
+    expect(planImportCardProps.calls).toHaveLength(1);
+    expect(planImportCardProps.calls[0]?.requestedMode).toBe("free-cloud");
   });
 
   it("renders the manual fallback when AI mode is selected but disabled", () => {

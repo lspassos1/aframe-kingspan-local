@@ -16,6 +16,7 @@ export type AiRateLimitDecision = {
 
 export type AiRateLimitInput = {
   feature: "plan-extract";
+  mode?: "free-cloud" | "paid";
   userId?: string | null;
   ip?: string | null;
   now?: Date;
@@ -147,8 +148,8 @@ function hashIdentifier(value: string, salt: string) {
   return createHash("sha256").update(`${salt}:${value}`).digest("hex").slice(0, 40);
 }
 
-function buildDailyKey(input: { feature: "plan-extract"; scope: AiRateLimitScope; identifier: string; dateKey: string; salt: string }) {
-  return `ai:${input.feature}:${input.scope}:${input.dateKey}:${hashIdentifier(input.identifier, input.salt)}`;
+function buildDailyKey(input: { feature: "plan-extract"; mode: "free-cloud" | "paid"; scope: AiRateLimitScope; identifier: string; dateKey: string; salt: string }) {
+  return `ai:${input.feature}:${input.mode}:${input.scope}:${input.dateKey}:${hashIdentifier(input.identifier, input.salt)}`;
 }
 
 function buildHeadersDecision(decision: AiRateLimitDecision) {
@@ -191,6 +192,7 @@ export async function checkAndConsumeAiDailyLimit(
   } = {}
 ): Promise<AiRateLimitDecision> {
   const env = options.env ?? process.env;
+  const mode = input.mode ?? "free-cloud";
   const now = input.now ?? new Date();
   const resetAtDate = getResetAt(now);
   const resetAt = resetAtDate.toISOString();
@@ -254,6 +256,7 @@ export async function checkAndConsumeAiDailyLimit(
     ...scope,
     key: buildDailyKey({
       feature: input.feature,
+      mode,
       scope: scope.scope,
       identifier: scope.identifier,
       dateKey: getDateKey(now),

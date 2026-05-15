@@ -12,7 +12,7 @@ import {
 import { isAiPlanExtractEnabled, sanitizePlanExtractFileName, validatePlanExtractFile } from "@/lib/ai/plan-extract-request";
 import { AiPlanExtractError, AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import { AiRouterError } from "@/lib/ai/free-cloud-router";
-import { readAiProductMode } from "@/lib/ai/mode";
+import { readAiProductMode, type AiModeEnv, type AiProductMode } from "@/lib/ai/mode";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 export const runtime = "nodejs";
@@ -28,8 +28,16 @@ export function serializeProviderErrorsForClient(providerErrors: Array<{ provide
   }));
 }
 
-export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?: string } = {}) {
-  const mode = readAiProductMode(process.env);
+export function readRequestedPlanExtractMode(formData: FormData | null): AiProductMode {
+  return formData?.get("aiMode") === "paid" ? "paid" : "free-cloud";
+}
+
+function createModeEnv(mode: AiProductMode): AiModeEnv {
+  return { ...process.env, AI_MODE: mode };
+}
+
+export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?: string; env?: AiModeEnv } = {}) {
+  const mode = readAiProductMode(context.env ?? process.env);
   if (error instanceof AiProviderUnavailableError) {
     return {
       message:
@@ -63,8 +71,8 @@ export function getPlanExtractErrorPayload(error: unknown, context: { mimeType?:
   return { message: "Nao foi possivel analisar a planta agora." };
 }
 
-function logPlanExtractFailure(error: unknown, context: { mimeType?: string } = {}) {
-  const mode = readAiProductMode(process.env);
+function logPlanExtractFailure(error: unknown, context: { mimeType?: string; env?: AiModeEnv } = {}) {
+  const mode = readAiProductMode(context.env ?? process.env);
 
   if (error instanceof AiProviderChainError) {
     console.warn("ai_plan_extract_provider_chain_failed", {
@@ -107,6 +115,8 @@ export async function POST(request: NextRequest) {
   }
 
   const formData = await request.formData().catch(() => null);
+  const requestedMode = readRequestedPlanExtractMode(formData);
+  const aiEnv = createModeEnv(requestedMode);
   const file = formData?.get("file");
   if (!(file instanceof File)) {
     return jsonResponse({ message: "Envie um arquivo de planta baixa." }, { status: 400 });
@@ -121,16 +131,17 @@ export async function POST(request: NextRequest) {
   try {
     fileBytes = Buffer.from(await file.arrayBuffer());
   } catch {
-    const payload = getPlanExtractErrorPayload(new AiPlanExtractError("Nao foi possivel ler o arquivo enviado.", "ai-plan-file-read-failed", 400));
+    const payload = getPlanExtractErrorPayload(new AiPlanExtractError("Nao foi possivel ler o arquivo enviado.", "ai-plan-file-read-failed", 400), { env: aiEnv });
     return jsonResponse(payload, { status: 400 });
   }
 
   const cacheStore = createMemoryPlanExtractCacheStore();
-  const cacheKey = createPlanExtractCacheKey({ fileBytes, mimeType: validation.mimeType });
+  const cacheKey = createPlanExtractCacheKey({ fileBytes, mimeType: validation.mimeType, env: aiEnv });
   const cachedExtraction = await cacheStore.get(cacheKey.key).catch(() => null);
   if (cachedExtraction) {
     return jsonResponse(
       {
+        mode: requestedMode,
         result: cachedExtraction.result,
         provider: cachedExtraction.provider,
         model: cachedExtraction.model,
@@ -138,13 +149,14 @@ export async function POST(request: NextRequest) {
         review: cachedExtraction.review,
         cached: true,
       },
-      { headers: { "X-AI-Cache": "HIT" } }
+      { headers: { "X-AI-Cache": "HIT", "X-AI-Mode": requestedMode } }
     );
   }
 
   const trustProxyHeaders = process.env.AI_TRUST_PROXY_IP_HEADERS === "true";
   const rateLimitDecision = await checkAndConsumeAiDailyLimit({
     feature: "plan-extract",
+    mode: requestedMode,
     userId: session.userId,
     ip: getClientIpFromHeaders(request.headers, { trustProxyHeaders }),
   });
@@ -184,26 +196,27 @@ export async function POST(request: NextRequest) {
       fileBase64,
       fileName: sanitizePlanExtractFileName(file.name),
       timeoutMs: 45_000,
-    });
+    }, { env: aiEnv });
     if (shouldCachePlanExtractResult(extraction)) {
       await cacheStore.set(cacheKey.key, extraction, getPlanExtractCacheTtlSeconds()).catch(() => undefined);
     }
 
     return jsonResponse(
       {
+        mode: requestedMode,
         result: extraction.result,
         provider: extraction.provider,
         model: extraction.model,
         tokens: extraction.tokens,
         review: extraction.review,
       },
-      { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS" } }
+      { headers: { ...rateLimitHeaders, "X-AI-Cache": "MISS", "X-AI-Mode": requestedMode } }
     );
   } catch (error) {
-    logPlanExtractFailure(error, { mimeType: validation.mimeType });
+    logPlanExtractFailure(error, { mimeType: validation.mimeType, env: aiEnv });
     await releaseAiDailyLimitDecision(rateLimitDecision);
-    const payload = getPlanExtractErrorPayload(error, { mimeType: validation.mimeType });
+    const payload = getPlanExtractErrorPayload(error, { mimeType: validation.mimeType, env: aiEnv });
     const status = error instanceof AiPlanExtractError ? error.status : 502;
-    return jsonResponse(payload, { status });
+    return jsonResponse({ ...payload, mode: requestedMode }, { status, headers: { "X-AI-Mode": requestedMode } });
   }
 }

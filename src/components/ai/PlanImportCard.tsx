@@ -15,6 +15,7 @@ import {
   getPlanImportStateCopy,
   getPlanImportStateFromResponse,
   type PlanImportProviderUiStatus,
+  type PlanImportAiMode,
   type PlanImportState,
 } from "@/lib/ai/plan-import-ui";
 import { planExtractResultSchema, type PlanExtractResult } from "@/lib/ai/plan-extract-schema";
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import type { Project, Scenario } from "@/types/project";
 
 type PlanExtractApiPayload = {
+  mode?: PlanImportAiMode;
   result?: unknown;
   message?: string;
   provider?: string;
@@ -54,6 +56,9 @@ type PlanExtractReviewPayload = {
 type PlanImportCardProps = {
   planExtractEnabled?: boolean;
   aiProviderStatus?: PlanImportProviderUiStatus;
+  requestedMode?: PlanImportAiMode;
+  uploadTitle?: string;
+  uploadDescription?: string;
   onManualFallback?: () => void;
   onStateChange?: (state: PlanImportState) => void;
   initialState?: PlanImportState;
@@ -198,6 +203,10 @@ function getPlanImportProductStatusLines({
   if (providerMeta.cached) lines.push("Cache reaproveitado; limite diário não foi consumido.");
   if (providerMeta.remaining && providerMeta.limit) lines.push(`Limite restante hoje: ${providerMeta.remaining}/${providerMeta.limit}.`);
   if (aiProviderStatus.mode === "free-cloud") lines.push("Sem cobrança automática; continue manualmente se a análise não estiver disponível.");
+  if (aiProviderStatus.mode === "paid") {
+    lines.push("Pode gerar custo de API; escolha explícita do Modo Pro.");
+    lines.push("Nada será aplicado sem revisão.");
+  }
 
   return lines;
 }
@@ -205,6 +214,9 @@ function getPlanImportProductStatusLines({
 export function PlanImportCard({
   planExtractEnabled = true,
   aiProviderStatus = defaultPlanImportProviderUiStatus,
+  requestedMode = aiProviderStatus.mode,
+  uploadTitle = "Enviar planta baixa",
+  uploadDescription,
   onManualFallback,
   onStateChange,
   initialState = "idle",
@@ -239,9 +251,10 @@ export function PlanImportCard({
   const reviewStatusLabel = getReviewStatusLabel(providerMeta.review, aiProviderStatus);
   const shouldShowMessage = Boolean(message) && state !== "limit-exceeded" && state !== "temporarily-unavailable";
   const providerCopy =
-    aiProviderStatus.mode === "free-cloud"
+    uploadDescription ??
+    (aiProviderStatus.mode === "free-cloud"
       ? `${aiProviderStatus.primaryProviderLabel} sugere campos preliminares; o sistema não aplica nada sem revisão humana.`
-      : "Modo Pro sugere campos preliminares; o sistema não aplica nada sem revisão humana.";
+      : "Modo Pro usa análise detalhada; o sistema não aplica nada sem revisão humana.");
   const productStatusLines = getPlanImportProductStatusLines({ planExtractEnabled, state, aiProviderStatus, reviewStatusLabel, providerMeta });
 
   function updateState(nextState: PlanImportState) {
@@ -271,6 +284,7 @@ export function PlanImportCard({
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("aiMode", requestedMode);
 
     try {
       const responsePromise = fetch("/api/ai/plan-extract", {
@@ -451,7 +465,7 @@ export function PlanImportCard({
                 {isBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileUp className="h-5 w-5" />}
               </span>
               <div className="min-w-0">
-                <h2 className="font-semibold">Enviar planta baixa</h2>
+                <h2 className="font-semibold">{uploadTitle}</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">{providerCopy}</p>
               </div>
             </div>

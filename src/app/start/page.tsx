@@ -11,7 +11,8 @@ export default async function StartPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const planExtractEnabled = isAiPlanExtractEnabled();
-  const aiProviderStatus = getSafePlanImportProviderUiStatus();
+  const aiProviderStatus = getSafePlanImportProviderUiStatus({ ...process.env, AI_MODE: "free-cloud" });
+  const proProviderStatus = getSafePlanImportProviderUiStatus({ ...process.env, AI_MODE: "paid" });
   const initialMode = normalizeStartAssistantModeParam(resolvedSearchParams?.mode);
   const reasonParam = Array.isArray(resolvedSearchParams?.reason) ? resolvedSearchParams?.reason[0] : resolvedSearchParams?.reason;
   const nextParam = Array.isArray(resolvedSearchParams?.next) ? resolvedSearchParams?.next[0] : resolvedSearchParams?.next;
@@ -23,6 +24,7 @@ export default async function StartPage({
         key={`${initialMode}-${redirectReason ?? "direct"}`}
         planExtractEnabled={planExtractEnabled}
         aiProviderStatus={aiProviderStatus}
+        proProviderStatus={proProviderStatus.primaryConfigured ? proProviderStatus : undefined}
         initialMode={initialMode}
         redirectReason={redirectReason}
         redirectNext={nextParam}
