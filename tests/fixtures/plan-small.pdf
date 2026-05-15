@@ -1,0 +1,28 @@
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 432] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
+4 0 obj << /Length 278 >> stream
+0.95 w
+72 72 468 288 re S
+250 72 m 250 360 l S
+72 210 m 540 210 l S
+390 210 m 390 72 l S
+BT /F1 18 Tf 100 300 Td (Sala 4.0 x 5.0 m) Tj ET
+BT /F1 18 Tf 290 300 Td (Cozinha) Tj ET
+BT /F1 18 Tf 100 140 Td (Quarto) Tj ET
+BT /F1 18 Tf 420 140 Td (Banho) Tj ET
+endstream endobj
+5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000570 00000 n 
+trailer << /Root 1 0 R /Size 6 >>
+startxref
+640
+%%EOF

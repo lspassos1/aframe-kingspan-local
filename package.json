@@ -11,6 +11,7 @@
     "test": "vitest run",
     "generate:hero": "node scripts/generate-hero-media.mjs",
     "ai:free-cloud:benchmark": "node scripts/free-cloud-ai-benchmark.mjs",
+    "ai:plan-extract:smoke": "node scripts/ai-plan-extract-smoke.mjs",
     "slack:review:test": "node scripts/test-slack-lucas-review.mjs",
     "triage:slack": "node scripts/hourly-github-triage.mjs",
     "pricing:sinapi-sync:dry-run": "node scripts/sinapi-sync-monthly.mjs --dry-run",

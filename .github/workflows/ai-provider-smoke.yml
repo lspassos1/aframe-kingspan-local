@@ -1,0 +1,69 @@
+name: AI provider smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Provider path to smoke"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - free-cloud
+          - paid
+          - both
+      fixture:
+        description: "Small deterministic fixture"
+        required: true
+        default: "png"
+        type: choice
+        options:
+          - png
+          - jpg
+          - pdf
+      endpoint:
+        description: "Preview or production /api/ai/plan-extract URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Run live provider smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run live smoke
+        env:
+          AI_LIVE_PROVIDER_SMOKE: "true"
+          AI_SMOKE_AUTH_BEARER: ${{ secrets.AI_SMOKE_AUTH_BEARER }}
+          AI_SMOKE_AUTH_COOKIE: ${{ secrets.AI_SMOKE_AUTH_COOKIE }}
+          INPUT_ENDPOINT: ${{ inputs.endpoint }}
+        run: |
+          node scripts/ai-plan-extract-smoke.mjs \
+            --mode "${{ inputs.mode }}" \
+            --fixture "${{ inputs.fixture }}" \
+            --endpoint "$INPUT_ENDPOINT" \
+            --output ai-provider-smoke-report.json \
+            --json
+
+      - name: Upload sanitized smoke report
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: ai-provider-smoke-report
+          path: ai-provider-smoke-report.json
+          if-no-files-found: ignore
