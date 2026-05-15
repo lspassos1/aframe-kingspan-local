@@ -33,6 +33,11 @@ const nextSteps = [
   "Gerar quantitativos e orçamento preliminar com fonte.",
 ];
 
+const initialPlanImportStates: Record<PlanImportProviderUiStatus["mode"], PlanImportState> = {
+  "free-cloud": "idle",
+  paid: "idle",
+};
+
 function getAiOperationalFacts(aiProviderStatus: PlanImportProviderUiStatus) {
   if (aiProviderStatus.mode === "free-cloud") {
     return [
@@ -72,16 +77,17 @@ export function StartGuidedAssistant({
   const setProject = useProjectStore((state) => state.setProject);
   const setOnboardingCompleted = useProjectStore((state) => state.setOnboardingCompleted);
   const [mode, setMode] = useState<StartAssistantMode>(initialMode);
-  const [planImportState, setPlanImportState] = useState<PlanImportState>("idle");
+  const [planImportStates, setPlanImportStates] = useState<Record<PlanImportProviderUiStatus["mode"], PlanImportState>>(initialPlanImportStates);
   const [activeUploadMode, setActiveUploadMode] = useState<PlanImportProviderUiStatus["mode"]>(aiProviderStatus.mode);
   const openedInitialExampleRef = useRef(false);
   const viewModel = useMemo(() => createStartAssistantViewModel({ mode, planExtractEnabled, aiMode: aiProviderStatus.mode }), [aiProviderStatus.mode, mode, planExtractEnabled]);
   const canShowProUpload = planExtractEnabled && proProviderStatus?.mode === "paid" && proProviderStatus.primaryConfigured;
   const activeProviderStatus = activeUploadMode === "paid" && canShowProUpload && proProviderStatus ? proProviderStatus : aiProviderStatus;
+  const activePlanImportState = planImportStates[activeProviderStatus.mode] ?? "idle";
   const aiOperationalFacts = useMemo(() => getAiOperationalFacts(activeProviderStatus), [activeProviderStatus]);
   const aiStatusPills = useMemo(
-    () => createStartAiStatusPills({ planExtractEnabled, state: planImportState, aiProviderStatus: activeProviderStatus }),
-    [activeProviderStatus, planExtractEnabled, planImportState]
+    () => createStartAiStatusPills({ planExtractEnabled, state: activePlanImportState, aiProviderStatus: activeProviderStatus }),
+    [activePlanImportState, activeProviderStatus, planExtractEnabled]
   );
   const aiReadyLabel = canShowProUpload ? "Free + Pro" : aiProviderStatus.modeLabel;
   const aiConfiguredLabel = canShowProUpload ? "Free + Pro" : activeProviderStatus.modeLabel;
@@ -112,7 +118,7 @@ export function StartGuidedAssistant({
       openExampleProject();
       return;
     }
-    setPlanImportState("idle");
+    setPlanImportStates(initialPlanImportStates);
     setActiveUploadMode(aiProviderStatus.mode);
     setMode(nextMode);
   }
@@ -126,7 +132,7 @@ export function StartGuidedAssistant({
 
   function handlePlanImportStateChange(providerStatus: PlanImportProviderUiStatus, nextState: PlanImportState) {
     setActiveUploadMode(providerStatus.mode);
-    setPlanImportState(nextState);
+    setPlanImportStates((current) => ({ ...current, [providerStatus.mode]: nextState }));
   }
 
   const currentStepIndex = mode === "choose" ? 0 : 1;

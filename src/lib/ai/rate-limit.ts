@@ -5,6 +5,7 @@ export type AiRateLimitStorageKind = "redis" | "memory";
 
 export type AiRateLimitDecision = {
   allowed: boolean;
+  mode: "free-cloud" | "paid";
   scope: AiRateLimitScope;
   limit: number;
   remaining: number;
@@ -148,8 +149,8 @@ function hashIdentifier(value: string, salt: string) {
   return createHash("sha256").update(`${salt}:${value}`).digest("hex").slice(0, 40);
 }
 
-function buildDailyKey(input: { feature: "plan-extract"; mode: "free-cloud" | "paid"; scope: AiRateLimitScope; identifier: string; dateKey: string; salt: string }) {
-  return `ai:${input.feature}:${input.mode}:${input.scope}:${input.dateKey}:${hashIdentifier(input.identifier, input.salt)}`;
+function buildDailyKey(input: { feature: "plan-extract"; scope: AiRateLimitScope; identifier: string; dateKey: string; salt: string }) {
+  return `ai:${input.feature}:${input.scope}:${input.dateKey}:${hashIdentifier(input.identifier, input.salt)}`;
 }
 
 function buildHeadersDecision(decision: AiRateLimitDecision) {
@@ -212,6 +213,7 @@ export async function checkAndConsumeAiDailyLimit(
   if (env.NODE_ENV === "production" && salt === "change-me-in-production") {
     return buildHeadersDecision({
       allowed: false,
+      mode,
       scope: "global",
       limit: limits.global,
       remaining: 0,
@@ -224,6 +226,7 @@ export async function checkAndConsumeAiDailyLimit(
   if (!input.userId && !allowAnonymous) {
     return buildHeadersDecision({
       allowed: false,
+      mode,
       scope: "user",
       limit: limits.user,
       remaining: 0,
@@ -236,6 +239,7 @@ export async function checkAndConsumeAiDailyLimit(
   if (!store) {
     return buildHeadersDecision({
       allowed: false,
+      mode,
       scope: "global",
       limit: limits.global,
       remaining: 0,
@@ -256,7 +260,6 @@ export async function checkAndConsumeAiDailyLimit(
     ...scope,
     key: buildDailyKey({
       feature: input.feature,
-      mode,
       scope: scope.scope,
       identifier: scope.identifier,
       dateKey: getDateKey(now),
@@ -277,6 +280,7 @@ export async function checkAndConsumeAiDailyLimit(
       if (failOpen) {
         return buildHeadersDecision({
           allowed: true,
+          mode,
           scope: scope.scope,
           limit: scope.limit,
           remaining: scope.limit,
@@ -287,6 +291,7 @@ export async function checkAndConsumeAiDailyLimit(
       }
       return buildHeadersDecision({
         allowed: false,
+        mode,
         scope: scope.scope,
         limit: scope.limit,
         remaining: 0,
@@ -299,6 +304,7 @@ export async function checkAndConsumeAiDailyLimit(
       await Promise.allSettled([activeStore.decrement(scope.key), rollbackConsumedScopes()]);
       return buildHeadersDecision({
         allowed: false,
+        mode,
         scope: scope.scope,
         limit: scope.limit,
         remaining: 0,
@@ -323,6 +329,7 @@ export async function checkAndConsumeAiDailyLimit(
 
   return buildHeadersDecision({
     allowed: true,
+    mode,
     scope: tightestScope?.scope ?? "global",
     limit: tightestScope?.limit ?? limits.global,
     remaining: tightestScope?.remaining ?? limits.global,

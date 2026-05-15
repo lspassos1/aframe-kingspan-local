@@ -73,7 +73,7 @@ describe("AI daily rate limit", () => {
     expect(second).toMatchObject({ allowed: true, remaining: 0 });
   });
 
-  it("separates daily quota between free and explicit Pro uploads", async () => {
+  it("keeps one daily quota across Free and Pro uploads while recording the selected mode", async () => {
     const store = createMemoryAiRateLimitStore(new Map());
     const baseInput = {
       feature: "plan-extract" as const,
@@ -85,12 +85,11 @@ describe("AI daily rate limit", () => {
 
     const free = await checkAndConsumeAiDailyLimit({ ...baseInput, mode: "free-cloud" }, { env, store });
     const paid = await checkAndConsumeAiDailyLimit({ ...baseInput, mode: "paid" }, { env, store });
-    const secondFree = await checkAndConsumeAiDailyLimit({ ...baseInput, mode: "free-cloud" }, { env, store });
 
-    expect(free).toMatchObject({ allowed: true, remaining: 0 });
-    expect(paid).toMatchObject({ allowed: true, remaining: 0 });
-    expect(secondFree).toMatchObject({
+    expect(free).toMatchObject({ allowed: true, mode: "free-cloud", remaining: 0 });
+    expect(paid).toMatchObject({
       allowed: false,
+      mode: "paid",
       scope: "user",
       reason: "user-daily-limit-exceeded",
     });
@@ -102,6 +101,7 @@ describe("AI daily rate limit", () => {
     await releaseAiDailyLimitDecision(
       {
         allowed: true,
+        mode: "free-cloud",
         scope: "user",
         limit: 3,
         remaining: 2,
