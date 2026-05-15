@@ -45,4 +45,35 @@ describe("OperationalChecklist UI", () => {
     expect(html).not.toContain("Diagnóstico seguro de IA, OpenAI");
     expect(html.indexOf("OPENAI_API_KEY")).toBeGreaterThan(html.indexOf("Diagnóstico técnico"));
   });
+
+  it("renders central DB read failures without exposing URL or token values", () => {
+    const centralPriceDbOperational = createExternalPriceDbOperationalStatus({
+      configured: true,
+      latestSource: { referenceMonth: "2026-05-01", status: "active" },
+      latestSyncRun: { status: "completed", finishedAt: "2026-05-10T00:00:00Z" },
+      readProbe: {
+        status: "failed",
+        errorMessage: "RPC failed at https://example.supabase.co/rest/v1 with Authorization: Bearer secret-token-12345678901234567890",
+      },
+    });
+    const html = renderToStaticMarkup(
+      createElement(OperationalChecklist, {
+        environment: {
+          ...paidEnvironment,
+          centralPriceDbConfigured: true,
+          centralPriceDbLabel: centralPriceDbOperational.centralLabel,
+          lastSemiannualSyncLabel: centralPriceDbOperational.syncLabel,
+          centralPriceDbOperational,
+        },
+      })
+    );
+
+    expect(html).toContain("Busca central indisponível");
+    expect(html).toContain("importação local");
+    expect(html).toContain("fonte manual revisável");
+    expect(html).toContain("RPC de preços/leitura pública falhou");
+    expect(html).not.toContain("example.supabase.co");
+    expect(html).not.toContain("secret-token");
+    expect(html).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+  });
 });

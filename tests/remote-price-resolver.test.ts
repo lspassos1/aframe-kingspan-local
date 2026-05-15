@@ -133,6 +133,27 @@ describe("remote price candidate resolver", () => {
     });
   });
 
+  it.each([401, 403, 500])("returns a safe adapter error when the Supabase RPC returns %s", async (status) => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ error: "raw provider payload" }), { status }));
+    const adapter = createSupabasePriceAdapter(
+      {
+        provider: "supabase",
+        supabaseUrl: "https://prices.example.supabase.co/",
+        supabaseAnonKey: "anon-read-key",
+      },
+      { fetcher }
+    );
+
+    const result = await adapter.searchCandidates({ query: "alvenaria", state: "BA", unit: "m2" });
+
+    expect(result).toMatchObject({
+      configured: true,
+      candidates: [],
+      error: `Remote price database search failed with status ${status}.`,
+    });
+    expect(JSON.stringify(result)).not.toContain("raw provider payload");
+  });
+
   it("marks unknown remote units invalid instead of coercing them to a supported unit", () => {
     const candidate = mapSupabasePriceCandidateRow(createRemoteRow({ unit: "caixa", price_status: "valid", pending_reason: "" }), { state: "BA", unit: "un" });
 
@@ -242,6 +263,29 @@ describe("remote price candidate resolver", () => {
     expect(result.candidates.map((candidate) => candidate.origin)).toEqual(["project-approved", "manual-entry"]);
   });
 
+  it("sanitizes thrown remote DB errors before exposing resolver fallback status", async () => {
+    const throwingRemoteDb: RemotePriceDbAdapter = {
+      provider: "supabase",
+      isConfigured: () => true,
+      searchCandidates: vi.fn(async () => {
+        throw new Error("request failed at https://prices.example.supabase.co with Authorization: Bearer secret-token-12345678901234567890");
+      }),
+    };
+
+    const result = await resolvePriceCandidates({
+      quantities: [quantity],
+      serviceCompositions: [createComposition()],
+      location: { city: "Cruz das Almas", state: "BA" },
+      remoteDb: throwingRemoteDb,
+    });
+
+    expect(result.remote.error).toContain("[url]");
+    expect(result.remote.error).toContain("[redacted]");
+    expect(result.remote.error).not.toContain("prices.example.supabase.co");
+    expect(result.remote.error).not.toContain("secret-token");
+    expect(result.manualEntryAvailable).toBe(true);
+  });
+
   it("falls back cleanly when the remote DB is not configured", async () => {
     const result = await resolvePriceCandidates({
       quantities: [quantity],
@@ -287,6 +331,19 @@ describe("remote price candidate resolver", () => {
     );
 
     expect(files.join("\n")).not.toMatch(/SERVICE_ROLE|SUPABASE_SERVICE_ROLE_KEY|service_role/i);
+  });
+
+  it("keeps service-role secrets out of app and component runtime files", () => {
+    const runtimeFiles = [
+      "src/app/budget-assistant/page.tsx",
+      "src/components/help/OperationalChecklist.tsx",
+      "src/lib/operations/operational-checklist.ts",
+      "src/lib/operations/operational-environment.ts",
+      "src/lib/pricing/remote-price-db.ts",
+      "src/lib/pricing/supabase-price-adapter.ts",
+    ].map((file) => readFileSync(join(process.cwd(), file), "utf8"));
+
+    expect(runtimeFiles.join("\n")).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_.*SERVICE_ROLE|service_role/i);
   });
 });
 
