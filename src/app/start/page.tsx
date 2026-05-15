@@ -1,6 +1,7 @@
 import { StartGuidedAssistant } from "@/components/onboarding/StartGuidedAssistant";
 import { getSafePlanImportProviderUiStatus } from "@/lib/ai/plan-import-status";
 import { isAiPlanExtractEnabled } from "@/lib/ai/plan-extract-request";
+import { createAiModeScopedEnv } from "@/lib/ai/mode";
 import { normalizeStartAssistantModeParam } from "@/lib/onboarding/start-guided-assistant";
 import type { StartRedirectReason } from "@/lib/routes/shell";
 
@@ -11,7 +12,8 @@ export default async function StartPage({
 }) {
   const resolvedSearchParams = await searchParams;
   const planExtractEnabled = isAiPlanExtractEnabled();
-  const aiProviderStatus = getSafePlanImportProviderUiStatus();
+  const aiProviderStatus = getSafePlanImportProviderUiStatus(createAiModeScopedEnv(process.env, "free-cloud"));
+  const proProviderStatus = getSafePlanImportProviderUiStatus(createAiModeScopedEnv(process.env, "paid"));
   const initialMode = normalizeStartAssistantModeParam(resolvedSearchParams?.mode);
   const reasonParam = Array.isArray(resolvedSearchParams?.reason) ? resolvedSearchParams?.reason[0] : resolvedSearchParams?.reason;
   const nextParam = Array.isArray(resolvedSearchParams?.next) ? resolvedSearchParams?.next[0] : resolvedSearchParams?.next;
@@ -23,6 +25,7 @@ export default async function StartPage({
         key={`${initialMode}-${redirectReason ?? "direct"}`}
         planExtractEnabled={planExtractEnabled}
         aiProviderStatus={aiProviderStatus}
+        proProviderStatus={proProviderStatus.primaryConfigured ? proProviderStatus : undefined}
         initialMode={initialMode}
         redirectReason={redirectReason}
         redirectNext={nextParam}

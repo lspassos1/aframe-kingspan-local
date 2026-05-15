@@ -6,6 +6,7 @@ import {
   type AiPlanExtractMimeType,
   type AiPlanExtractProviderResult,
 } from "@/lib/ai/providers";
+import { readAiProductMode } from "@/lib/ai/mode";
 import { planExtractResultSchema } from "@/lib/ai/plan-extract-schema";
 
 export type AiPlanExtractCacheStore = {
@@ -97,9 +98,10 @@ export function createPlanExtractCacheKey({
   const fileHash = hashValue(fileBytes);
   const versionHash = hashValue(getPlanExtractCacheVersion(env)).slice(0, 24);
   const mimeToken = mimeType.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const modeToken = readAiProductMode(env);
 
   return {
-    key: `ai:plan-extract-cache:${mimeToken}:${versionHash}:${fileHash}`,
+    key: `ai:plan-extract-cache:${modeToken}:${mimeToken}:${versionHash}:${fileHash}`,
     fileHash,
     versionHash,
   };

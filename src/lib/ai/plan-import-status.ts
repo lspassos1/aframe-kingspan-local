@@ -20,7 +20,7 @@ export function getSafePlanImportProviderUiStatus(env: AiRouterEnv = process.env
       primaryProviderLabel: aiMode.publicPrimaryLabel,
       reviewProviderLabel: aiMode.publicReviewLabel,
       paidFallbackEnabled: aiMode.paidFallbackEnabled,
-      primaryConfigured: aiMode.primaryConfigured,
+      primaryConfigured: aiMode.primaryConfigured && aiMode.primaryModelConfigured,
       reviewConfigured: false,
     };
   }

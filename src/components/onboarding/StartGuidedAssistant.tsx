@@ -33,6 +33,11 @@ const nextSteps = [
   "Gerar quantitativos e orçamento preliminar com fonte.",
 ];
 
+const initialPlanImportStates: Record<PlanImportProviderUiStatus["mode"], PlanImportState> = {
+  "free-cloud": "idle",
+  paid: "idle",
+};
+
 function getAiOperationalFacts(aiProviderStatus: PlanImportProviderUiStatus) {
   if (aiProviderStatus.mode === "free-cloud") {
     return [
@@ -56,12 +61,14 @@ function getAiOperationalFacts(aiProviderStatus: PlanImportProviderUiStatus) {
 export function StartGuidedAssistant({
   planExtractEnabled,
   aiProviderStatus = defaultPlanImportProviderUiStatus,
+  proProviderStatus,
   initialMode = "choose",
   redirectReason,
   redirectNext,
 }: {
   planExtractEnabled: boolean;
   aiProviderStatus?: PlanImportProviderUiStatus;
+  proProviderStatus?: PlanImportProviderUiStatus;
   initialMode?: StartAssistantMode;
   redirectReason?: StartRedirectReason;
   redirectNext?: string;
@@ -70,16 +77,20 @@ export function StartGuidedAssistant({
   const setProject = useProjectStore((state) => state.setProject);
   const setOnboardingCompleted = useProjectStore((state) => state.setOnboardingCompleted);
   const [mode, setMode] = useState<StartAssistantMode>(initialMode);
-  const [planImportState, setPlanImportState] = useState<PlanImportState>("idle");
+  const [planImportStates, setPlanImportStates] = useState<Record<PlanImportProviderUiStatus["mode"], PlanImportState>>(initialPlanImportStates);
+  const [activeUploadMode, setActiveUploadMode] = useState<PlanImportProviderUiStatus["mode"]>(aiProviderStatus.mode);
   const openedInitialExampleRef = useRef(false);
   const viewModel = useMemo(() => createStartAssistantViewModel({ mode, planExtractEnabled, aiMode: aiProviderStatus.mode }), [aiProviderStatus.mode, mode, planExtractEnabled]);
-  const aiOperationalFacts = useMemo(() => getAiOperationalFacts(aiProviderStatus), [aiProviderStatus]);
+  const canShowProUpload = planExtractEnabled && proProviderStatus?.mode === "paid" && proProviderStatus.primaryConfigured;
+  const activeProviderStatus = activeUploadMode === "paid" && canShowProUpload && proProviderStatus ? proProviderStatus : aiProviderStatus;
+  const activePlanImportState = planImportStates[activeProviderStatus.mode] ?? "idle";
+  const aiOperationalFacts = useMemo(() => getAiOperationalFacts(activeProviderStatus), [activeProviderStatus]);
   const aiStatusPills = useMemo(
-    () => createStartAiStatusPills({ planExtractEnabled, state: planImportState, aiProviderStatus }),
-    [aiProviderStatus, planExtractEnabled, planImportState]
+    () => createStartAiStatusPills({ planExtractEnabled, state: activePlanImportState, aiProviderStatus: activeProviderStatus }),
+    [activePlanImportState, activeProviderStatus, planExtractEnabled]
   );
-  const aiReadyLabel = aiProviderStatus.modeLabel;
-  const aiConfiguredLabel = aiProviderStatus.modeLabel;
+  const aiReadyLabel = canShowProUpload ? "Free + Pro" : aiProviderStatus.modeLabel;
+  const aiConfiguredLabel = canShowProUpload ? "Free + Pro" : activeProviderStatus.modeLabel;
 
   const loadExampleProject = useCallback(() => {
     setProject({
@@ -107,7 +118,8 @@ export function StartGuidedAssistant({
       openExampleProject();
       return;
     }
-    setPlanImportState("idle");
+    setPlanImportStates(initialPlanImportStates);
+    setActiveUploadMode(aiProviderStatus.mode);
     setMode(nextMode);
   }
 
@@ -116,6 +128,11 @@ export function StartGuidedAssistant({
     setTimeout(() => {
       document.getElementById("manual-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
+  }
+
+  function handlePlanImportStateChange(providerStatus: PlanImportProviderUiStatus, nextState: PlanImportState) {
+    setActiveUploadMode(providerStatus.mode);
+    setPlanImportStates((current) => ({ ...current, [providerStatus.mode]: nextState }));
   }
 
   const currentStepIndex = mode === "choose" ? 0 : 1;
@@ -234,11 +251,39 @@ export function StartGuidedAssistant({
           <div className="space-y-3">
             <SectionHeader
               eyebrow="Caminho principal"
-              title="Enviar planta baixa"
-              description="Arraste ou selecione um arquivo. O app mostra cache, limite, análise e revisão antes de aplicar qualquer dado."
-              action={<StatusPill tone="pending">{aiProviderStatus.mode === "free-cloud" ? "Modo gratuito + revisão" : "Revisão obrigatória"}</StatusPill>}
+              title={canShowProUpload ? "Escolha Free ou Pro" : "Enviar planta baixa"}
+              description={
+                canShowProUpload
+                  ? "Teste o mesmo arquivo no modo gratuito ou no Modo Pro. O Pro é uma escolha explícita, nunca fallback automático."
+                  : "Arraste ou selecione um arquivo. O app mostra cache, limite, análise e revisão antes de aplicar qualquer dado."
+              }
+              action={
+                <StatusPill tone="pending">
+                  {canShowProUpload ? "Free padrão + Pro explícito" : aiProviderStatus.mode === "free-cloud" ? "Modo gratuito + revisão" : "Revisão obrigatória"}
+                </StatusPill>
+              }
             />
-            <PlanImportCard planExtractEnabled={planExtractEnabled} aiProviderStatus={aiProviderStatus} onManualFallback={openManualCompletion} onStateChange={setPlanImportState} />
+            <div className={canShowProUpload ? "grid gap-3 2xl:grid-cols-2" : "space-y-3"}>
+              <PlanImportCard
+                planExtractEnabled={planExtractEnabled}
+                aiProviderStatus={aiProviderStatus}
+                requestedMode={aiProviderStatus.mode}
+                uploadTitle={canShowProUpload ? "Enviar com IA gratuita" : "Enviar planta baixa"}
+                onManualFallback={openManualCompletion}
+                onStateChange={(nextState) => handlePlanImportStateChange(aiProviderStatus, nextState)}
+              />
+              {canShowProUpload && proProviderStatus ? (
+                <PlanImportCard
+                  planExtractEnabled={planExtractEnabled}
+                  aiProviderStatus={proProviderStatus}
+                  requestedMode="paid"
+                  uploadTitle="Enviar com Modo Pro"
+                  uploadDescription="Modo Pro usa análise detalhada. Pode gerar custo de API; nada será aplicado sem revisão."
+                  onManualFallback={openManualCompletion}
+                  onStateChange={(nextState) => handlePlanImportStateChange(proProviderStatus, nextState)}
+                />
+              ) : null}
+            </div>
           </div>
 
           <StickySummary

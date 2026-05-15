@@ -50,10 +50,23 @@ describe("AI plan extract cache", () => {
       env: { ...baseEnv, AI_OPENAI_MODEL: "gpt-4.1-mini" },
     });
     const differentMime = createPlanExtractCacheKey({ fileBytes, mimeType: "application/pdf", env: baseEnv });
+    const differentMode = createPlanExtractCacheKey({
+      fileBytes,
+      mimeType: "image/png",
+      env: {
+        AI_MODE: "free-cloud",
+        AI_PLAN_PRIMARY_PROVIDER: "gemini",
+        GEMINI_API_KEY: "key",
+        GEMINI_MODEL: "gemini-2.5-flash",
+      },
+    });
 
     expect(first.key).toBe(same.key);
     expect(first.key).not.toBe(differentModel.key);
     expect(first.key).not.toBe(differentMime.key);
+    expect(first.key).not.toBe(differentMode.key);
+    expect(first.key).toContain(":paid:");
+    expect(differentMode.key).toContain(":free-cloud:");
     expect(first.fileHash).toHaveLength(64);
     expect(first.versionHash).toHaveLength(24);
   });

@@ -124,7 +124,8 @@ export function getAiPlanExtractProviderOrder(env: AiPlanExtractEnv = process.en
 export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.env): AiPlanExtractProviderConfig[] {
   return getAiPlanExtractProviderOrder(env).map((id) => {
     const defaults = providerDefaults[id];
-    const model = env[defaults.modelEnv] || defaults.defaultModel;
+    const configuredModel = env[defaults.modelEnv]?.trim();
+    const model = configuredModel || defaults.defaultModel;
     const baseUrl = defaults.baseUrl;
     const apiKey = defaults.keyEnv ? env[defaults.keyEnv] : undefined;
     return {
@@ -132,7 +133,7 @@ export function getAiPlanExtractProviderConfigs(env: AiPlanExtractEnv = process.
       model,
       baseUrl,
       apiKey,
-      configured: Boolean(model && baseUrl && apiKey),
+      configured: Boolean((id === "openai" ? configuredModel : model) && baseUrl && apiKey),
       supports: defaults.supports,
     };
   });

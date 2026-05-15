@@ -49,6 +49,19 @@ export function readAiProductMode(env: AiModeEnv = process.env): AiProductMode {
   return env.AI_MODE === "paid" ? "paid" : "free-cloud";
 }
 
+export function createAiModeScopedEnv(env: AiModeEnv, mode: AiProductMode): AiModeEnv {
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        if (property === "AI_MODE") return mode;
+        if (typeof property !== "string") return undefined;
+        return env[property];
+      },
+    }
+  ) as AiModeEnv;
+}
+
 export function resolveAiMode(env: AiModeEnv = process.env): AiModeStatus {
   const mode = readAiProductMode(env);
 

@@ -73,12 +73,35 @@ describe("AI daily rate limit", () => {
     expect(second).toMatchObject({ allowed: true, remaining: 0 });
   });
 
+  it("keeps one daily quota across Free and Pro uploads while recording the selected mode", async () => {
+    const store = createMemoryAiRateLimitStore(new Map());
+    const baseInput = {
+      feature: "plan-extract" as const,
+      userId: "user-mode-split",
+      ip: "203.0.113.46",
+      now: new Date("2026-05-04T12:00:00.000Z"),
+    };
+    const env = { ...baseEnv, AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER: "1" };
+
+    const free = await checkAndConsumeAiDailyLimit({ ...baseInput, mode: "free-cloud" }, { env, store });
+    const paid = await checkAndConsumeAiDailyLimit({ ...baseInput, mode: "paid" }, { env, store });
+
+    expect(free).toMatchObject({ allowed: true, mode: "free-cloud", remaining: 0 });
+    expect(paid).toMatchObject({
+      allowed: false,
+      mode: "paid",
+      scope: "user",
+      reason: "user-daily-limit-exceeded",
+    });
+  });
+
   it("does not attempt to release quota when no consumed keys are tracked", async () => {
     const decrement = vi.fn();
 
     await releaseAiDailyLimitDecision(
       {
         allowed: true,
+        mode: "free-cloud",
         scope: "user",
         limit: 3,
         remaining: 2,
