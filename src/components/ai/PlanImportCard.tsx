@@ -27,6 +27,7 @@ import type { Project, Scenario } from "@/types/project";
 
 type PlanExtractApiPayload = {
   mode?: PlanImportAiMode;
+  diagnosticId?: string;
   result?: unknown;
   message?: string;
   provider?: string;
@@ -231,6 +232,7 @@ export function PlanImportCard({
   const [modifiedValues, setModifiedValues] = useState<PlanExtractModifiedValues>({});
   const [questionAnswers, setQuestionAnswers] = useState<PlanExtractQuestionAnswers>({});
   const [message, setMessage] = useState("");
+  const [diagnosticId, setDiagnosticId] = useState("");
   const [providerMeta, setProviderMeta] = useState<{ provider?: string; model?: string; remaining?: string; limit?: string; cached?: boolean; review?: PlanExtractReviewPayload }>({});
 
   const copy = planExtractEnabled
@@ -262,6 +264,11 @@ export function PlanImportCard({
     onStateChange?.(nextState);
   }
 
+  function readDiagnosticId(payload: PlanExtractApiPayload | null, response: Response) {
+    const value = typeof payload?.diagnosticId === "string" ? payload.diagnosticId : response.headers.get("X-AI-Diagnostic-Id") ?? "";
+    return value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+  }
+
   function openManualFallback() {
     if (onManualFallback) {
       onManualFallback();
@@ -281,6 +288,7 @@ export function PlanImportCard({
     setModifiedValues({});
     setQuestionAnswers({});
     setProviderMeta({});
+    setDiagnosticId("");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -305,6 +313,7 @@ export function PlanImportCard({
 
       if (!response.ok) {
         updateState(nextState);
+        setDiagnosticId(readDiagnosticId(payload, response));
         setMessage(getPlanImportPayloadMessage(payload, nextState));
         return;
       }
@@ -312,6 +321,7 @@ export function PlanImportCard({
       const parsed = planExtractResultSchema.safeParse(payload?.result);
       if (!parsed.success) {
         updateState("error");
+        setDiagnosticId(readDiagnosticId(payload, response));
         setMessage("A resposta da extração veio em formato inválido.");
         return;
       }
@@ -328,6 +338,7 @@ export function PlanImportCard({
         remaining: response.headers.get("X-RateLimit-Remaining") ?? undefined,
         limit: response.headers.get("X-RateLimit-Limit") ?? undefined,
       });
+      setDiagnosticId("");
       updateState(nextState);
       setMessage(getPlanImportPayloadMessage(payload, nextState));
     } catch {
@@ -388,6 +399,7 @@ export function PlanImportCard({
     setQuestionAnswers({});
     setProviderMeta({});
     setMessage("");
+    setDiagnosticId("");
     updateState("idle");
   }
 
@@ -486,6 +498,11 @@ export function PlanImportCard({
                 )}
                 <span className={cn(state === "error" && "text-destructive")}>{message}</span>
               </div>
+            ) : null}
+            {diagnosticId && canShowManualRecovery ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                ID de diagnóstico: <span className="font-mono text-foreground">{diagnosticId}</span>
+              </p>
             ) : null}
           </div>
 

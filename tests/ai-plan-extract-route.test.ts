@@ -1,9 +1,26 @@
-import { describe, expect, it } from "vitest";
-import { getPlanExtractErrorPayload, readRequestedPlanExtractMode, serializeProviderErrorsForClient } from "@/app/api/ai/plan-extract/route";
+import { NextRequest } from "next/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clerk/nextjs/server", () => ({
+  auth: vi.fn(async () => ({ userId: "user_test" })),
+}));
+
+import { getPlanExtractErrorPayload, POST, readRequestedPlanExtractMode, serializeProviderErrorsForClient } from "@/app/api/ai/plan-extract/route";
 import { AiProviderChainError } from "@/lib/ai/errors";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
 
 describe("plan extract route diagnostics", () => {
+  beforeEach(() => {
+    vi.stubEnv("AI_PLAN_EXTRACT_ENABLED", "true");
+    vi.stubEnv("AI_RATE_LIMIT_SALT", "test-salt");
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
   it("redacts provider URLs and token-like values from safe diagnostics", () => {
     const sanitized = sanitizeAiDiagnosticMessage(
       "Provider failed at https://example.test/path with Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 and x-api-key=short-key"
@@ -63,5 +80,20 @@ describe("plan extract route diagnostics", () => {
     expect(readRequestedPlanExtractMode(paidForm)).toBe("paid");
     expect(readRequestedPlanExtractMode(invalidForm)).toBe("free-cloud");
     expect(readRequestedPlanExtractMode(null)).toBe("free-cloud");
+  });
+
+  it("returns a safe diagnostic id on upload validation errors", async () => {
+    const request = new NextRequest("http://localhost/api/ai/plan-extract", {
+      method: "POST",
+      body: new FormData(),
+    });
+
+    const response = await POST(request);
+    const payload = (await response.json()) as { diagnosticId?: string; message?: string };
+
+    expect(response.status).toBe(400);
+    expect(payload.message).toBe("Envie um arquivo de planta baixa.");
+    expect(payload.diagnosticId).toMatch(/^diag_[a-zA-Z0-9_-]+$/);
+    expect(response.headers.get("X-AI-Diagnostic-Id")).toBe(payload.diagnosticId);
   });
 });

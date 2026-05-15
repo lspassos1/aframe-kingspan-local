@@ -14,6 +14,7 @@ const disabledEnvironment: OperationalEnvironmentStatus = {
   aiModelConfigured: false,
   aiRateLimitSaltConfigured: false,
   aiRateLimitStorageConfigured: false,
+  aiDiagnosticsStorageConfigured: false,
   providerLabel: "Modo gratuito",
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,
@@ -38,6 +39,7 @@ describe("operational checklist", () => {
     expect(getStatus(checklist, "manual-fallback")).toBe("disponível");
     expect(getStatus(checklist, "ai-config")).toBe("ausente");
     expect(getStatus(checklist, "daily-limit")).toBe("configurar");
+    expect(getStatus(checklist, "ai-diagnostics")).toBe("log seguro");
     expect(getStatus(checklist, "local-price-base")).toBe("ausente");
     expect(getStatus(checklist, "central-db")).toBe("não configurada");
     expect(getStatus(checklist, "sinapi")).toBe("base ausente");
@@ -50,6 +52,7 @@ describe("operational checklist", () => {
     expect(publicDetails).not.toContain("GEMINI_API_KEY");
     expect(publicDetails).not.toContain("AI_MODE");
     expect(checklist.some((item) => item.technicalDetail?.includes("GEMINI_MODEL"))).toBe(true);
+    expect(checklist.find((item) => item.id === "ai-diagnostics")?.technicalDetail).toContain("Não armazena arquivo");
   });
 
   it("detects imported SINAPI metadata without exposing secrets", () => {
@@ -79,11 +82,13 @@ describe("operational checklist", () => {
         aiModelConfigured: true,
         aiRateLimitSaltConfigured: true,
         aiRateLimitStorageConfigured: true,
+        aiDiagnosticsStorageConfigured: true,
       },
       project
     );
 
     expect(getStatus(checklist, "plan-extract")).toBe("ativo");
+    expect(getStatus(checklist, "ai-diagnostics")).toBe("histórico curto");
     expect(getStatus(checklist, "sinapi")).toBe("base importada");
     expect(getStatus(checklist, "local-price-base")).toBe("1 fonte(s)");
     expect(getStatus(checklist, "reference")).toBe("2026-05");

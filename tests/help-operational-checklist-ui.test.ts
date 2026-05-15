@@ -18,6 +18,7 @@ const paidEnvironment: OperationalEnvironmentStatus = {
   aiModelConfigured: false,
   aiRateLimitSaltConfigured: false,
   aiRateLimitStorageConfigured: false,
+  aiDiagnosticsStorageConfigured: false,
   providerLabel: "Modo Pro",
   dailyLimitLabel: "3/usuário · 5/IP · 50/global",
   centralPriceDbConfigured: false,

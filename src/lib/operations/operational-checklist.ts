@@ -11,6 +11,7 @@ export interface OperationalEnvironmentStatus {
   aiModelConfigured: boolean;
   aiRateLimitSaltConfigured: boolean;
   aiRateLimitStorageConfigured: boolean;
+  aiDiagnosticsStorageConfigured: boolean;
   providerLabel: string;
   dailyLimitLabel: string;
   centralPriceDbConfigured: boolean;
@@ -159,6 +160,16 @@ export function createOperationalChecklist(
         environment.aiRateLimitStorageConfigured ? "configurado" : "ausente"
       }. Aceita UPSTASH_REDIS_REST_URL/TOKEN ou KV_REST_API_URL/TOKEN no servidor.`,
       tone: rateLimitReady ? "ok" : "warning",
+    },
+    {
+      id: "ai-diagnostics",
+      label: "Diagnóstico IA",
+      status: environment.aiDiagnosticsStorageConfigured ? "histórico curto" : "log seguro",
+      detail: environment.aiDiagnosticsStorageConfigured
+        ? "Tentativas de upload recebem ID seguro e histórico temporário para suporte."
+        : "Tentativas de upload continuam com ID seguro; sem histórico persistente neste ambiente.",
+      technicalDetail: "Não armazena arquivo, base64, payload bruto, stack trace completo ou segredos.",
+      tone: environment.aiDiagnosticsStorageConfigured ? "ok" : "muted",
     },
     {
       id: "local-price-base",
