@@ -558,6 +558,7 @@ function hasUsablePlanExtractContent(value: Record<string, unknown>) {
     value.quantitySeeds,
     value.questions,
     value.extractionWarnings,
+    value.assumptions,
     value.missingInformation,
     value.warnings,
   ].some(hasNonEmptyValue);
