@@ -31,7 +31,7 @@ AI_OPENAI_MODEL=gpt-4o-mini
 AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini
 ```
 
-`AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente agora.
+Quando `AI_OPENAI_MODEL_PREMIUM` está configurado, o Modo Pro explícito usa esse modelo para extração de planta; caso contrário usa `AI_OPENAI_MODEL`.
 
 `OPENAI_API_KEY` deve ser lida apenas no servidor. Nunca use `NEXT_PUBLIC_OPENAI_API_KEY`; variáveis com prefixo `NEXT_PUBLIC_` entram no bundle do navegador.
 
@@ -44,7 +44,7 @@ Obrigatórias para habilitar o runtime:
 - `AI_PLAN_EXTRACT_ENABLED=true`
 - `AI_MODE=free-cloud` ou `AI_MODE=paid`
 - Em `free-cloud`: `GEMINI_API_KEY`, `GEMINI_MODEL`, `OPENROUTER_API_KEY`, `OPENROUTER_PLAN_REVIEW_MODEL`, `GROQ_API_KEY`, `GROQ_TEXT_MODEL` conforme providers habilitados.
-- Em `paid`: `OPENAI_API_KEY` e `AI_OPENAI_MODEL=gpt-4o-mini`.
+- Em `paid`: `OPENAI_API_KEY` e `AI_OPENAI_MODEL_PREMIUM` ou `AI_OPENAI_MODEL`.
 - `AI_RATE_LIMIT_SALT` com valor forte e único em produção
 
 Limites e segurança:
@@ -150,7 +150,7 @@ GROQ_API_KEY=...
 GROQ_TEXT_MODEL=llama-3.1-8b-instant
 ```
 
-Para testar com OpenAI real, use `AI_MODE=paid`, `OPENAI_API_KEY` e `AI_OPENAI_MODEL`. Assinatura ChatGPT não configura automaticamente a API do app. A chave precisa vir da plataforma OpenAI e ficar somente em `.env.local` ou nas variáveis server-side da Vercel.
+Para testar com OpenAI real, use `AI_MODE=paid`, `OPENAI_API_KEY` e `AI_OPENAI_MODEL` ou `AI_OPENAI_MODEL_PREMIUM`. Assinatura ChatGPT não configura automaticamente a API do app. A chave precisa vir da plataforma OpenAI e ficar somente em `.env.local` ou nas variáveis server-side da Vercel.
 
 ## Deploy Vercel
 

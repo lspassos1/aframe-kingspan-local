@@ -100,16 +100,30 @@ describe("AI plan extract cache", () => {
   it("returns only valid cached extraction results", async () => {
     const entries = new Map();
     const store = createMemoryPlanExtractCacheStore(entries);
+    const noActionableExtraction: AiPlanExtractProviderResult = {
+      ...validExtraction,
+      result: {
+        ...validExtraction.result,
+        extracted: {
+          notes: ["Leitura sem medida aplicável."],
+        },
+        fieldConfidence: {},
+        assumptions: ["A imagem parece conter uma planta, mas sem cota legível."],
+      },
+    };
 
     await store.set("valid-key", validExtraction, 60);
     await store.set("invalid-key", { ...validExtraction, result: { summary: "missing schema fields" } } as AiPlanExtractProviderResult, 60);
+    await store.set("no-actionable-key", noActionableExtraction, 60);
 
     expect(await store.get("valid-key")).toMatchObject({
       provider: "openai",
       model: "gpt-4o-mini",
     });
     expect(await store.get("invalid-key")).toBeNull();
+    expect(await store.get("no-actionable-key")).toBeNull();
     expect(entries.has("invalid-key")).toBe(false);
+    expect(entries.has("no-actionable-key")).toBe(false);
   });
 
   it("prunes expired memory entries when writing new cache results", async () => {
@@ -132,6 +146,19 @@ describe("AI plan extract cache", () => {
 
   it("does not cache retryable plan-review provider failures", () => {
     expect(shouldCachePlanExtractResult(validExtraction)).toBe(true);
+    expect(
+      shouldCachePlanExtractResult({
+        ...validExtraction,
+        result: {
+          ...validExtraction.result,
+          extracted: {
+            notes: ["Sem campo aplicável."],
+          },
+          fieldConfidence: {},
+          assumptions: ["Sem escala legível."],
+        },
+      })
+    ).toBe(false);
     expect(
       shouldCachePlanExtractResult({
         ...validExtraction,

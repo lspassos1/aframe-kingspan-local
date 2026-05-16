@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { auth } from "@clerk/nextjs/server";
 import { after, NextRequest, NextResponse } from "next/server";
+import { hasActionablePlanExtractFields } from "@/lib/ai/apply-plan-extract";
 import { isPlanExtractImageMimeType, shouldPreprocessPlanExtractImage } from "@/lib/ai/plan-image-mime";
 import { preprocessPlanExtractImage } from "@/lib/ai/plan-image-preprocess";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
@@ -432,6 +433,28 @@ export async function POST(request: NextRequest) {
       timeoutMs: 45_000,
     }, { env: aiEnv });
     const providerAttempts = getDiagnosticProviderAttempts(extraction);
+    if (!hasActionablePlanExtractFields(extraction.result)) {
+      await releaseAiDailyLimitDecision(rateLimitDecision);
+      const message = "A análise não encontrou campos aplicáveis. Continue manualmente ou tente uma imagem mais legível.";
+      queueDiagnostic({
+        status: "extraction_empty",
+        cache: "MISS",
+        quota: "released",
+        reason: "plan-extract-empty-result",
+        mimeType: validation.mimeType,
+        fileSizeBytes: fileBytes.byteLength,
+        providersTried: compactProviders([extraction.provider, extraction.review?.provider]),
+        providerAttempts,
+        providerDurations: getProviderDurations(providerAttempts),
+        imageProcessing,
+        message,
+      });
+      return jsonDiagnosticResponse({ message, reason: "plan-extract-empty-result", mode: requestedMode }, diagnosticId, {
+        status: 422,
+        headers: { "X-AI-Mode": requestedMode },
+      });
+    }
+
     if (shouldCachePlanExtractResult(extraction)) {
       await cacheStore.set(cacheKey.key, extraction, getPlanExtractCacheTtlSeconds()).catch(() => undefined);
     }

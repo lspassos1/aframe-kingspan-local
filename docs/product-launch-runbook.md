@@ -189,7 +189,7 @@ Validation:
 
 - `/help` reports `Modo Pro` safely.
 - Pro mode is explicit.
-- `AI_OPENAI_MODEL_PREMIUM` remains reserved and is not selected automatically.
+- `AI_OPENAI_MODEL_PREMIUM` is selected only inside the explicit Pro upload path when configured.
 - No live paid request is required unless Lucas explicitly approves a paid smoke test.
 - Manual fallback remains available.
 

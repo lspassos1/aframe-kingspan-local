@@ -83,7 +83,7 @@ describe("AI plan extraction providers", () => {
     expect(getAiPlanExtractProviderOrder({ AI_MODE: "paid", AI_PLAN_REVIEW_PROVIDER: "openrouter" })).toEqual(["openai"]);
   });
 
-  it("keeps the premium OpenAI model reserved instead of selecting it automatically", () => {
+  it("prefers the premium OpenAI model for explicit Pro extraction when configured", () => {
     const [provider] = getAiPlanExtractProviderConfigs({
       AI_MODE: "paid",
       OPENAI_API_KEY: "openai-key",
@@ -93,7 +93,7 @@ describe("AI plan extraction providers", () => {
 
     expect(provider).toMatchObject({
       id: "openai",
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       configured: true,
     });
   });

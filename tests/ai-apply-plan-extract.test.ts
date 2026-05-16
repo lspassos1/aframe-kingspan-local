@@ -4,6 +4,7 @@ import {
   applyPlanExtractToProject,
   getDefaultPlanExtractSelectedFields,
   getPlanExtractApplicableFields,
+  hasActionablePlanExtractFields,
   type PlanExtractSelectedFields,
 } from "@/lib/ai/apply-plan-extract";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
@@ -303,6 +304,51 @@ describe("AI plan extract application", () => {
   it("lists only present fields as applicable", () => {
     expect(getPlanExtractApplicableFields(baseResult)).toContain("houseWidthM");
     expect(getPlanExtractApplicableFields(baseResult)).not.toContain("address");
+  });
+
+  it("distinguishes reviewable notes from fields that can be applied to the study", () => {
+    const assumptionsOnly: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        notes: ["A planta parece conter cotas, mas nenhuma medida legível foi extraída."],
+      },
+      fieldConfidence: {},
+      assumptions: ["A imagem parece ser uma planta baixa."],
+      missingInformation: ["Informe uma medida de referência."],
+      warnings: [],
+    };
+
+    expect(hasActionablePlanExtractFields(baseResult)).toBe(true);
+    expect(hasActionablePlanExtractFields(assumptionsOnly)).toBe(false);
+  });
+
+  it("does not treat invalid numeric extracted values as actionable", () => {
+    const zeroTerrainOnly: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        terrainWidthM: 0,
+        notes: ["Largura ilegível retornou zero."],
+      },
+      fieldConfidence: {
+        terrainWidthM: "low",
+      },
+      assumptions: [],
+      missingInformation: ["Confirmar largura do terreno."],
+      warnings: [],
+    };
+    const zeroOpenings: PlanExtractResult = {
+      ...zeroTerrainOnly,
+      extracted: {
+        doorCount: 0,
+        notes: ["Nenhuma porta legível."],
+      },
+      fieldConfidence: {
+        doorCount: "medium",
+      },
+    };
+
+    expect(hasActionablePlanExtractFields(zeroTerrainOnly)).toBe(false);
+    expect(hasActionablePlanExtractFields(zeroOpenings)).toBe(true);
   });
 
   it("lists only A-frame-applicable dimensions when the target method is A-frame", () => {

@@ -93,7 +93,7 @@ AI_OPENAI_MODEL=gpt-4o-mini
 AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini
 ```
 
-`AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente. Chaves de IA são server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY` nem `NEXT_PUBLIC_*_API_KEY` para providers privados, e nunca exponha chave no frontend, em logs ou respostas de API.
+Quando `AI_OPENAI_MODEL_PREMIUM` está configurado, o Modo Pro explícito usa esse modelo para extração de planta; caso contrário usa `AI_OPENAI_MODEL`. Chaves de IA são server-side. Nunca crie `NEXT_PUBLIC_OPENAI_API_KEY` nem `NEXT_PUBLIC_*_API_KEY` para providers privados, e nunca exponha chave no frontend, em logs ou respostas de API.
 
 Não crie novas variações de env de modelo/provider. Veja [docs/free-cloud-ai-routing.md](docs/free-cloud-ai-routing.md) e [docs/setup-ai-and-sinapi.md](docs/setup-ai-and-sinapi.md) para setup completo de IA, Vercel, limites diários e SINAPI.
 

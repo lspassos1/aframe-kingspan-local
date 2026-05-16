@@ -164,6 +164,17 @@ describe("plan import UI state", () => {
     });
     expect(JSON.stringify(status)).not.toContain("configured-openai");
     expect(JSON.stringify(status)).not.toContain("gpt-4o-mini");
+
+    expect(
+      getSafePlanImportProviderUiStatus({
+        AI_MODE: "paid",
+        OPENAI_API_KEY: "configured-openai",
+        AI_OPENAI_MODEL_PREMIUM: "gpt-5.4-mini",
+      })
+    ).toMatchObject({
+      mode: "paid",
+      primaryConfigured: true,
+    });
   });
 });
 

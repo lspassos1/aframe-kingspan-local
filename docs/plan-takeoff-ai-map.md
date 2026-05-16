@@ -9,8 +9,8 @@ Definir o mapa técnico para transformar planta baixa ou entrada manual em quant
 Providers oficiais:
 
 - Modo free-cloud: Gemini como análise principal, OpenRouter como segunda leitura e Groq/Cerebras/SambaNova para texto.
-- Modo pago explícito: OpenAI com `AI_OPENAI_MODEL=gpt-4o-mini`.
-- `AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini` fica reservado para comparação futura e não é chamado automaticamente.
+- Modo pago explícito: OpenAI com `AI_OPENAI_MODEL_PREMIUM` quando configurado; caso contrário `AI_OPENAI_MODEL`.
+- `AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini` é usado apenas no Modo Pro explícito quando configurado; caso contrário o Pro usa `AI_OPENAI_MODEL`.
 - Todas as chaves ficam somente no servidor.
 - Nenhum `NEXT_PUBLIC_*_API_KEY`.
 - Nenhuma chave em log, resposta de API ou código hardcoded.

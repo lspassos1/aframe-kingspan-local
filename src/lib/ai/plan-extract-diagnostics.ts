@@ -4,7 +4,7 @@ import type { AiProductMode } from "@/lib/ai/mode";
 
 export type PlanExtractDiagnosticCacheStatus = "HIT" | "MISS" | "SKIP";
 export type PlanExtractDiagnosticQuotaStatus = "not-consumed" | "consumed" | "released";
-export type PlanExtractDiagnosticStatus = "success" | "provider_chain_failed" | "rate_limit" | "setup_unavailable" | "invalid_file";
+export type PlanExtractDiagnosticStatus = "success" | "provider_chain_failed" | "extraction_empty" | "rate_limit" | "setup_unavailable" | "invalid_file";
 
 export type PlanExtractDiagnosticEnv = Record<string, string | undefined>;
 
