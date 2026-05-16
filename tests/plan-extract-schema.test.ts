@@ -248,6 +248,67 @@ describe("plan extract advanced schema", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("normalizes sparse provider JSON into a review-safe extraction result", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        extracted: {
+          city: "Salvador",
+          notes: null,
+        },
+        document: null,
+        location: {
+          city: "Salvador",
+        },
+        rooms: null,
+        questions: [
+          {
+            id: "q-scale",
+            question: "Qual medida posso usar como referência?",
+            target: "scale",
+            requiredBeforeBudget: true,
+          },
+          {
+            id: "",
+            question: "",
+          },
+        ],
+        fieldConfidence: {
+          city: "high",
+          ignored: "certain",
+        },
+        providerMeta: {
+          provider: null,
+          model: null,
+        },
+        extraProviderKey: "ignored",
+      })
+    );
+
+    expect(result).toMatchObject({
+      version: "1.0",
+      summary: "Extração preliminar da planta. Revise os campos antes de aplicar.",
+      confidence: "low",
+      extracted: {
+        city: "Salvador",
+        notes: [],
+      },
+      fieldConfidence: {
+        city: "high",
+      },
+      assumptions: [],
+      missingInformation: [],
+      warnings: [],
+    });
+    expect(result.document).toBeUndefined();
+    expect(result.location).toBeUndefined();
+    expect(result.rooms).toBeUndefined();
+    expect(result.providerMeta).toBeUndefined();
+    expect(result.questions).toHaveLength(1);
+    expect(result.questions?.[0]?.id).toBe("q-scale");
+    expect(JSON.stringify(result)).not.toContain("extraProviderKey");
+  });
+
   it("rejects forbidden price, composition, labor-hour and approval outputs", () => {
     expect(() =>
       parsePlanExtractResult(

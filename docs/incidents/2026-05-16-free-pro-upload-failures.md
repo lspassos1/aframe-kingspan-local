@@ -17,6 +17,34 @@ The UI, mode selection, diagnostic ID display, and manual fallback are working. 
 
 Do not make another blind provider-routing change. Use the diagnostic IDs from issue #278 and the smoke harness to identify the concrete failure class first.
 
+## Diagnostic findings
+
+The screenshot diagnostic IDs were found in the production KV diagnostic store.
+
+Free diagnostic `diag_96496f53a582488a`:
+
+- mode: `free-cloud`
+- MIME type: `image/png`
+- size bucket: `<1MB`
+- status: `provider_chain_failed`
+- reason: `free-image-provider-rate-limited`
+- providers tried: `gemini`, `openrouter`
+- provider attempts: Gemini timed out twice at 45 seconds; OpenRouter returned 429.
+- quota: released
+
+Pro diagnostic `diag_562caf4b97c74141`:
+
+- mode: `paid`
+- MIME type: `image/png`
+- size bucket: `<1MB`
+- status: `provider_chain_failed`
+- reason: `ai-provider-chain-failed`
+- provider tried: `openai`
+- provider attempt: OpenAI returned JSON, but the parser rejected it because required schema fields were missing or malformed.
+- quota: released
+
+Conclusion: the Free path is currently blocked by external provider timeout/rate limit. The Pro path reached the provider and failed in the schema/parser layer, so the smallest product fix is to tolerate sparse but safe provider JSON instead of rejecting a usable extraction.
+
 ## Senior debugging sequence
 
 ### 1. Retrieve diagnostic records
@@ -82,6 +110,14 @@ Do not combine fixes. Create one narrow PR after classification:
 - schema parser fix;
 - Free provider resilience fix;
 - diagnostic persistence fix.
+
+For this PR, the selected smallest layer is the schema parser plus retryable error UX:
+
+- normalize sparse provider JSON into the app schema only when it still contains usable extraction content;
+- keep forbidden price/composition/H/H/approval keys blocked before normalization;
+- discard malformed optional advanced blocks instead of failing the whole extraction;
+- reject empty/no-content JSON responses;
+- keep the upload retryable after provider-chain errors with an explicit `Tentar outro arquivo` action.
 
 ## Acceptance criteria for the next implementation PR
 

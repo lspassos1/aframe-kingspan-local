@@ -306,6 +306,12 @@ const planExtractExteriorSchema = z.object({
   drivewayAreaM2: extractedNonNegativeNumberValueSchema.optional(),
 });
 
+const planExtractProviderMetaSchema = z.object({
+  provider: z.string(),
+  model: z.string(),
+  tokens: z.number().int().nonnegative().optional(),
+});
+
 export const planExtractResultSchema = z.object({
   version: z.literal("1.0"),
   summary: z.string().max(800),
@@ -356,13 +362,7 @@ export const planExtractResultSchema = z.object({
   assumptions: z.array(z.string()).default([]),
   missingInformation: z.array(z.string()).default([]),
   warnings: z.array(z.string()).default([]),
-  providerMeta: z
-    .object({
-      provider: z.string(),
-      model: z.string(),
-      tokens: z.number().int().nonnegative().optional(),
-    })
-    .optional(),
+  providerMeta: planExtractProviderMetaSchema.optional(),
 }).strict();
 
 export type PlanExtractConfidence = z.infer<typeof planExtractConfidenceSchema>;
@@ -382,7 +382,246 @@ export function stripJsonCodeFence(value: string) {
 export function parsePlanExtractResult(value: string): PlanExtractResult {
   const parsedJson = JSON.parse(stripJsonCodeFence(value));
   assertNoForbiddenPlanExtractKeys(parsedJson);
-  return planExtractResultSchema.parse(parsedJson);
+  const normalizedJson = normalizePlanExtractResultJson(parsedJson);
+  if (isRecord(normalizedJson) && !hasUsablePlanExtractContent(normalizedJson)) {
+    throw new Error("AI plan extraction returned no usable content.");
+  }
+  return planExtractResultSchema.parse(normalizedJson);
+}
+
+const planExtractRootKeys = new Set([
+  "version",
+  "summary",
+  "confidence",
+  "extractionStatus",
+  "extracted",
+  "fieldConfidence",
+  "fieldEvidence",
+  "document",
+  "scale",
+  "location",
+  "lot",
+  "building",
+  "rooms",
+  "walls",
+  "openings",
+  "floorFinishes",
+  "wallFinishes",
+  "painting",
+  "ceiling",
+  "roof",
+  "foundation",
+  "structure",
+  "electrical",
+  "plumbing",
+  "fixtures",
+  "exterior",
+  "quantitySeeds",
+  "questions",
+  "extractionWarnings",
+  "assumptions",
+  "missingInformation",
+  "warnings",
+  "providerMeta",
+]);
+
+const optionalObjectPlanExtractSections = [
+  "document",
+  "scale",
+  "location",
+  "lot",
+  "building",
+  "walls",
+  "openings",
+  "floorFinishes",
+  "wallFinishes",
+  "painting",
+  "ceiling",
+  "roof",
+  "foundation",
+  "structure",
+  "electrical",
+  "plumbing",
+  "fixtures",
+  "exterior",
+  "providerMeta",
+] as const;
+
+const optionalArrayPlanExtractSections = ["rooms", "quantitySeeds", "questions", "extractionWarnings", "assumptions", "missingInformation", "warnings"] as const;
+
+const optionalObjectPlanExtractSectionSchemas = {
+  document: planExtractDocumentSchema,
+  scale: planExtractScaleSchema,
+  location: planExtractLocationSchema,
+  lot: planExtractLotSchema,
+  building: planExtractBuildingSchema,
+  walls: planExtractWallsSchema,
+  openings: planExtractOpeningsSchema,
+  floorFinishes: planExtractFloorFinishesSchema,
+  wallFinishes: planExtractWallFinishesSchema,
+  painting: planExtractPaintingSchema,
+  ceiling: planExtractCeilingSchema,
+  roof: planExtractRoofSchema,
+  foundation: planExtractFoundationSchema,
+  structure: planExtractStructureSchema,
+  electrical: planExtractElectricalSchema,
+  plumbing: planExtractPlumbingSchema,
+  fixtures: planExtractFixturesSchema,
+  exterior: planExtractExteriorSchema,
+  providerMeta: planExtractProviderMetaSchema,
+};
+
+const optionalArrayPlanExtractSectionSchemas = {
+  rooms: planExtractRoomSchema,
+  quantitySeeds: planExtractQuantitySeedSchema,
+  questions: planExtractQuestionSchema,
+  extractionWarnings: planExtractWarningSchema,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function stripNullishPlanExtractValues(value: unknown): unknown {
+  if (value === null || value === undefined) return undefined;
+  if (Array.isArray(value)) return value.map(stripNullishPlanExtractValues).filter((item) => item !== undefined);
+  if (!isRecord(value)) return value;
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, nestedValue]) => [key, stripNullishPlanExtractValues(nestedValue)] as const)
+      .filter(([, nestedValue]) => nestedValue !== undefined)
+  );
+}
+
+function isPlanExtractConfidence(value: unknown): value is PlanExtractConfidence {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+function isPlanExtractStatus(value: unknown) {
+  return value === "complete" || value === "partial" || value === "insufficient";
+}
+
+function deriveFallbackSummary(value: Record<string, unknown>) {
+  const extracted = isRecord(value.extracted) ? value.extracted : undefined;
+  const notes = extracted?.notes;
+  const firstNote = Array.isArray(notes) ? notes.find((note): note is string => typeof note === "string" && note.trim().length > 0) : undefined;
+  return (firstNote ?? "Extração preliminar da planta. Revise os campos antes de aplicar.").slice(0, 800);
+}
+
+function normalizeFieldConfidence(value: unknown) {
+  if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value).filter((entry): entry is [string, PlanExtractConfidence] => typeof entry[0] === "string" && isPlanExtractConfidence(entry[1]));
+  return Object.fromEntries(entries);
+}
+
+function normalizeFieldEvidence(value: unknown) {
+  if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0);
+  return Object.fromEntries(entries);
+}
+
+function hasNonEmptyValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number" || typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.some(hasNonEmptyValue);
+  if (isRecord(value)) return Object.values(value).some(hasNonEmptyValue);
+  return false;
+}
+
+function hasUsablePlanExtractContent(value: Record<string, unknown>) {
+  const extracted = isRecord(value.extracted) ? value.extracted : {};
+  const extractedContent = Object.entries(extracted).some(([key, nestedValue]) => key !== "notes" && hasNonEmptyValue(nestedValue));
+  if (extractedContent) return true;
+
+  return [
+    value.document,
+    value.scale,
+    value.location,
+    value.lot,
+    value.building,
+    value.rooms,
+    value.walls,
+    value.openings,
+    value.floorFinishes,
+    value.wallFinishes,
+    value.painting,
+    value.ceiling,
+    value.roof,
+    value.foundation,
+    value.structure,
+    value.electrical,
+    value.plumbing,
+    value.fixtures,
+    value.exterior,
+    value.quantitySeeds,
+    value.questions,
+    value.extractionWarnings,
+    value.missingInformation,
+    value.warnings,
+  ].some(hasNonEmptyValue);
+}
+
+function normalizePlanExtractResultJson(value: unknown) {
+  const stripped = stripNullishPlanExtractValues(value);
+  if (!isRecord(stripped)) return stripped;
+
+  const normalized: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(stripped)) {
+    if (planExtractRootKeys.has(key)) normalized[key] = nestedValue;
+  }
+
+  if (normalized.version === undefined) normalized.version = "1.0";
+  if (typeof normalized.summary !== "string" || !normalized.summary.trim()) normalized.summary = deriveFallbackSummary(normalized);
+  if (!isPlanExtractConfidence(normalized.confidence)) normalized.confidence = "low";
+  if (!isPlanExtractStatus(normalized.extractionStatus)) delete normalized.extractionStatus;
+
+  normalized.extracted = isRecord(normalized.extracted) ? normalized.extracted : {};
+  if (isRecord(normalized.extracted) && "notes" in normalized.extracted && !Array.isArray(normalized.extracted.notes)) {
+    delete normalized.extracted.notes;
+  }
+
+  const fieldConfidence = normalizeFieldConfidence(normalized.fieldConfidence);
+  if (fieldConfidence) normalized.fieldConfidence = fieldConfidence;
+  else delete normalized.fieldConfidence;
+
+  const fieldEvidence = normalizeFieldEvidence(normalized.fieldEvidence);
+  if (fieldEvidence) normalized.fieldEvidence = fieldEvidence;
+  else delete normalized.fieldEvidence;
+
+  for (const key of optionalObjectPlanExtractSections) {
+    if (normalized[key] !== undefined && !isRecord(normalized[key])) delete normalized[key];
+  }
+
+  for (const key of optionalArrayPlanExtractSections) {
+    if (normalized[key] !== undefined && !Array.isArray(normalized[key])) delete normalized[key];
+  }
+
+  for (const [key, schema] of Object.entries(optionalObjectPlanExtractSectionSchemas)) {
+    const section = normalized[key];
+    if (section === undefined) continue;
+    const parsed = schema.safeParse(section);
+    if (parsed.success) normalized[key] = parsed.data;
+    else delete normalized[key];
+  }
+
+  for (const [key, schema] of Object.entries(optionalArrayPlanExtractSectionSchemas)) {
+    const section = normalized[key];
+    if (!Array.isArray(section)) continue;
+    const items = section.map((item) => schema.safeParse(item)).filter((item) => item.success).map((item) => item.data);
+    if (items.length > 0) normalized[key] = items;
+    else delete normalized[key];
+  }
+
+  for (const key of ["assumptions", "missingInformation", "warnings"] as const) {
+    const section = normalized[key];
+    if (!Array.isArray(section)) continue;
+    const items = section.filter((item): item is string => typeof item === "string");
+    normalized[key] = items;
+  }
+
+  return normalized;
 }
 
 const forbiddenPlanExtractKeys = new Set([
