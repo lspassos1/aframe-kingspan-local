@@ -73,7 +73,10 @@ describe("plan import UI state", () => {
     expect(getPlanImportStateCopy("idle", freeCloudStatus).badge).toBe("Modo gratuito");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).title).toContain("Análise rápida");
     expect(getPlanImportStateCopy("analyzing", freeCloudStatus).description).toContain("Revisão detalhada");
-    expect(getPlanImportStateCopy("error", freeCloudStatus).description).toBe("Continue pelo preenchimento manual ou tente outro arquivo quando a análise estiver disponível.");
+    expect(getPlanImportStateCopy("error", freeCloudStatus)).toMatchObject({
+      title: "Não foi possível analisar",
+      description: "Continue pelo preenchimento manual ou tente outro arquivo.",
+    });
     expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).title).toBe("Envio por IA indisponível hoje");
     expect(getPlanImportStateCopy("limit-exceeded", freeCloudStatus).description).toBe("Continue manualmente ou tente novamente amanhã.");
   });
@@ -278,11 +281,13 @@ describe("PlanImportCard", () => {
     );
 
     expect(html).toContain('data-state="error"');
-    expect(html).toContain("Análise indisponível");
+    expect(html).toContain("Não foi possível analisar");
     expect(html).toContain("Análise não concluída.");
     expect(html).toContain("Continuar manualmente disponível.");
     expect(html).toContain("Tente outro arquivo quando a análise estiver disponível.");
     expect(html).toContain("Continuar manualmente");
+    expect(html).toContain("Tentar outro arquivo");
+    expect(html).toContain("Clique para selecionar ou solte o arquivo aqui");
     expect(html).not.toContain("Modo gratuito: Análise rápida.");
     expect(html).not.toContain("Cache reaproveitado");
     expect(html).not.toContain("Gemini");

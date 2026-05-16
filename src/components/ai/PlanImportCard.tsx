@@ -516,6 +516,11 @@ export function PlanImportCard({
               <Button type="button" onClick={openManualFallback}>
                 Continuar manualmente
               </Button>
+              {state === "error" && canUpload ? (
+                <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
+                  Tentar outro arquivo
+                </Button>
+              ) : null}
               {state === "limit-exceeded" ? (
                 <Button type="button" variant="outline" onClick={resetReview}>
                   Tentar novamente depois
