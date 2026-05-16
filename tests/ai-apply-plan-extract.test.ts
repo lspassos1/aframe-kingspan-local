@@ -5,6 +5,8 @@ import {
   getDefaultPlanExtractSelectedFields,
   getPlanExtractApplicableFields,
   hasActionablePlanExtractFields,
+  hasReviewablePlanExtractFields,
+  preparePlanExtractResultForMethodReview,
   type PlanExtractSelectedFields,
 } from "@/lib/ai/apply-plan-extract";
 import { getConstructionMethodDefinition } from "@/lib/construction-methods";
@@ -400,5 +402,79 @@ describe("AI plan extract application", () => {
     expect(hasActionablePlanExtractFields(rectangularOnly, "conventional-masonry")).toBe(true);
     expect(hasActionablePlanExtractFields(rectangularOnly, "aframe")).toBe(false);
     expect(getPlanExtractApplicableFields(rectangularOnly, "aframe")).toEqual([]);
+  });
+
+  it("selects an explicit method suggestion when it unlocks extracted fields for review", () => {
+    const masonrySuggestion: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        constructionMethod: "conventional-masonry",
+        houseWidthM: 9,
+        floorHeightM: 3,
+        floors: 2,
+        doorCount: 3,
+        windowCount: 6,
+        notes: ["Provider detectou método retangular com campos aplicáveis."],
+      },
+      fieldConfidence: {
+        constructionMethod: "medium",
+        houseWidthM: "medium",
+        floors: "medium",
+      },
+      assumptions: [],
+      missingInformation: [],
+      warnings: [],
+    };
+    const lowConfidenceSuggestion: PlanExtractResult = {
+      ...masonrySuggestion,
+      fieldConfidence: {
+        ...masonrySuggestion.fieldConfidence,
+        constructionMethod: "low",
+      },
+    };
+
+    expect(hasActionablePlanExtractFields(masonrySuggestion, "aframe")).toBe(true);
+    expect(hasReviewablePlanExtractFields(masonrySuggestion, "aframe")).toBe(true);
+    expect(hasReviewablePlanExtractFields(lowConfidenceSuggestion, "aframe")).toBe(true);
+
+    const selected = getDefaultPlanExtractSelectedFields(masonrySuggestion, "aframe");
+    const lowConfidenceSelected = getDefaultPlanExtractSelectedFields(lowConfidenceSuggestion, "aframe");
+
+    expect(selected.constructionMethod).toBe(true);
+    expect(selected.houseWidthM).toBe(true);
+    expect(selected.floors).toBe(true);
+    expect(lowConfidenceSelected.constructionMethod).toBe(false);
+  });
+
+  it("adds a method-confirmation suggestion when extracted fields do not match the current method", () => {
+    const rectangularOnly: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        houseWidthM: 9,
+        floorHeightM: 3,
+        floors: 2,
+        doorCount: 3,
+        windowCount: 6,
+        notes: ["Provider detectou campos retangulares sem método confirmado."],
+      },
+      fieldConfidence: {
+        houseWidthM: "medium",
+        floors: "medium",
+      },
+      assumptions: [],
+      missingInformation: [],
+      warnings: [],
+    };
+
+    const prepared = preparePlanExtractResultForMethodReview(rectangularOnly, "aframe");
+    const selected = getDefaultPlanExtractSelectedFields(rectangularOnly, "aframe");
+
+    expect(hasActionablePlanExtractFields(rectangularOnly, "aframe")).toBe(false);
+    expect(hasReviewablePlanExtractFields(rectangularOnly, "aframe")).toBe(true);
+    expect(prepared.extracted.constructionMethod).toBe("conventional-masonry");
+    expect(prepared.fieldEvidence.constructionMethod).toContain("confirmar o método construtivo");
+    expect(selected.constructionMethod).toBe(true);
+    expect(selected.houseWidthM).toBe(true);
+    expect(selected.floors).toBe(true);
   });
 });

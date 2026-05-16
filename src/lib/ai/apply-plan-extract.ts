@@ -6,6 +6,7 @@ import { normalizeBrazilStateName } from "@/lib/locations/brazil";
 export type PlanExtractSelectedFields = Partial<Record<keyof PlanExtractResult["extracted"], boolean>>;
 
 const nonAFrameMethodIds: ConstructionMethodId[] = ["conventional-masonry", "eco-block", "monolithic-eps"];
+const methodConfirmationFallbackOrder: ConstructionMethodId[] = [...nonAFrameMethodIds];
 const commonApplicableFields = new Set<keyof PlanExtractResult["extracted"]>([
   "projectName",
   "address",
@@ -89,12 +90,23 @@ function hasManualTakeoffInvalidatingChange(previousScenario: Scenario, nextScen
 }
 
 export function getDefaultPlanExtractSelectedFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId): PlanExtractSelectedFields {
-  const constructionMethodSelected = (result.fieldConfidence.constructionMethod ?? result.confidence) === "high";
-  const extractedMethod = constructionMethodSelected ? getCompatibleExtractedMethod(result.extracted.constructionMethod) : undefined;
-  const effectiveMethod = extractedMethod ?? currentMethod;
+  const reviewResult = preparePlanExtractResultForMethodReview(result, currentMethod);
+  const methodConfidence = reviewResult.fieldConfidence.constructionMethod ?? reviewResult.confidence;
+  const extractedMethod = getCompatibleExtractedMethod(reviewResult.extracted.constructionMethod);
+  const currentMethodHasFields = currentMethod ? hasActionableMethodSpecificFields(result, currentMethod) : false;
+  const extractedMethodUnlocksFields = Boolean(
+    currentMethod &&
+      extractedMethod &&
+      extractedMethod !== currentMethod &&
+      methodConfidence !== "low" &&
+      !currentMethodHasFields &&
+      hasActionableMethodSpecificFields(reviewResult, extractedMethod)
+  );
+  const constructionMethodSelected = methodConfidence === "high" || extractedMethodUnlocksFields;
+  const effectiveMethod = constructionMethodSelected ? extractedMethod ?? currentMethod : currentMethod;
 
-  return getPlanExtractApplicableFields(result, effectiveMethod).reduce<PlanExtractSelectedFields>((selected, field) => {
-    selected[field] = field === "constructionMethod" ? constructionMethodSelected : (result.fieldConfidence[field] ?? result.confidence) !== "low";
+  return getPlanExtractApplicableFields(reviewResult, effectiveMethod).reduce<PlanExtractSelectedFields>((selected, field) => {
+    selected[field] = field === "constructionMethod" ? constructionMethodSelected : (reviewResult.fieldConfidence[field] ?? reviewResult.confidence) !== "low";
     return selected;
   }, {});
 }
@@ -205,11 +217,63 @@ export function getPlanExtractApplicableFields(result: PlanExtractResult, curren
 
 export function hasActionablePlanExtractFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId) {
   return getPlanExtractApplicableFields(result, currentMethod).some((field) => {
-    const value = result.extracted[field];
-    if (Array.isArray(value)) return value.length > 0;
-    if (typeof value === "number") return normalizePlanExtractNumberField(field, value) !== undefined;
-    return value !== undefined && value !== "";
+    return isActionablePlanExtractField(result, field);
   });
+}
+
+function isActionablePlanExtractField(result: PlanExtractResult, field: keyof PlanExtractResult["extracted"]) {
+  const value = result.extracted[field];
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "number") return normalizePlanExtractNumberField(field, value) !== undefined;
+  return value !== undefined && value !== "";
+}
+
+function hasActionableMethodSpecificFields(result: PlanExtractResult, method: ConstructionMethodId) {
+  const fields = method === "aframe" ? aFrameApplicableFields : rectangularMethodApplicableFields;
+  return Array.from(fields).some((field) => isActionablePlanExtractField(result, field));
+}
+
+function findMethodConfirmationFallback(result: PlanExtractResult, currentMethod: ConstructionMethodId) {
+  return methodConfirmationFallbackOrder.find((method) => method !== currentMethod && hasActionablePlanExtractFields(result, method));
+}
+
+export function preparePlanExtractResultForMethodReview(result: PlanExtractResult, currentMethod?: ConstructionMethodId): PlanExtractResult {
+  if (!currentMethod || hasActionablePlanExtractFields(result, currentMethod)) return result;
+
+  const existingMethod = getCompatibleExtractedMethod(result.extracted.constructionMethod);
+  if (existingMethod) return result;
+
+  const fallbackMethod = findMethodConfirmationFallback(result, currentMethod);
+  if (!fallbackMethod) return result;
+
+  return {
+    ...result,
+    extracted: {
+      ...result.extracted,
+      constructionMethod: fallbackMethod,
+    },
+    fieldConfidence: {
+      ...result.fieldConfidence,
+      constructionMethod: result.fieldConfidence.constructionMethod ?? "medium",
+    },
+    fieldEvidence: {
+      ...result.fieldEvidence,
+      constructionMethod: result.fieldEvidence?.constructionMethod ?? "Campos extraídos exigem confirmar o método construtivo antes de aplicar.",
+    },
+    assumptions: result.assumptions.includes("Método construtivo sugerido apenas para liberar revisão dos campos detectados.")
+      ? result.assumptions
+      : [...result.assumptions, "Método construtivo sugerido apenas para liberar revisão dos campos detectados."],
+  };
+}
+
+export function hasReviewablePlanExtractFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId) {
+  const reviewResult = preparePlanExtractResultForMethodReview(result, currentMethod);
+  if (!currentMethod) return hasActionablePlanExtractFields(reviewResult);
+  if (hasActionablePlanExtractFields(reviewResult, currentMethod)) return true;
+
+  const extractedMethod = getCompatibleExtractedMethod(reviewResult.extracted.constructionMethod);
+  const methodConfidence = reviewResult.fieldConfidence.constructionMethod ?? reviewResult.confidence;
+  return Boolean(extractedMethod && extractedMethod !== currentMethod && methodConfidence !== "low" && hasActionablePlanExtractFields(reviewResult, extractedMethod));
 }
 
 export function isPlanExtractMethodCompatible(method: ConstructionMethodId) {

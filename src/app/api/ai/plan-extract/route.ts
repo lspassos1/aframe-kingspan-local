@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { auth } from "@clerk/nextjs/server";
 import { after, NextRequest, NextResponse } from "next/server";
-import { hasActionablePlanExtractFields, isPlanExtractMethodCompatible } from "@/lib/ai/apply-plan-extract";
+import { hasReviewablePlanExtractFields, isPlanExtractMethodCompatible, preparePlanExtractResultForMethodReview } from "@/lib/ai/apply-plan-extract";
 import { isPlanExtractImageMimeType, shouldPreprocessPlanExtractImage } from "@/lib/ai/plan-image-mime";
 import { preprocessPlanExtractImage } from "@/lib/ai/plan-image-preprocess";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
@@ -336,7 +336,8 @@ export async function POST(request: NextRequest) {
   const cacheKey = createPlanExtractCacheKey({ fileBytes, mimeType: validation.mimeType, env: aiEnv });
   const cachedExtraction = await cacheStore.get(cacheKey.key).catch(() => null);
   if (cachedExtraction) {
-    if (!hasActionablePlanExtractFields(cachedExtraction.result, requestedConstructionMethod)) {
+    const cachedReviewResult = preparePlanExtractResultForMethodReview(cachedExtraction.result, requestedConstructionMethod);
+    if (!hasReviewablePlanExtractFields(cachedExtraction.result, requestedConstructionMethod)) {
       const noApplicableFieldsPayload = getPlanExtractNoApplicableFieldsPayload(requestedConstructionMethod);
       queueDiagnostic({
         status: "extraction_empty",
@@ -367,7 +368,7 @@ export async function POST(request: NextRequest) {
     return jsonDiagnosticResponse(
       {
         mode: requestedMode,
-        result: cachedExtraction.result,
+        result: cachedReviewResult,
         provider: cachedExtraction.provider,
         model: cachedExtraction.model,
         tokens: cachedExtraction.tokens,
@@ -472,7 +473,8 @@ export async function POST(request: NextRequest) {
       timeoutMs: 45_000,
     }, { env: aiEnv });
     const providerAttempts = getDiagnosticProviderAttempts(extraction);
-    if (!hasActionablePlanExtractFields(extraction.result, requestedConstructionMethod)) {
+    const reviewResult = preparePlanExtractResultForMethodReview(extraction.result, requestedConstructionMethod);
+    if (!hasReviewablePlanExtractFields(extraction.result, requestedConstructionMethod)) {
       await releaseAiDailyLimitDecision(rateLimitDecision);
       const noApplicableFieldsPayload = getPlanExtractNoApplicableFieldsPayload(requestedConstructionMethod);
       queueDiagnostic({
@@ -515,7 +517,7 @@ export async function POST(request: NextRequest) {
     return jsonDiagnosticResponse(
       {
         mode: requestedMode,
-        result: extraction.result,
+        result: reviewResult,
         provider: extraction.provider,
         model: extraction.model,
         tokens: extraction.tokens,
