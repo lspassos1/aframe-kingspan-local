@@ -48,6 +48,29 @@ const routePlanResult: PlanExtractResult = {
   warnings: [],
 };
 
+const routePlanResultWithMethodSuggestion: PlanExtractResult = {
+  ...routePlanResult,
+  extracted: {
+    ...routePlanResult.extracted,
+    constructionMethod: "conventional-masonry",
+  },
+  fieldConfidence: {
+    ...routePlanResult.fieldConfidence,
+    constructionMethod: "medium",
+  },
+};
+
+const routePlanEmptyResult: PlanExtractResult = {
+  ...routePlanResult,
+  extracted: {
+    notes: ["Provider encontrou conteúdo, mas não extraiu campos aplicáveis."],
+  },
+  fieldConfidence: {},
+  assumptions: ["A imagem parece ser uma planta baixa."],
+  missingInformation: ["Confirmar medidas principais."],
+  warnings: [],
+};
+
 function createPlanUploadRequest(fileName: string, constructionMethod: string) {
   const formData = new FormData();
   formData.set("aiMode", "paid");
@@ -63,6 +86,9 @@ describe("plan extract route diagnostics", () => {
   beforeEach(() => {
     vi.stubEnv("AI_PLAN_EXTRACT_ENABLED", "true");
     vi.stubEnv("AI_RATE_LIMIT_SALT", "test-salt");
+    vi.stubEnv("AI_PLAN_EXTRACT_GLOBAL_DAILY_LIMIT", "1000");
+    vi.stubEnv("AI_PLAN_EXTRACT_DAILY_LIMIT_PER_USER", "1000");
+    vi.stubEnv("AI_PLAN_EXTRACT_DAILY_LIMIT_PER_IP", "1000");
     vi.mocked(auth).mockResolvedValue({ userId: "user_test" } as never);
     vi.mocked(extractPlanWithProviderChain).mockReset();
     vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -225,7 +251,7 @@ describe("plan extract route diagnostics", () => {
     });
   });
 
-  it("rejects extracted fields that are not applicable to the current construction method", async () => {
+  it("returns a method-confirmation suggestion when extracted fields need another method", async () => {
     vi.mocked(extractPlanWithProviderChain).mockResolvedValueOnce({
       result: routePlanResult,
       provider: "openai",
@@ -236,6 +262,51 @@ describe("plan extract route diagnostics", () => {
     });
 
     const response = await POST(createPlanUploadRequest("aframe-method.png", "aframe"));
+    const payload = (await response.json()) as { result?: PlanExtractResult; mode?: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.mode).toBe("paid");
+    expect(payload.result?.extracted.constructionMethod).toBe("conventional-masonry");
+    expect(payload.result?.fieldConfidence.constructionMethod).toBe("medium");
+    expect(payload.result?.fieldEvidence.constructionMethod).toContain("confirmar o método construtivo");
+    expect(payload.result?.extracted.houseWidthM).toBe(9);
+  });
+
+  it("returns prepared method-confirmation results from cache", async () => {
+    vi.mocked(extractPlanWithProviderChain).mockResolvedValueOnce({
+      result: routePlanResult,
+      provider: "openai",
+      model: "premium-test",
+      diagnostics: {
+        providerAttempts: [{ provider: "openai", attempt: 1, outcome: "success", durationMs: 10 }],
+      },
+    });
+
+    const firstResponse = await POST(createPlanUploadRequest("aframe-method-cache.png", "aframe"));
+    const secondResponse = await POST(createPlanUploadRequest("aframe-method-cache.png", "aframe"));
+    const firstPayload = (await firstResponse.json()) as { result?: PlanExtractResult; cached?: boolean };
+    const secondPayload = (await secondResponse.json()) as { result?: PlanExtractResult; cached?: boolean };
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstPayload.result?.extracted.constructionMethod).toBe("conventional-masonry");
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.headers.get("X-AI-Cache")).toBe("HIT");
+    expect(secondPayload.cached).toBe(true);
+    expect(secondPayload.result?.extracted.constructionMethod).toBe("conventional-masonry");
+    expect(extractPlanWithProviderChain).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects provider results with no applicable extracted fields", async () => {
+    vi.mocked(extractPlanWithProviderChain).mockResolvedValueOnce({
+      result: routePlanEmptyResult,
+      provider: "openai",
+      model: "premium-test",
+      diagnostics: {
+        providerAttempts: [{ provider: "openai", attempt: 1, outcome: "success", durationMs: 10 }],
+      },
+    });
+
+    const response = await POST(createPlanUploadRequest("notes-only-method.png", "aframe"));
     const payload = (await response.json()) as { reason?: string; message?: string; mode?: string };
 
     expect(response.status).toBe(422);
@@ -244,6 +315,25 @@ describe("plan extract route diagnostics", () => {
       mode: "paid",
     });
     expect(payload.message).toContain("nenhum campo aplicável ao método atual");
+  });
+
+  it("accepts extracted-method fields when method confirmation makes them reviewable", async () => {
+    vi.mocked(extractPlanWithProviderChain).mockResolvedValueOnce({
+      result: routePlanResultWithMethodSuggestion,
+      provider: "openai",
+      model: "premium-test",
+      diagnostics: {
+        providerAttempts: [{ provider: "openai", attempt: 1, outcome: "success", durationMs: 10 }],
+      },
+    });
+
+    const response = await POST(createPlanUploadRequest("aframe-method-suggestion.png", "aframe"));
+    const payload = (await response.json()) as { result?: PlanExtractResult; mode?: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.mode).toBe("paid");
+    expect(payload.result?.extracted.constructionMethod).toBe("conventional-masonry");
+    expect(payload.result?.extracted.houseWidthM).toBe(9);
   });
 
   it("accepts extracted fields that are applicable to the current construction method", async () => {
