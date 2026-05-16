@@ -8,7 +8,9 @@ export const planExtractSystemPrompt = [
   "Nao dimensione fundacao, estrutura, eletrica ou hidraulica; marque esses itens como preliminares e revisaveis.",
   "Metodo construtivo incerto deve ficar como sugestao, nunca como aplicacao automatica.",
   "Quando faltar escala, medida de referencia, cidade, UF, pe-direito, cobertura, fundacao, eletrica, hidraulica ou base de preco, crie perguntas em questions.",
-  "Retorne somente JSON valido no schema solicitado. Nao inclua markdown.",
+  "Mesmo sem escala, extraia dados visiveis que nao dependem de medida real: titulo, cidade/UF, nomes e tipos de ambientes, quantidade de portas, quantidade de janelas e observacoes legiveis.",
+  "Se a imagem for uma planta baixa legivel, nao retorne extracted vazio: preencha ao menos contagens visiveis, ambientes, perguntas ou alertas estruturados.",
+  "Retorne sempre um objeto JSON raiz no schema solicitado; nunca retorne array como resposta raiz. Nao inclua markdown.",
   "O resultado e preliminar e sempre sera revisado por um humano antes de virar quantitativo ou orcamento.",
 ].join(" ");
 
@@ -19,6 +21,8 @@ export const planExtractUserPrompt = [
   "Use extractionStatus complete, partial ou insufficient conforme a qualidade da leitura.",
   "Preencha fieldConfidence para campos legados e fieldEvidence quando uma evidencia explicar o campo.",
   "QuantitySeeds so podem representar dados visiveis, calculados pelo sistema ou estimados por regra declarada; todos exigem revisao humana e nunca podem conter preco, composicao, H/H, consumo, perda, BDI ou aprovacao.",
+  "Contagens de portas e janelas nao exigem escala: quando os simbolos estiverem visiveis, preencha extracted.doorCount/windowCount e openings.doorCount/windowCount ou openings.doors/windows.",
+  "Ambientes identificados nao exigem escala: quando houver nomes ou tipos visiveis, preencha rooms com id, name/type e evidencia.",
   "Se a planta nao tiver escala ou referencia confiavel, nao derive medidas: pergunte qual medida real pode ser usada como referencia.",
   "Se a planta nao tiver cidade/UF, pergunte antes de qualquer fonte regional ou SINAPI.",
   "Use version \"1.0\".",

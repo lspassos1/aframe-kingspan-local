@@ -402,6 +402,44 @@ describe("plan extract advanced schema", () => {
     expect(result.extractionWarnings?.[0]?.code).toBe("no-electrical-plan");
   });
 
+  it("recovers a plan extraction object wrapped in a provider root array", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify([
+        {
+          version: "1.0",
+          summary: "Planta baixa com contagens visíveis.",
+          confidence: "medium",
+          extracted: {
+            doorCount: 2,
+            windowCount: 4,
+            notes: ["Resposta veio embrulhada em array."],
+          },
+          fieldConfidence: {
+            doorCount: "medium",
+            windowCount: "medium",
+          },
+          assumptions: [],
+          missingInformation: [],
+          warnings: [],
+        },
+      ])
+    );
+
+    expect(result.extracted.doorCount).toBe(2);
+    expect(result.extracted.windowCount).toBe(4);
+  });
+
+  it("uses a clear no-content error for unrecoverable provider root arrays", () => {
+    expect(() =>
+      parsePlanExtractResult(
+        JSON.stringify([
+          { label: "porta", count: 2 },
+          { label: "janela", count: 4 },
+        ])
+      )
+    ).toThrow("AI plan extraction returned no usable content.");
+  });
+
   it("rejects AI extracted values that do not require human review", () => {
     const parsed = planExtractResultSchema.safeParse({
       version: "1.0",
@@ -608,8 +646,12 @@ describe("plan extract advanced schema", () => {
     expect(planExtractSystemPrompt).toContain("Nao invente medida, escala, preco, H/H, consumo, perda, BDI");
     expect(planExtractSystemPrompt).toContain("Nao dimensione fundacao, estrutura, eletrica ou hidraulica");
     expect(planExtractSystemPrompt).toContain("pendingReason");
+    expect(planExtractSystemPrompt).toContain("nunca retorne array como resposta raiz");
+    expect(planExtractSystemPrompt).toContain("quantidade de portas");
     expect(planExtractUserPrompt).toContain("questions");
     expect(planExtractUserPrompt).toContain("QuantitySeeds");
+    expect(planExtractUserPrompt).toContain("Contagens de portas e janelas nao exigem escala");
+    expect(planExtractUserPrompt).toContain("Ambientes identificados nao exigem escala");
     expect(planExtractUserPrompt).toContain("cidade/UF");
     expect(planExtractUserPrompt).toContain("wallFinishes");
     expect(planExtractUserPrompt).toContain("fixtures");

@@ -200,7 +200,8 @@ function buildMessageContent(input: AiPlanExtractInput) {
 
   return [
     { type: "text", text: `${planExtractSystemPrompt}\n\n${planExtractUserPrompt}` },
-    { type: "image_url", image_url: { url: dataUrl } },
+    // Pro upload is explicit and floor-plan symbols need legibility; high detail is intentional despite the higher token cost.
+    { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
   ];
 }
 
