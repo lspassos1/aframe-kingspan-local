@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { auth } from "@clerk/nextjs/server";
 import { after, NextRequest, NextResponse } from "next/server";
-import { hasActionablePlanExtractFields } from "@/lib/ai/apply-plan-extract";
+import { hasActionablePlanExtractFields, isPlanExtractMethodCompatible } from "@/lib/ai/apply-plan-extract";
 import { isPlanExtractImageMimeType, shouldPreprocessPlanExtractImage } from "@/lib/ai/plan-image-mime";
 import { preprocessPlanExtractImage } from "@/lib/ai/plan-image-preprocess";
 import { extractPlanWithProviderChain } from "@/lib/ai/providers";
@@ -26,6 +26,7 @@ import {
   type PlanExtractDiagnosticStatus,
 } from "@/lib/ai/plan-extract-diagnostics";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
+import type { ConstructionMethodId } from "@/lib/construction-methods";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,25 @@ export function serializeProviderErrorsForClient(providerErrors: Array<{ provide
 
 export function readRequestedPlanExtractMode(formData: FormData | null): AiProductMode {
   return formData?.get("aiMode") === "paid" ? "paid" : "free-cloud";
+}
+
+export function readRequestedPlanExtractConstructionMethod(formData: FormData | null): ConstructionMethodId | undefined {
+  const value = formData?.get("constructionMethod");
+  return typeof value === "string" && isPlanExtractMethodCompatible(value as ConstructionMethodId) ? (value as ConstructionMethodId) : undefined;
+}
+
+export function getPlanExtractNoApplicableFieldsPayload(constructionMethod: ConstructionMethodId | undefined) {
+  if (constructionMethod) {
+    return {
+      message: "A análise encontrou dados, mas nenhum campo aplicável ao método atual. Continue manualmente ou tente confirmar o método da planta.",
+      reason: "plan-extract-no-current-method-fields",
+    };
+  }
+
+  return {
+    message: "A análise não encontrou campos aplicáveis. Continue manualmente ou tente uma imagem mais legível.",
+    reason: "plan-extract-empty-result",
+  };
 }
 
 function createModeEnv(mode: AiProductMode): AiModeEnv {
@@ -272,6 +292,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData().catch(() => null);
   requestedMode = readRequestedPlanExtractMode(formData);
   aiEnv = createModeEnv(requestedMode);
+  const requestedConstructionMethod = readRequestedPlanExtractConstructionMethod(formData);
   const file = formData?.get("file");
 
   if (!(file instanceof File)) {
@@ -315,6 +336,24 @@ export async function POST(request: NextRequest) {
   const cacheKey = createPlanExtractCacheKey({ fileBytes, mimeType: validation.mimeType, env: aiEnv });
   const cachedExtraction = await cacheStore.get(cacheKey.key).catch(() => null);
   if (cachedExtraction) {
+    if (!hasActionablePlanExtractFields(cachedExtraction.result, requestedConstructionMethod)) {
+      const noApplicableFieldsPayload = getPlanExtractNoApplicableFieldsPayload(requestedConstructionMethod);
+      queueDiagnostic({
+        status: "extraction_empty",
+        cache: "HIT",
+        quota: "not-consumed",
+        reason: noApplicableFieldsPayload.reason,
+        mimeType: validation.mimeType,
+        fileSizeBytes: fileBytes.byteLength,
+        providersTried: compactProviders([cachedExtraction.provider, cachedExtraction.review?.provider]),
+        message: noApplicableFieldsPayload.message,
+      });
+      return jsonDiagnosticResponse({ ...noApplicableFieldsPayload, mode: requestedMode, cached: true }, diagnosticId, {
+        status: 422,
+        headers: { "X-AI-Cache": "HIT", "X-AI-Mode": requestedMode },
+      });
+    }
+
     queueDiagnostic({
       status: "success",
       cache: "HIT",
@@ -433,23 +472,23 @@ export async function POST(request: NextRequest) {
       timeoutMs: 45_000,
     }, { env: aiEnv });
     const providerAttempts = getDiagnosticProviderAttempts(extraction);
-    if (!hasActionablePlanExtractFields(extraction.result)) {
+    if (!hasActionablePlanExtractFields(extraction.result, requestedConstructionMethod)) {
       await releaseAiDailyLimitDecision(rateLimitDecision);
-      const message = "A análise não encontrou campos aplicáveis. Continue manualmente ou tente uma imagem mais legível.";
+      const noApplicableFieldsPayload = getPlanExtractNoApplicableFieldsPayload(requestedConstructionMethod);
       queueDiagnostic({
         status: "extraction_empty",
         cache: "MISS",
         quota: "released",
-        reason: "plan-extract-empty-result",
+        reason: noApplicableFieldsPayload.reason,
         mimeType: validation.mimeType,
         fileSizeBytes: fileBytes.byteLength,
         providersTried: compactProviders([extraction.provider, extraction.review?.provider]),
         providerAttempts,
         providerDurations: getProviderDurations(providerAttempts),
         imageProcessing,
-        message,
+        message: noApplicableFieldsPayload.message,
       });
-      return jsonDiagnosticResponse({ message, reason: "plan-extract-empty-result", mode: requestedMode }, diagnosticId, {
+      return jsonDiagnosticResponse({ ...noApplicableFieldsPayload, mode: requestedMode }, diagnosticId, {
         status: 422,
         headers: { "X-AI-Mode": requestedMode },
       });

@@ -293,6 +293,7 @@ export function PlanImportCard({
     const formData = new FormData();
     formData.append("file", file);
     formData.append("aiMode", requestedMode);
+    formData.append("constructionMethod", getActiveScenario(useProjectStore.getState().project).constructionMethod);
 
     try {
       const responsePromise = fetch("/api/ai/plan-extract", {

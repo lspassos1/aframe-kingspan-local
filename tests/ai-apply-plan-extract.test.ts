@@ -375,4 +375,30 @@ describe("AI plan extract application", () => {
     expect(fields).not.toContain("houseWidthM");
     expect(fields).not.toContain("floors");
   });
+
+  it("does not treat non-current-method-only fields as actionable for the current method", () => {
+    const rectangularOnly: PlanExtractResult = {
+      ...baseResult,
+      extracted: {
+        houseWidthM: 9,
+        floorHeightM: 3,
+        floors: 2,
+        doorCount: 3,
+        windowCount: 6,
+        notes: ["Provider detectou campos retangulares sem método confirmado."],
+      },
+      fieldConfidence: {
+        houseWidthM: "medium",
+        floors: "medium",
+      },
+      assumptions: [],
+      missingInformation: [],
+      warnings: [],
+    };
+
+    expect(hasActionablePlanExtractFields(rectangularOnly)).toBe(true);
+    expect(hasActionablePlanExtractFields(rectangularOnly, "conventional-masonry")).toBe(true);
+    expect(hasActionablePlanExtractFields(rectangularOnly, "aframe")).toBe(false);
+    expect(getPlanExtractApplicableFields(rectangularOnly, "aframe")).toEqual([]);
+  });
 });

@@ -5,16 +5,66 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(async () => ({ userId: "user_test" })),
 }));
 
+vi.mock("@/lib/ai/providers", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/providers")>();
+  return {
+    ...actual,
+    extractPlanWithProviderChain: vi.fn(),
+  };
+});
+
 import { auth } from "@clerk/nextjs/server";
-import { getPlanExtractErrorPayload, POST, readRequestedPlanExtractMode, serializeProviderErrorsForClient } from "@/app/api/ai/plan-extract/route";
+import {
+  getPlanExtractErrorPayload,
+  getPlanExtractNoApplicableFieldsPayload,
+  POST,
+  readRequestedPlanExtractConstructionMethod,
+  readRequestedPlanExtractMode,
+  serializeProviderErrorsForClient,
+} from "@/app/api/ai/plan-extract/route";
 import { AiProviderChainError } from "@/lib/ai/errors";
+import { extractPlanWithProviderChain } from "@/lib/ai/providers";
 import { sanitizeAiDiagnosticMessage } from "@/lib/ai/safe-errors";
+import type { PlanExtractResult } from "@/lib/ai/plan-extract-schema";
+
+const routePlanResult: PlanExtractResult = {
+  version: "1.0",
+  summary: "Planta com campos retangulares.",
+  confidence: "medium",
+  extracted: {
+    houseWidthM: 9,
+    floorHeightM: 3,
+    floors: 2,
+    doorCount: 3,
+    windowCount: 6,
+    notes: ["Campos retangulares detectados."],
+  },
+  fieldConfidence: {
+    houseWidthM: "medium",
+    floors: "medium",
+  },
+  assumptions: [],
+  missingInformation: [],
+  warnings: [],
+};
+
+function createPlanUploadRequest(fileName: string, constructionMethod: string) {
+  const formData = new FormData();
+  formData.set("aiMode", "paid");
+  formData.set("constructionMethod", constructionMethod);
+  formData.set("file", new File([`plan-${fileName}`], fileName, { type: "image/png" }));
+  return new NextRequest("http://localhost/api/ai/plan-extract", {
+    method: "POST",
+    body: formData,
+  });
+}
 
 describe("plan extract route diagnostics", () => {
   beforeEach(() => {
     vi.stubEnv("AI_PLAN_EXTRACT_ENABLED", "true");
     vi.stubEnv("AI_RATE_LIMIT_SALT", "test-salt");
     vi.mocked(auth).mockResolvedValue({ userId: "user_test" } as never);
+    vi.mocked(extractPlanWithProviderChain).mockReset();
     vi.spyOn(console, "info").mockImplementation(() => undefined);
   });
 
@@ -148,6 +198,71 @@ describe("plan extract route diagnostics", () => {
     expect(readRequestedPlanExtractMode(paidForm)).toBe("paid");
     expect(readRequestedPlanExtractMode(invalidForm)).toBe("free-cloud");
     expect(readRequestedPlanExtractMode(null)).toBe("free-cloud");
+  });
+
+  it("reads only supported construction methods from form data", () => {
+    const aframeForm = new FormData();
+    aframeForm.set("constructionMethod", "aframe");
+    const masonryForm = new FormData();
+    masonryForm.set("constructionMethod", "conventional-masonry");
+    const invalidForm = new FormData();
+    invalidForm.set("constructionMethod", "steel-frame");
+
+    expect(readRequestedPlanExtractConstructionMethod(aframeForm)).toBe("aframe");
+    expect(readRequestedPlanExtractConstructionMethod(masonryForm)).toBe("conventional-masonry");
+    expect(readRequestedPlanExtractConstructionMethod(invalidForm)).toBeUndefined();
+    expect(readRequestedPlanExtractConstructionMethod(null)).toBeUndefined();
+  });
+
+  it("uses generic no-applicable-field copy when no construction method was provided", () => {
+    expect(getPlanExtractNoApplicableFieldsPayload(undefined)).toMatchObject({
+      reason: "plan-extract-empty-result",
+      message: "A análise não encontrou campos aplicáveis. Continue manualmente ou tente uma imagem mais legível.",
+    });
+    expect(getPlanExtractNoApplicableFieldsPayload("aframe")).toMatchObject({
+      reason: "plan-extract-no-current-method-fields",
+      message: "A análise encontrou dados, mas nenhum campo aplicável ao método atual. Continue manualmente ou tente confirmar o método da planta.",
+    });
+  });
+
+  it("rejects extracted fields that are not applicable to the current construction method", async () => {
+    vi.mocked(extractPlanWithProviderChain).mockResolvedValueOnce({
+      result: routePlanResult,
+      provider: "openai",
+      model: "premium-test",
+      diagnostics: {
+        providerAttempts: [{ provider: "openai", attempt: 1, outcome: "success", durationMs: 10 }],
+      },
+    });
+
+    const response = await POST(createPlanUploadRequest("aframe-method.png", "aframe"));
+    const payload = (await response.json()) as { reason?: string; message?: string; mode?: string };
+
+    expect(response.status).toBe(422);
+    expect(payload).toMatchObject({
+      reason: "plan-extract-no-current-method-fields",
+      mode: "paid",
+    });
+    expect(payload.message).toContain("nenhum campo aplicável ao método atual");
+  });
+
+  it("accepts extracted fields that are applicable to the current construction method", async () => {
+    vi.mocked(extractPlanWithProviderChain).mockResolvedValueOnce({
+      result: routePlanResult,
+      provider: "openai",
+      model: "premium-test",
+      diagnostics: {
+        providerAttempts: [{ provider: "openai", attempt: 1, outcome: "success", durationMs: 10 }],
+      },
+    });
+
+    const response = await POST(createPlanUploadRequest("masonry-method.png", "conventional-masonry"));
+    const payload = (await response.json()) as { result?: PlanExtractResult; mode?: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.mode).toBe("paid");
+    expect(payload.result?.extracted.houseWidthM).toBe(9);
+    expect(response.headers.get("X-AI-Mode")).toBe("paid");
   });
 
   it("returns a safe diagnostic id on upload validation errors", async () => {
