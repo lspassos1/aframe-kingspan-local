@@ -309,6 +309,31 @@ describe("plan extract advanced schema", () => {
     expect(JSON.stringify(result)).not.toContain("extraProviderKey");
   });
 
+  it("keeps assumptions-only insufficient extractions reviewable", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        extractionStatus: "insufficient",
+        extracted: {
+          notes: [],
+        },
+        assumptions: ["A imagem parece conter uma planta, mas não há escala legível."],
+      })
+    );
+
+    expect(result).toMatchObject({
+      version: "1.0",
+      extractionStatus: "insufficient",
+      confidence: "low",
+      extracted: {
+        notes: [],
+      },
+      assumptions: ["A imagem parece conter uma planta, mas não há escala legível."],
+      missingInformation: [],
+      warnings: [],
+    });
+  });
+
   it("rejects forbidden price, composition, labor-hour and approval outputs", () => {
     expect(() =>
       parsePlanExtractResult(
