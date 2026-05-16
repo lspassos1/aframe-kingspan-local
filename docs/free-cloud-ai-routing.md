@@ -22,9 +22,9 @@ Fluxo de produto:
 | --- | --- | --- |
 | `AI_MODE` | `free-cloud` | Modo padrão deste ciclo. Não pode chamar OpenAI nem provider pago. |
 | `AI_PAID_FALLBACK_ENABLED` | `false` | Padrão seguro. Sem fallback automático para OpenAI ou provider pago. |
-| `AI_MODE` | `paid` | Modo Pro/OpenAI explícito. Usa `OPENAI_API_KEY` e `AI_OPENAI_MODEL`. |
+| `AI_MODE` | `paid` | Modo Pro/OpenAI explícito. Usa `OPENAI_API_KEY` e `AI_OPENAI_MODEL_PREMIUM` quando configurado; caso contrário usa `AI_OPENAI_MODEL`. |
 
-OpenAI não deve ser removido. A chave `OPENAI_API_KEY` continua server-side e só pode ser usada quando o modo pago estiver explicitamente habilitado. `AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente agora.
+OpenAI não deve ser removido. A chave `OPENAI_API_KEY` continua server-side e só pode ser usada quando o modo pago estiver explicitamente habilitado.
 
 ## Providers Por Tarefa
 
@@ -46,7 +46,7 @@ Modelos configuráveis por provider:
 - `CEREBRAS_TEXT_MODEL`
 - `SAMBANOVA_TEXT_MODEL`
 - `AI_OPENAI_MODEL` para OpenAI em modo pago explícito
-- `AI_OPENAI_MODEL_PREMIUM` reservado para comparação futura
+- `AI_OPENAI_MODEL_PREMIUM` como modelo preferencial do Modo Pro explícito, quando configurado
 
 ## Variáveis De Ambiente
 

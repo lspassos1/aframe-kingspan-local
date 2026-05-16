@@ -33,7 +33,7 @@ export type AiModeStatus = {
   publicPrimaryLabel: "Análise rápida" | "Revisão detalhada";
   publicReviewLabel: "Revisão detalhada" | "Validação Pro";
   canUseOpenAi: boolean;
-  canUsePremiumModel: false;
+  canUsePremiumModel: boolean;
   paidFallbackEnabled: false;
   allowedEnvVars: readonly string[];
   primaryConfigured: boolean;
@@ -43,6 +43,10 @@ export type AiModeStatus = {
 
 function hasEnv(env: AiModeEnv, key: string) {
   return Boolean(env[key]?.trim());
+}
+
+function hasOpenAiPlanExtractModel(env: AiModeEnv) {
+  return hasEnv(env, "AI_OPENAI_MODEL") || hasEnv(env, "AI_OPENAI_MODEL_PREMIUM");
 }
 
 export function readAiProductMode(env: AiModeEnv = process.env): AiProductMode {
@@ -73,11 +77,11 @@ export function resolveAiMode(env: AiModeEnv = process.env): AiModeStatus {
       publicPrimaryLabel: "Revisão detalhada",
       publicReviewLabel: "Validação Pro",
       canUseOpenAi: true,
-      canUsePremiumModel: false,
+      canUsePremiumModel: hasEnv(env, "AI_OPENAI_MODEL_PREMIUM"),
       paidFallbackEnabled: false,
       allowedEnvVars: paidAiEnvAllowList,
       primaryConfigured: hasEnv(env, "OPENAI_API_KEY"),
-      primaryModelConfigured: hasEnv(env, "AI_OPENAI_MODEL"),
+      primaryModelConfigured: hasOpenAiPlanExtractModel(env),
       premiumModelConfigured: hasEnv(env, "AI_OPENAI_MODEL_PREMIUM"),
     };
   }

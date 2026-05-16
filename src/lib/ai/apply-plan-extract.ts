@@ -203,6 +203,15 @@ export function getPlanExtractApplicableFields(result: PlanExtractResult, curren
   });
 }
 
+export function hasActionablePlanExtractFields(result: PlanExtractResult, currentMethod?: ConstructionMethodId) {
+  return getPlanExtractApplicableFields(result, currentMethod).some((field) => {
+    const value = result.extracted[field];
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === "number") return normalizePlanExtractNumberField(field, value) !== undefined;
+    return value !== undefined && value !== "";
+  });
+}
+
 export function isPlanExtractMethodCompatible(method: ConstructionMethodId) {
   return method === "aframe" || nonAFrameMethodIds.includes(method);
 }

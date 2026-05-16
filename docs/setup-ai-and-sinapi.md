@@ -78,7 +78,7 @@ AI_OPENAI_MODEL=gpt-4o-mini
 AI_OPENAI_MODEL_PREMIUM=gpt-5.4-mini
 ```
 
-`AI_OPENAI_MODEL_PREMIUM` fica reservado para comparação futura e não é chamado automaticamente agora.
+Quando `AI_OPENAI_MODEL_PREMIUM` está configurado, o Modo Pro explícito usa esse modelo para extração de planta; caso contrário usa `AI_OPENAI_MODEL`.
 
 ## Modo Free-cloud
 
@@ -128,7 +128,7 @@ IA ligada:
 AI_PLAN_EXTRACT_ENABLED=true
 ```
 
-Mesmo com a flag ligada, upload assistido precisa do provider do modo atual configurado no servidor. Em `AI_MODE=free-cloud`, configure Gemini como principal e OpenRouter/Groq conforme a lista acima. Em `AI_MODE=paid`, configure `OPENAI_API_KEY` e `AI_OPENAI_MODEL`.
+Mesmo com a flag ligada, upload assistido precisa do provider do modo atual configurado no servidor. Em `AI_MODE=free-cloud`, configure Gemini como principal e OpenRouter/Groq conforme a lista acima. Em `AI_MODE=paid`, configure `OPENAI_API_KEY` e `AI_OPENAI_MODEL_PREMIUM` ou `AI_OPENAI_MODEL`.
 
 ## Limites Diários
 
@@ -155,7 +155,7 @@ Verifique:
 1. `AI_PLAN_EXTRACT_ENABLED=true`.
 2. `AI_MODE=free-cloud` ou `AI_MODE=paid`.
 3. Em free-cloud: `GEMINI_API_KEY`, `GEMINI_MODEL`, `OPENROUTER_API_KEY`, `OPENROUTER_PLAN_REVIEW_MODEL`, `GROQ_API_KEY` e `GROQ_TEXT_MODEL` existem no servidor conforme o fluxo desejado.
-4. Em modo pago: `OPENAI_API_KEY` e `AI_OPENAI_MODEL` existem no servidor.
+4. Em modo pago: `OPENAI_API_KEY` e `AI_OPENAI_MODEL_PREMIUM` ou `AI_OPENAI_MODEL` existem no servidor.
 5. O deployment foi refeito depois da mudança.
 6. O usuário está autenticado, se anônimo estiver desabilitado.
 7. O arquivo é PNG, JPG, WebP ou PDF e respeita `AI_PLAN_EXTRACT_MAX_FILE_MB`.

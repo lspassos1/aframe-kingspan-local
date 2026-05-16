@@ -27,7 +27,7 @@ describe("AI mode contract", () => {
     expect(status.allowedEnvVars).toEqual(freeCloudAiEnvAllowList);
   });
 
-  it("resolves paid mode with OpenAI standard model and keeps premium reserved", () => {
+  it("resolves paid mode with OpenAI premium enabled only for explicit Pro extraction", () => {
     const status = resolveAiMode({
       AI_MODE: "paid",
       [openAiKeyEnv]: "openai-key",
@@ -41,7 +41,7 @@ describe("AI mode contract", () => {
       publicModeLabel: "Modo Pro",
       publicPrimaryLabel: "Revisão detalhada",
       canUseOpenAi: true,
-      canUsePremiumModel: false,
+      canUsePremiumModel: true,
       paidFallbackEnabled: false,
       primaryConfigured: true,
       primaryModelConfigured: true,

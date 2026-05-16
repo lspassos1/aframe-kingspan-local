@@ -125,7 +125,7 @@ export function createOperationalChecklist(
           : "Continue pelo preenchimento manual enquanto a proteção diária é configurada.",
       technicalDetail:
         environment.aiMode === "paid"
-          ? "Verifique AI_PLAN_EXTRACT_ENABLED, OPENAI_API_KEY, AI_OPENAI_MODEL, AI_RATE_LIMIT_SALT e storage persistente (UPSTASH_REDIS_REST_URL/TOKEN ou KV_REST_API_URL/TOKEN) no servidor."
+          ? "Verifique AI_PLAN_EXTRACT_ENABLED, OPENAI_API_KEY, AI_OPENAI_MODEL ou AI_OPENAI_MODEL_PREMIUM, AI_RATE_LIMIT_SALT e storage persistente (UPSTASH_REDIS_REST_URL/TOKEN ou KV_REST_API_URL/TOKEN) no servidor."
           : "Verifique AI_PLAN_EXTRACT_ENABLED, AI_MODE=free-cloud, GEMINI_API_KEY, GEMINI_MODEL, AI_RATE_LIMIT_SALT e storage persistente (UPSTASH_REDIS_REST_URL/TOKEN ou KV_REST_API_URL/TOKEN) no servidor.",
       tone: aiOperational && rateLimitReady ? "ok" : "warning",
     },
@@ -144,8 +144,8 @@ export function createOperationalChecklist(
       technicalDetail:
         environment.aiMode === "paid"
           ? environment.aiModelConfigured
-            ? "AI_OPENAI_MODEL está definido."
-            : "Defina AI_OPENAI_MODEL no ambiente do servidor."
+            ? "Modelo OpenAI do Pro está definido."
+            : "Defina AI_OPENAI_MODEL ou AI_OPENAI_MODEL_PREMIUM no ambiente do servidor."
           : environment.aiModelConfigured
             ? "GEMINI_MODEL está definido."
             : "Defina GEMINI_MODEL no ambiente do servidor.",

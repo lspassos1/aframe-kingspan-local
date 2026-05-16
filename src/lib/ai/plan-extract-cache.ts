@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai/providers";
 import { readAiProductMode } from "@/lib/ai/mode";
 import { planExtractResultSchema } from "@/lib/ai/plan-extract-schema";
+import { hasActionablePlanExtractFields } from "@/lib/ai/apply-plan-extract";
 
 export type AiPlanExtractCacheStore = {
   kind: "memory";
@@ -83,7 +84,7 @@ export function getPlanExtractCacheVersion(env: AiPlanExtractEnv = process.env) 
 }
 
 export function shouldCachePlanExtractResult(value: AiPlanExtractProviderResult) {
-  return value.review?.status !== "unavailable" || value.review.error?.retryable !== true;
+  return hasActionablePlanExtractFields(value.result) && (value.review?.status !== "unavailable" || value.review.error?.retryable !== true);
 }
 
 export function createPlanExtractCacheKey({
@@ -119,7 +120,7 @@ export function createMemoryPlanExtractCacheStore(entries = sharedMemoryCache): 
       }
 
       const parsed = planExtractResultSchema.safeParse(entry.value.result);
-      if (!parsed.success) {
+      if (!parsed.success || !hasActionablePlanExtractFields(parsed.data)) {
         entries.delete(key);
         return null;
       }
