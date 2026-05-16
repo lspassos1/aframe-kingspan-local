@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AiProviderChainError, AiProviderUnavailableError } from "@/lib/ai/errors";
 import {
+  callOpenRouterPlanReviewProvider,
   extractPlanWithProviderChain,
   getAiPlanExtractProviderConfigs,
   getAiPlanExtractProviderOrder,
@@ -104,6 +105,37 @@ describe("AI plan extraction providers", () => {
     expect(result.version).toBe("1.0");
     expect(result.extracted.city).toBe("Curitiba");
     expect(result.fieldConfidence.houseWidthM).toBe("medium");
+  });
+
+  it("requests high image detail from OpenAI-compatible plan extraction providers", async () => {
+    let requestBody: unknown;
+    await callOpenRouterPlanReviewProvider(
+      {
+        id: "openrouter",
+        model: "openrouter/free",
+        configured: true,
+        baseUrl: "https://openrouter.example.test/chat/completions",
+        apiKey: "openrouter-key",
+        supports: ["image/png", "image/jpeg", "image/webp"],
+      },
+      {
+        mimeType: "image/png",
+        fileBase64: "abc",
+      },
+      async (_url, init) => {
+        requestBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: validPlanExtractJson } }],
+            usage: { total_tokens: 12 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+    );
+
+    const content = (requestBody as { messages: Array<{ content: Array<{ type: string; image_url?: { detail?: string } }> }> }).messages[0]?.content;
+    expect(content?.find((item) => item.type === "image_url")?.image_url?.detail).toBe("high");
   });
 
   it("does not configure Groq even when Groq env vars are present", () => {

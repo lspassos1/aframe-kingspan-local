@@ -382,7 +382,11 @@ export function stripJsonCodeFence(value: string) {
 export function parsePlanExtractResult(value: string): PlanExtractResult {
   const parsedJson = JSON.parse(stripJsonCodeFence(value));
   assertNoForbiddenPlanExtractKeys(parsedJson);
-  const normalizedJson = normalizePlanExtractResultJson(parsedJson);
+  const planExtractRoot = selectPlanExtractRoot(parsedJson);
+  if (Array.isArray(planExtractRoot)) {
+    throw new Error("AI plan extraction returned no usable content.");
+  }
+  const normalizedJson = normalizePlanExtractResultJson(planExtractRoot);
   if (isRecord(normalizedJson) && !hasUsablePlanExtractContent(normalizedJson)) {
     throw new Error("AI plan extraction returned no usable content.");
   }
@@ -480,6 +484,17 @@ const optionalArrayPlanExtractSectionSchemas = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function looksLikePlanExtractRoot(value: unknown) {
+  if (!isRecord(value)) return false;
+  return ["version", "summary", "extracted", "document", "scale", "location", "lot", "building", "rooms", "openings", "quantitySeeds", "questions"].some((key) => key in value);
+}
+
+function selectPlanExtractRoot(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  if (value.length === 1 && isRecord(value[0])) return value[0];
+  return value.find(looksLikePlanExtractRoot) ?? value;
 }
 
 function stripNullishPlanExtractValues(value: unknown): unknown {
