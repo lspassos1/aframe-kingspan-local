@@ -192,15 +192,39 @@ Run this only after the preview or production deployment includes the relevant P
 
 ### Provider smoke
 
-Use the manual harness only with live smoke explicitly enabled:
+Use the manual harness only with live smoke explicitly enabled and pointed at the deployment being validated. Do not rely on the default localhost endpoint for preview or production sign-off.
+
+Set the target endpoint first:
 
 ```bash
-AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --mode free-cloud --file ./tests/fixtures/plan-small.png --json
-AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --mode paid --file ./tests/fixtures/plan-small.png --json
-AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --mode paid --file ./tests/fixtures/plan-small.pdf --json
+export AI_SMOKE_ENDPOINT="https://PREVIEW_OR_PRODUCTION_DOMAIN/api/ai/plan-extract"
+[[ -z "$AI_SMOKE_ENDPOINT" ]] && echo "ERROR: AI_SMOKE_ENDPOINT must be set" && exit 1
 ```
 
-Do not paste or commit the resulting report if it contains deployment-specific metadata. Use it to compare mode, MIME type, status, safe reason, and provider attempt summary.
+If the deployment requires authentication, set one auth input locally before running the commands below. Do not paste, commit, or log these values:
+
+```bash
+export AI_SMOKE_AUTH_COOKIE="..." # full Cookie header value
+# or
+export AI_SMOKE_AUTH_BEARER="..." # raw token only; the harness sends Authorization: Bearer <token>
+# or
+export AI_SMOKE_AUTH_HEADER="Bearer ..." # full Authorization header value
+```
+
+Run every fixture/mode pair that is part of the acceptance criteria:
+
+```bash
+AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --endpoint "$AI_SMOKE_ENDPOINT" --mode free-cloud --fixture png --json
+AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --endpoint "$AI_SMOKE_ENDPOINT" --mode free-cloud --fixture jpg --json
+AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --endpoint "$AI_SMOKE_ENDPOINT" --mode free-cloud --fixture pdf --json
+AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --endpoint "$AI_SMOKE_ENDPOINT" --mode paid --fixture png --json
+AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --endpoint "$AI_SMOKE_ENDPOINT" --mode paid --fixture jpg --json
+AI_LIVE_PROVIDER_SMOKE=true npm run ai:plan-extract:smoke -- --endpoint "$AI_SMOKE_ENDPOINT" --mode paid --fixture pdf --json
+```
+
+Free PDF may return the documented PDF recovery path instead of a successful extraction; that is acceptable only when the report shows the safe Free PDF recovery reason and the browser flow still offers manual continuation. Auth failures are not provider smoke results; fix the auth input or explicitly enable anonymous plan extraction in the target environment before evaluating provider behavior.
+
+Do not paste or commit the resulting report if it contains deployment-specific metadata. Use it to compare mode, MIME type, status, safe reason, diagnostic ID, and provider attempt summary.
 
 ### Supabase smoke
 
