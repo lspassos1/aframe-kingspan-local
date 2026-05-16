@@ -20,6 +20,222 @@ const reviewedNumber = {
 };
 
 describe("plan extract advanced schema", () => {
+  it("backfills actionable legacy fields from advanced sections", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Planta respondida com blocos avançados.",
+        confidence: "medium",
+        extractionStatus: "partial",
+        extracted: {
+          notes: ["Provider preencheu blocos avançados, mas não os campos legados."],
+        },
+        document: {
+          title: { ...reviewedValue, value: "Residência Alfa", evidence: "Título visível no carimbo." },
+        },
+        location: {
+          city: { ...reviewedValue, value: "Salvador" },
+          state: { ...reviewedValue, value: "BA" },
+        },
+        lot: {
+          widthM: { ...reviewedNumber, value: 12, unit: "m", evidence: "Cota frontal do lote." },
+          depthM: { ...reviewedNumber, value: 24, unit: "m", evidence: "Cota lateral do lote." },
+        },
+        building: {
+          widthM: { ...reviewedNumber, value: 8, unit: "m", evidence: "Largura da construção." },
+          depthM: { ...reviewedNumber, value: 10, unit: "m", evidence: "Profundidade da construção." },
+          floorHeightM: { ...reviewedNumber, value: 2.8, unit: "m", evidence: "Pé-direito anotado." },
+          floors: { ...reviewedNumber, value: 1, unit: "un", evidence: "Um pavimento visível." },
+        },
+        openings: {
+          doorCount: { value: 3, unit: "un", confidence: "medium", source: "visible", requiresReview: true, evidence: "Três portas visíveis." },
+          windows: [
+            {
+              id: "window-1",
+              type: { value: "janela", unit: "texto", confidence: "medium", source: "visible", requiresReview: true, evidence: "Janela identificada." },
+            },
+            {
+              id: "window-2",
+              type: { value: "janela", unit: "texto", confidence: "medium", source: "visible", requiresReview: true, evidence: "Janela identificada." },
+            },
+          ],
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted).toMatchObject({
+      projectName: "Residência Alfa",
+      city: "Salvador",
+      state: "BA",
+      terrainWidthM: 12,
+      terrainDepthM: 24,
+      houseWidthM: 8,
+      houseDepthM: 10,
+      floorHeightM: 2.8,
+      floors: 1,
+      doorCount: 3,
+      windowCount: 2,
+    });
+    expect(result.fieldConfidence).toMatchObject({
+      projectName: "high",
+      city: "high",
+      terrainWidthM: "medium",
+      houseWidthM: "medium",
+      windowCount: "medium",
+    });
+    expect(result.fieldEvidence?.terrainWidthM).toBe("Cota frontal do lote.");
+    expect(result.fieldEvidence?.windowCount).toBe("Quantidade derivada dos itens visíveis em windows.");
+  });
+
+  it("ignores non-integer explicit opening counts when deriving legacy fields", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Planta com contagem fracionada de esquadrias.",
+        confidence: "medium",
+        extracted: {
+          notes: ["Contagem explícita inválida deve ser ignorada."],
+        },
+        openings: {
+          doorCount: { value: 2.5, unit: "un", confidence: "medium", source: "visible", requiresReview: true, evidence: "Contagem fracionada retornada pelo provider." },
+          doors: [
+            {
+              id: "door-1",
+              type: { value: "porta", unit: "texto", confidence: "medium", source: "visible", requiresReview: true, evidence: "Porta identificada." },
+            },
+            {
+              id: "door-2",
+              type: { value: "porta", unit: "texto", confidence: "medium", source: "visible", requiresReview: true, evidence: "Porta identificada." },
+            },
+          ],
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.doorCount).toBe(2);
+    expect(result.fieldEvidence?.doorCount).toBe("Quantidade derivada dos itens visíveis em doors.");
+  });
+
+  it("ignores non-integer floor counts from advanced building data", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Planta com pavimentos fracionados.",
+        confidence: "medium",
+        extracted: {
+          notes: ["Pavimentos fracionados não devem quebrar a extração."],
+        },
+        building: {
+          widthM: { ...reviewedNumber, value: 8, unit: "m", evidence: "Largura da construção." },
+          depthM: { ...reviewedNumber, value: 10, unit: "m", evidence: "Profundidade da construção." },
+          floors: { ...reviewedNumber, value: 1.5, unit: "un", evidence: "Valor fracionado retornado pelo provider." },
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.houseWidthM).toBe(8);
+    expect(result.extracted.houseDepthM).toBe(10);
+    expect(result.extracted.floors).toBeUndefined();
+  });
+
+  it("uses building lot dimensions when the lot section is absent", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Planta com dimensões de lote no bloco de construção.",
+        confidence: "medium",
+        extracted: {
+          notes: ["Lote informado apenas no bloco building."],
+        },
+        building: {
+          lotWidthM: { ...reviewedNumber, value: 14, unit: "m", evidence: "Largura do lote anotada no bloco building." },
+          lotDepthM: { ...reviewedNumber, value: 28, unit: "m", evidence: "Profundidade do lote anotada no bloco building." },
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.terrainWidthM).toBe(14);
+    expect(result.extracted.terrainDepthM).toBe(28);
+    expect(result.fieldEvidence?.terrainWidthM).toBe("Largura do lote anotada no bloco building.");
+  });
+
+  it("preserves existing confidence and evidence when explicit opening counts are backfilled", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Planta com metadados legados e contagem avançada.",
+        confidence: "medium",
+        extracted: {
+          notes: ["Metadados legados devem ser preservados."],
+        },
+        fieldConfidence: {
+          doorCount: "high",
+        },
+        fieldEvidence: {
+          doorCount: "Contagem revisada no campo legado.",
+        },
+        openings: {
+          doorCount: { value: 3, unit: "un", confidence: "medium", source: "visible", requiresReview: true, evidence: "Três portas visíveis no bloco avançado." },
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.doorCount).toBe(3);
+    expect(result.fieldConfidence.doorCount).toBe("high");
+    expect(result.fieldEvidence?.doorCount).toBe("Contagem revisada no campo legado.");
+  });
+
+  it("preserves existing confidence and evidence when construction method is backfilled", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Planta com sugestão de método no bloco avançado.",
+        confidence: "medium",
+        extracted: {
+          notes: ["Método compatível apenas no bloco building."],
+        },
+        fieldConfidence: {
+          constructionMethod: "high",
+        },
+        fieldEvidence: {
+          constructionMethod: "Método revisado no campo legado.",
+        },
+        building: {
+          constructionMethodSuggestion: {
+            value: "conventional-masonry",
+            unit: "texto",
+            confidence: "medium",
+            source: "visible",
+            requiresReview: true,
+            evidence: "Alvenaria sugerida pelo bloco avançado.",
+          },
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.constructionMethod).toBe("conventional-masonry");
+    expect(result.fieldConfidence.constructionMethod).toBe("high");
+    expect(result.fieldEvidence?.constructionMethod).toBe("Método revisado no campo legado.");
+  });
+
   it("parses advanced extraction blocks with evidence, questions and quantity seeds", () => {
     const result = parsePlanExtractResult(
       JSON.stringify({

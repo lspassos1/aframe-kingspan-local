@@ -521,6 +521,140 @@ function normalizeFieldEvidence(value: unknown) {
   return Object.fromEntries(entries);
 }
 
+function readExtractedValue(section: unknown, key: string) {
+  if (!isRecord(section)) return undefined;
+  const value = section[key];
+  if (!isRecord(value) || !("value" in value)) return undefined;
+  return value.value;
+}
+
+function readExtractedConfidence(section: unknown, key: string): PlanExtractConfidence | undefined {
+  if (!isRecord(section)) return undefined;
+  const value = section[key];
+  if (!isRecord(value) || !isPlanExtractConfidence(value.confidence)) return undefined;
+  return value.confidence;
+}
+
+function readExtractedEvidence(section: unknown, key: string): string | undefined {
+  if (!isRecord(section)) return undefined;
+  const value = section[key];
+  if (!isRecord(value) || typeof value.evidence !== "string" || !value.evidence.trim()) return undefined;
+  return value.evidence.trim();
+}
+
+function ensureNormalizedExtractedSection(value: Record<string, unknown>): Record<string, unknown> {
+  const extracted = isRecord(value.extracted) ? value.extracted : {};
+  value.extracted = extracted;
+  return extracted;
+}
+
+function ensureNormalizedFieldConfidence(value: Record<string, unknown>): Record<string, unknown> {
+  const fieldConfidence = isRecord(value.fieldConfidence) ? value.fieldConfidence : {};
+  value.fieldConfidence = fieldConfidence;
+  return fieldConfidence;
+}
+
+function ensureNormalizedFieldEvidence(value: Record<string, unknown>): Record<string, unknown> {
+  const fieldEvidence = isRecord(value.fieldEvidence) ? value.fieldEvidence : {};
+  value.fieldEvidence = fieldEvidence;
+  return fieldEvidence;
+}
+
+function backfillExtractedFieldFromAdvancedSection(
+  normalized: Record<string, unknown>,
+  field: string,
+  section: unknown,
+  sectionField: string,
+  type: "string" | "number",
+  options: { integer?: boolean } = {}
+) {
+  const extracted = ensureNormalizedExtractedSection(normalized);
+  if (extracted[field] !== undefined) return;
+
+  const value = readExtractedValue(section, sectionField);
+  if (type === "string") {
+    if (typeof value !== "string" || !value.trim()) return;
+    extracted[field] = value.trim();
+  } else {
+    if (typeof value !== "number" || !Number.isFinite(value)) return;
+    if (options.integer && !Number.isInteger(value)) return;
+    extracted[field] = value;
+  }
+
+  const confidence = readExtractedConfidence(section, sectionField);
+  if (confidence) {
+    const fieldConfidence = ensureNormalizedFieldConfidence(normalized);
+    if (fieldConfidence[field] === undefined) fieldConfidence[field] = confidence;
+  }
+
+  const evidence = readExtractedEvidence(section, sectionField);
+  if (evidence) {
+    const fieldEvidence = ensureNormalizedFieldEvidence(normalized);
+    if (fieldEvidence[field] === undefined) fieldEvidence[field] = evidence;
+  }
+}
+
+function backfillExtractedOpeningCount(normalized: Record<string, unknown>, field: "doorCount" | "windowCount", sectionField: "doorCount" | "windowCount", itemsField: "doors" | "windows") {
+  const openings = normalized.openings;
+  const extracted = ensureNormalizedExtractedSection(normalized);
+  if (extracted[field] !== undefined) return;
+
+  const explicitCount = readExtractedValue(openings, sectionField);
+  if (typeof explicitCount === "number" && Number.isInteger(explicitCount)) {
+    extracted[field] = explicitCount;
+    const confidence = readExtractedConfidence(openings, sectionField);
+    const fieldConfidence = ensureNormalizedFieldConfidence(normalized);
+    if (confidence && fieldConfidence[field] === undefined) fieldConfidence[field] = confidence;
+    const evidence = readExtractedEvidence(openings, sectionField);
+    const fieldEvidence = ensureNormalizedFieldEvidence(normalized);
+    if (evidence && fieldEvidence[field] === undefined) fieldEvidence[field] = evidence;
+    return;
+  }
+
+  if (!isRecord(openings) || !Array.isArray(openings[itemsField]) || openings[itemsField].length === 0) return;
+  extracted[field] = openings[itemsField].length;
+  const fieldConfidence = ensureNormalizedFieldConfidence(normalized);
+  if (fieldConfidence[field] === undefined) fieldConfidence[field] = "medium";
+  const fieldEvidence = ensureNormalizedFieldEvidence(normalized);
+  if (fieldEvidence[field] === undefined) fieldEvidence[field] = `Quantidade derivada dos itens visíveis em ${itemsField}.`;
+}
+
+function backfillLegacyExtractedFieldsFromAdvancedSections(normalized: Record<string, unknown>) {
+  backfillExtractedFieldFromAdvancedSection(normalized, "projectName", normalized.document, "title", "string");
+  backfillExtractedFieldFromAdvancedSection(normalized, "address", normalized.location, "address", "string");
+  backfillExtractedFieldFromAdvancedSection(normalized, "city", normalized.location, "city", "string");
+  backfillExtractedFieldFromAdvancedSection(normalized, "state", normalized.location, "state", "string");
+  backfillExtractedFieldFromAdvancedSection(normalized, "country", normalized.location, "country", "string");
+
+  backfillExtractedFieldFromAdvancedSection(normalized, "terrainWidthM", normalized.lot, "widthM", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "terrainDepthM", normalized.lot, "depthM", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "terrainWidthM", normalized.building, "lotWidthM", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "terrainDepthM", normalized.building, "lotDepthM", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "houseWidthM", normalized.building, "widthM", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "houseDepthM", normalized.building, "depthM", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "builtAreaM2", normalized.building, "builtAreaM2", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "floorHeightM", normalized.building, "floorHeightM", "number");
+  backfillExtractedFieldFromAdvancedSection(normalized, "floors", normalized.building, "floors", "number", { integer: true });
+
+  const constructionMethod = readExtractedValue(normalized.building, "constructionMethodSuggestion");
+  if (
+    typeof constructionMethod === "string" &&
+    planExtractConstructionMethodSchema.safeParse(constructionMethod).success &&
+    ensureNormalizedExtractedSection(normalized).constructionMethod === undefined
+  ) {
+    ensureNormalizedExtractedSection(normalized).constructionMethod = constructionMethod;
+    const confidence = readExtractedConfidence(normalized.building, "constructionMethodSuggestion");
+    const fieldConfidence = ensureNormalizedFieldConfidence(normalized);
+    if (confidence && fieldConfidence.constructionMethod === undefined) fieldConfidence.constructionMethod = confidence;
+    const evidence = readExtractedEvidence(normalized.building, "constructionMethodSuggestion");
+    const fieldEvidence = ensureNormalizedFieldEvidence(normalized);
+    if (evidence && fieldEvidence.constructionMethod === undefined) fieldEvidence.constructionMethod = evidence;
+  }
+
+  backfillExtractedOpeningCount(normalized, "doorCount", "doorCount", "doors");
+  backfillExtractedOpeningCount(normalized, "windowCount", "windowCount", "windows");
+}
+
 function hasNonEmptyValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim().length > 0;
@@ -621,6 +755,8 @@ function normalizePlanExtractResultJson(value: unknown) {
     const items = section.filter((item): item is string => typeof item === "string");
     normalized[key] = items;
   }
+
+  backfillLegacyExtractedFieldsFromAdvancedSections(normalized);
 
   return normalized;
 }
