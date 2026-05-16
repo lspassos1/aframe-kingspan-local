@@ -236,6 +236,144 @@ describe("plan extract advanced schema", () => {
     expect(result.fieldEvidence?.constructionMethod).toBe("Método revisado no campo legado.");
   });
 
+  it("normalizes rich legacy extracted values into actionable fields", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Provider retornou campos legados em formato rico.",
+        confidence: "medium",
+        extracted: {
+          city: { ...reviewedValue, value: " Salvador ", evidence: "Cidade visível no carimbo." },
+          state: { ...reviewedValue, value: "BA", evidence: "UF visível no carimbo." },
+          constructionMethod: {
+            value: "conventional-masonry",
+            unit: "texto",
+            confidence: "medium",
+            source: "visible",
+            requiresReview: true,
+            evidence: "Blocos de alvenaria indicados na legenda.",
+          },
+          builtAreaM2: { ...reviewedNumber, value: 83.4, evidence: "Área construída visível no quadro." },
+          floors: { ...reviewedNumber, value: 1, unit: "un", evidence: "Um pavimento indicado." },
+          doorCount: { ...reviewedNumber, value: 3, unit: "un", evidence: "Três portas visíveis." },
+          windowCount: { ...reviewedNumber, value: 5, unit: "un", evidence: "Cinco janelas visíveis." },
+          notes: ["Campos legados vieram como objetos ricos."],
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted).toMatchObject({
+      city: "Salvador",
+      state: "BA",
+      constructionMethod: "conventional-masonry",
+      builtAreaM2: 83.4,
+      floors: 1,
+      doorCount: 3,
+      windowCount: 5,
+    });
+    expect(result.fieldConfidence).toMatchObject({
+      city: "high",
+      constructionMethod: "medium",
+      builtAreaM2: "medium",
+      floors: "medium",
+    });
+    expect(result.fieldEvidence?.city).toBe("Cidade visível no carimbo.");
+    expect(result.fieldEvidence?.windowCount).toBe("Cinco janelas visíveis.");
+  });
+
+  it("drops invalid rich legacy extracted values without rejecting valid fields", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Provider retornou alguns campos legados inválidos.",
+        confidence: "medium",
+        extracted: {
+          city: { ...reviewedValue, value: "Salvador" },
+          constructionMethod: {
+            value: "wood-frame",
+            unit: "texto",
+            confidence: "medium",
+            source: "visible",
+            requiresReview: true,
+            evidence: "Método fora do contrato atual.",
+          },
+          floors: { ...reviewedNumber, value: 1.5, unit: "un", evidence: "Valor fracionado retornado pelo provider." },
+          doorCount: { ...reviewedNumber, value: -1, unit: "un", evidence: "Contagem negativa inválida." },
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.city).toBe("Salvador");
+    expect(result.extracted.constructionMethod).toBeUndefined();
+    expect(result.extracted.floors).toBeUndefined();
+    expect(result.extracted.doorCount).toBeUndefined();
+  });
+
+  it("preserves explicit metadata when normalizing rich legacy extracted values", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Provider retornou metadados legados e metadados explícitos.",
+        confidence: "medium",
+        extracted: {
+          city: { ...reviewedValue, value: "Salvador", confidence: "medium", evidence: "Cidade sugerida pelo provider." },
+          notes: ["Metadados explícitos devem prevalecer."],
+        },
+        fieldConfidence: {
+          city: "high",
+        },
+        fieldEvidence: {
+          city: "Cidade revisada no campo legado.",
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.city).toBe("Salvador");
+    expect(result.fieldConfidence.city).toBe("high");
+    expect(result.fieldEvidence?.city).toBe("Cidade revisada no campo legado.");
+  });
+
+  it("allows advanced sections to backfill invalid rich legacy extracted values", () => {
+    const result = parsePlanExtractResult(
+      JSON.stringify({
+        version: "1.0",
+        summary: "Campos legados inválidos não devem bloquear backfill avançado.",
+        confidence: "medium",
+        extracted: {
+          city: { ...reviewedValue, value: { label: "Salvador" } },
+          state: { ...reviewedValue, value: "" },
+          floors: { ...reviewedNumber, value: 1.5, unit: "un" },
+          notes: ["Campos legados inválidos devem ser descartados."],
+        },
+        location: {
+          city: { ...reviewedValue, value: "Salvador", evidence: "Cidade visível no bloco de localização." },
+          state: { ...reviewedValue, value: "BA", evidence: "UF visível no bloco de localização." },
+        },
+        building: {
+          floors: { ...reviewedNumber, value: 1, unit: "un", evidence: "Um pavimento visível no bloco building." },
+        },
+        assumptions: [],
+        missingInformation: [],
+        warnings: [],
+      })
+    );
+
+    expect(result.extracted.city).toBe("Salvador");
+    expect(result.extracted.state).toBe("BA");
+    expect(result.extracted.floors).toBe(1);
+    expect(result.fieldEvidence?.city).toBe("Cidade visível no bloco de localização.");
+    expect(result.fieldEvidence?.floors).toBe("Um pavimento visível no bloco building.");
+  });
+
   it("parses advanced extraction blocks with evidence, questions and quantity seeds", () => {
     const result = parsePlanExtractResult(
       JSON.stringify({

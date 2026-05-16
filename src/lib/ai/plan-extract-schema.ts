@@ -575,6 +575,90 @@ function ensureNormalizedFieldEvidence(value: Record<string, unknown>): Record<s
   return fieldEvidence;
 }
 
+const legacyExtractedFieldTypes = {
+  projectName: "string",
+  address: "string",
+  city: "string",
+  state: "string",
+  country: "string",
+  constructionMethod: "construction-method",
+  terrainWidthM: "positive-number",
+  terrainDepthM: "positive-number",
+  houseWidthM: "positive-number",
+  houseDepthM: "positive-number",
+  builtAreaM2: "positive-number",
+  floorHeightM: "positive-number",
+  floors: "positive-integer",
+  doorCount: "nonnegative-integer",
+  windowCount: "nonnegative-integer",
+} as const;
+
+type LegacyExtractedField = keyof typeof legacyExtractedFieldTypes;
+type LegacyExtractedFieldType = (typeof legacyExtractedFieldTypes)[LegacyExtractedField];
+
+function readRichExtractedValue(value: unknown) {
+  if (!isRecord(value) || !("value" in value)) return value;
+  return value.value;
+}
+
+function readRichExtractedConfidence(value: unknown): PlanExtractConfidence | undefined {
+  if (!isRecord(value) || !isPlanExtractConfidence(value.confidence)) return undefined;
+  return value.confidence;
+}
+
+function readRichExtractedEvidence(value: unknown): string | undefined {
+  if (!isRecord(value) || typeof value.evidence !== "string" || !value.evidence.trim()) return undefined;
+  return value.evidence.trim();
+}
+
+function normalizeLegacyExtractedFieldValue(value: unknown, type: LegacyExtractedFieldType) {
+  const extractedValue = readRichExtractedValue(value);
+  if (type === "string") {
+    if (typeof extractedValue !== "string" || !extractedValue.trim()) return undefined;
+    return extractedValue.trim();
+  }
+
+  if (type === "construction-method") {
+    if (typeof extractedValue !== "string") return undefined;
+    const normalizedMethod = extractedValue.trim();
+    return planExtractConstructionMethodSchema.safeParse(normalizedMethod).success ? normalizedMethod : undefined;
+  }
+
+  if (typeof extractedValue !== "number" || !Number.isFinite(extractedValue)) return undefined;
+  if ((type === "positive-number" || type === "positive-integer") && extractedValue <= 0) return undefined;
+  if (type === "nonnegative-integer" && extractedValue < 0) return undefined;
+  if ((type === "positive-integer" || type === "nonnegative-integer") && !Number.isInteger(extractedValue)) return undefined;
+  return extractedValue;
+}
+
+function normalizeLegacyExtractedRichValues(normalized: Record<string, unknown>) {
+  const extracted = ensureNormalizedExtractedSection(normalized);
+
+  for (const [field, type] of Object.entries(legacyExtractedFieldTypes) as [LegacyExtractedField, LegacyExtractedFieldType][]) {
+    if (extracted[field] === undefined) continue;
+    const originalValue = extracted[field];
+    const normalizedValue = normalizeLegacyExtractedFieldValue(originalValue, type);
+    if (normalizedValue === undefined) {
+      delete extracted[field];
+      continue;
+    }
+
+    extracted[field] = normalizedValue;
+
+    const confidence = readRichExtractedConfidence(originalValue);
+    if (confidence) {
+      const fieldConfidence = ensureNormalizedFieldConfidence(normalized);
+      if (fieldConfidence[field] === undefined) fieldConfidence[field] = confidence;
+    }
+
+    const evidence = readRichExtractedEvidence(originalValue);
+    if (evidence) {
+      const fieldEvidence = ensureNormalizedFieldEvidence(normalized);
+      if (fieldEvidence[field] === undefined) fieldEvidence[field] = evidence;
+    }
+  }
+}
+
 function backfillExtractedFieldFromAdvancedSection(
   normalized: Record<string, unknown>,
   field: string,
@@ -739,6 +823,8 @@ function normalizePlanExtractResultJson(value: unknown) {
   const fieldEvidence = normalizeFieldEvidence(normalized.fieldEvidence);
   if (fieldEvidence) normalized.fieldEvidence = fieldEvidence;
   else delete normalized.fieldEvidence;
+
+  normalizeLegacyExtractedRichValues(normalized);
 
   for (const key of optionalObjectPlanExtractSections) {
     if (normalized[key] !== undefined && !isRecord(normalized[key])) delete normalized[key];
